@@ -17,7 +17,7 @@ from app.u_pack.u_coordinates import get_coordinates, calculate_osrm_route, get_
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
 
-from app.database.requests import set_user, get_users, set_username, set_user_email, set_user_phone, get_user_info
+from app.database.requests import user_data
 
 from datetime import datetime
 
@@ -60,7 +60,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
                                              reply_markup=reply_kb,
                                              disable_notification=True)
     await handler.handle_new_message(new_message, message)
-    await set_user(message.from_user.id)
+    await user_data.set_user(message.from_user.id)
 
 
 # registration
@@ -81,7 +81,7 @@ async def data_name_user(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
     name = message.text
-    await set_username(tg_id, name)
+    await user_data.set_username(tg_id, name)
     text = f"Спасибо {name}\nТеперь введите ваш email:"
     new_message = await message.answer(text, disable_notification=True)
     await handler.handle_new_message(new_message, message)
@@ -97,7 +97,7 @@ async def data_email_user(message: Message, state: FSMContext):
     email = message.text
 
     # Сохраняем email пользователя в БД
-    await set_user_email(tg_id, email)
+    await user_data.set_user_email(tg_id, email)
     reply_kb = await get_user_kb(text="phone_number")
     text = ("Последний шаг!\n\n"
             "Ваш номер телефона:")
@@ -115,8 +115,8 @@ async def data_phone_user(message: Message, state: FSMContext):
     phone = message.contact.phone_number
 
     # Сохраняем email пользователя в БД
-    await set_user_phone(tg_id, phone)
-    name, email, phone_number = await get_user_info(tg_id)
+    await user_data.set_user_phone(tg_id, phone)
+    name, email, phone_number = await user_data.get_user_info(tg_id)
     text = (f"Вы успешно зарегистрировались!\n\n"
             f"Имя: {name}\n"
             f"Почта: {email}\n"
@@ -153,7 +153,7 @@ async def cmd_p_customer(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
     photo_title = await get_image_title_user(message.text)
-    name, email, phone_number = await get_user_info(tg_id)
+    name, email, phone_number = await user_data.get_user_info(tg_id)
 
     text = (f"Имя: {name} \n"
             f"Почта: {email}\n"

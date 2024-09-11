@@ -29,11 +29,6 @@ utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0
 # Enums
 
 class Base(AsyncAttrs, DeclarativeBase):
-    # type_annotation_map = {
-    #     str_256: String(256)
-    #
-    # }
-
     repr_cols_num = 3
     repr_cols = tuple()
 
@@ -85,7 +80,7 @@ class OrderStatus(enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[intPK]
 
     user_tg_id: Mapped[int] = mapped_column(BigInteger)
     user_name: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -99,7 +94,7 @@ class User(Base):
 class Courier(Base):
     __tablename__ = "couriers"
 
-    courier_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    courier_id: Mapped[intPK]
 
     courier_tg_id: Mapped[int] = mapped_column(BigInteger)
     courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -114,7 +109,7 @@ class Courier(Base):
 class Order(Base):
     __tablename__ = "orders"
 
-    order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[intPK]
 
     order_status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
@@ -133,7 +128,7 @@ class Order(Base):
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
-    subscription_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[intPK]
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     subscription_cost: Mapped[float] = mapped_column(Float, nullable=False)
@@ -150,18 +145,19 @@ class DailyEvent(Base):
 
     # Основные поля
     daily_event_id: Mapped[intPK]
+
     event_date: Mapped[Date] = mapped_column(Date, primary_key=True, default=func.current_date(), nullable=False)
     total_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     canceled_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_users: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    new_couriers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_subscriptions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_order_revenue: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     fastest_order_time: Mapped[float] = mapped_column(Float, nullable=True)  # В секундах или минутах
     total_reviews: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     support_requests: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Поле для дополнительных комментариев или данных
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     def __repr__(self):

@@ -7,14 +7,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
-from app.c_pack.c_middlewares import OuterMiddleware,InnerMiddleware
+from app.c_pack.c_middlewares import OuterMiddleware, InnerMiddleware
 from app.c_pack.c_states import CourierState
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_courier
 from app.common.titles import get_image_title_courier
 from app.c_pack.c_kb import get_courier_kb
 
-from app.database.requests import set_user, get_users, set_username, set_user_email, set_user_phone, get_user_info
+from app.database.requests import courier_data
 
 from datetime import datetime
 
@@ -55,8 +55,7 @@ async def cmd_start_courier(message: Message, state: FSMContext) -> None:
                                              reply_markup=reply_kb,
                                              disable_notification=True)
     await handler.handle_new_message(new_message, message)
-    await set_user(message.from_user.id)
-    print(await get_users())
+    await courier_data.set_courier(message.from_user.id)
 
 
 # registration
@@ -77,7 +76,7 @@ async def data_name_user(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
     name = message.text
-    await set_username(tg_id, name)
+    await courier_data.set_courier_name(tg_id, name)
     text = f"Спасибо {name}\nТеперь введите ваш email:"
     new_message = await message.answer(text, disable_notification=True)
     await handler.handle_new_message(new_message, message)
@@ -93,7 +92,7 @@ async def data_email_user(message: Message, state: FSMContext):
     email = message.text
 
     # Сохраняем email пользователя в БД
-    await set_user_email(tg_id, email)
+    await courier_data.set_courier_email(tg_id, email)
     reply_kb = await get_courier_kb(text="phone_number")
     text = ("Последний шаг!\n\n"
             "Ваш номер телефона:")
@@ -111,8 +110,8 @@ async def data_phone_user(message: Message, state: FSMContext):
     phone = message.contact.phone_number
 
     # Сохраняем email пользователя в БД
-    await set_user_phone(tg_id, phone)
-    name, email, phone_number = await get_user_info(tg_id)
+    await courier_data.set_courier_phone(tg_id, phone)
+    name, email, phone_number = await courier_data.get_courier_info(tg_id)
     text = (f"Вы успешно зарегистрировались!\n\n"
             f"Имя: {name}\n"
             f"Почта: {email}\n"
