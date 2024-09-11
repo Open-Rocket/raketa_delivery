@@ -28,7 +28,7 @@ class OuterMiddleware(BaseMiddleware):
             message_text = event.text
 
             print("--------------------")
-            print("Users")
+            print("Couriers")
             print("Outer_mw")
             print(f"User message: {message_text}")
             print(f"User ID: {user_id}")
@@ -40,7 +40,7 @@ class OuterMiddleware(BaseMiddleware):
             callback_data = event.data
 
             print("--------------------")
-            print("Users")
+            print("Couriers")
             print("Outer_mw")
             print(f"Callback data: {callback_data}")
             print(f"User ID: {user_id}")
@@ -63,7 +63,7 @@ class InnerMiddleware(BaseMiddleware):
             message_text = event.text
 
             print("--------------------")
-            print("Users")
+            print("Couriers")
             print("Inner_mw")
             print(f"User message: {message_text}")
             print(f"User ID: {user_id}")
@@ -74,7 +74,7 @@ class InnerMiddleware(BaseMiddleware):
             callback_data = event.data
 
             print("--------------------")
-            print("Users")
+            print("Couriers")
             print("Inner_mw")
             print(f"Callback data: {callback_data}")
             print(f"User ID: {user_id}")

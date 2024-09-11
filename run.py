@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from app.u_pack.u_rout import users_router
 from app.c_pack.c_rout import couriers_router
 from app.admin_pack.admin_rout import admin_router
-from app.u_pack.u_fallback_rout import fallback_router
+from app.u_pack.u_fallback_rout import u_fallback_router
+from app.c_pack.c_fallback_rout import c_fallback_router
 from app.c_pack.c_test_payment import test_payment_router
 from app.database.models import async_main
 
@@ -21,8 +22,8 @@ async def main():
     u_dp = Dispatcher()
     c_dp = Dispatcher()
 
-    u_dp.include_routers(users_router, fallback_router)
-    c_dp.include_routers(couriers_router, test_payment_router)
+    u_dp.include_routers(users_router, u_fallback_router)
+    c_dp.include_routers(couriers_router, test_payment_router, c_fallback_router)
 
     u_dp.startup.register(on_startup)
     # await u_dp.start_polling(users_bot, skip_updates=True)

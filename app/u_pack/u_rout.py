@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
-from app.u_pack.u_middlewares import AdminPasswordAcception, InnerMiddleware
+from app.u_pack.u_middlewares import AdminPasswordAcception, InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
@@ -24,8 +24,8 @@ from datetime import datetime
 users_router = Router()
 admins_router_pass = Router()
 
-# users_router.message.outer_middleware(OuterMiddleware())
-# users_router.callback_query.outer_middleware(OuterMiddleware())
+users_router.message.outer_middleware(OuterMiddleware())
+users_router.callback_query.outer_middleware(OuterMiddleware())
 
 users_router.message.middleware(InnerMiddleware())
 users_router.callback_query.middleware(InnerMiddleware())
@@ -33,7 +33,7 @@ users_router.callback_query.middleware(InnerMiddleware())
 admins_router_pass.message.middleware(AdminPasswordAcception())
 
 
-# message
+# start
 
 
 @users_router.message(CommandStart())
@@ -44,7 +44,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
     text = ("Ракета — это новый, современный сервис доставки, созданный для вашего комфорта. "
             "Мы используем технологии искусственного интеллекта, "
             "чтобы обеспечить максимально удобное оформление и отслеживание заказов.\n\n"
-            "Почему стоит выбрать Ракету:\n\n"
+            "Почему стоит выбрать Нас?\n\n"
             "◉ Низкие цены:\n"
             "Самые низкие цены и полная свобода выбора! Вы всегда видите доступные заказы и выбираете тех курьеров, "
             "кто наиболее подходит вашим требованиям по времени и местоположению.\n\n"
@@ -63,6 +63,71 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
     await set_user(message.from_user.id)
 
 
+# registration
+
+@users_router.callback_query(F.data == "next")
+async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
+    handler = MessageHandler(state, callback_query.bot)
+    await state.set_state(UserState.state_Name)
+    text = "Пройдите небольшую регистрацию, это не займет много времени.\n\nКак вас зовут?"
+    new_message = await callback_query.message.answer(text, disable_notification=True)
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+@users_router.message(filters.StateFilter(UserState.state_Name))
+async def data_name_user(message: Message, state: FSMContext):
+    await state.set_state(UserState.state_email)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    tg_id = message.from_user.id
+    name = message.text
+    await set_username(tg_id, name)
+    text = f"Спасибо {name}\nТеперь введите ваш email:"
+    new_message = await message.answer(text, disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
+@users_router.message(filters.StateFilter(UserState.state_email))
+async def data_email_user(message: Message, state: FSMContext):
+    await state.set_state(UserState.state_Phone)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    email = message.text
+
+    # Сохраняем email пользователя в БД
+    await set_user_email(tg_id, email)
+    reply_kb = await get_user_kb(text="phone_number")
+    text = ("Последний шаг!\n\n"
+            "Ваш номер телефона:")
+    msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
+    await handler.handle_new_message(msg, message)
+
+
+@users_router.message(filters.StateFilter(UserState.state_Phone))
+async def data_phone_user(message: Message, state: FSMContext):
+    await state.set_state(UserState.zero)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    phone = message.contact.phone_number
+
+    # Сохраняем email пользователя в БД
+    await set_user_phone(tg_id, phone)
+    name, email, phone_number = await get_user_info(tg_id)
+    text = (f"Вы успешно зарегистрировались!\n\n"
+            f"Имя: {name}\n"
+            f"Почта: {email}\n"
+            f"Номер: {phone_number}\n\n▼ Выберите действие в меню")
+    msg = await message.answer(text, disable_notification=True)
+    await handler.handle_new_message(msg, message)
+
+
+# commands
+
+
 @users_router.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     await asyncio.sleep(0)
@@ -73,32 +138,6 @@ async def cmd_order(message: Message, state: FSMContext):
             "и наш ИИ ассистент быстро его обработает его и передаст курьеру.\n\n"
             "• При записи голосового сообщения или набора текста описывайте заказ так как вам удобно, "
             "ассистент создаст заявку для вашего заказа.")
-    reply_kb = await get_user_kb(message)
-    await asyncio.sleep(0)
-
-    new_message = await message.answer_photo(photo=photo_title, caption=text, reply_markup=reply_kb)
-    await handler.handle_new_message(new_message, message)
-
-
-@users_router.message(F.text == "/become_courier")
-async def cmd_become_courier(message: Message, state: FSMContext):
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    photo_title = await get_image_title_user("/become_courier")
-    reply_kb = await get_user_kb(message)
-    new_message = await message.answer_photo(photo=photo_title, reply_markup=reply_kb)
-
-    await handler.handle_new_message(new_message, message)
-
-
-@users_router.message(F.text == "/run")
-async def cmd_run(message: Message, state: FSMContext):
-    await state.set_state(UserState.run_state)
-    await asyncio.sleep(0)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    photo_title = await get_image_title_user(message.text)
-    text = ("Отправьте свою локацию 🧭")
     reply_kb = await get_user_kb(message)
     await asyncio.sleep(0)
 
@@ -141,21 +180,6 @@ async def cmd_ai(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.message(F.content_type == ContentType.LOCATION)
-async def get_location(message: Message, state: FSMContext):
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    caption_message = await message.answer("Мы ищем заказы поблизости 🔎\n\n")
-    # location_message = await message.answer_location(latitude=message.location.latitude,
-    #                                                  longitude=message.location.longitude,
-    #                                                  disable_notification=True)
-
-    # await handler.update_previous_message_ids(
-    #     [location_message.message_id, caption_message.message_id])
-    await handler.handle_new_message(caption_message, message)
-    await message.delete()
-
-
 @users_router.message(F.text == "/help")
 async def cmd_help(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
@@ -172,6 +196,20 @@ async def cmd_help(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+@users_router.message(F.text == "/become_courier")
+async def cmd_become_courier(message: Message, state: FSMContext):
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    photo_title = await get_image_title_user("/become_courier")
+    reply_kb = await get_user_kb(message)
+    new_message = await message.answer_photo(photo=photo_title, reply_markup=reply_kb)
+
+    await handler.handle_new_message(new_message, message)
+
+
+# callbacks
+
+
 @users_router.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.ai_voice_order)
@@ -181,66 +219,6 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     new_message = await callback_query.message.answer(text=f"{example_text}\n\nゞ Опишите ваш заказ ...",
                                                       disable_notification=True)
     await handler.handle_new_message(new_message, callback_query.message)
-
-
-@users_router.callback_query(F.data == "next")
-async def data_ok(callback_query: CallbackQuery, state: FSMContext):
-    handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.state_Name)
-    text = "Пройдите небольшую регистрацию, это не займет много времени.\n\nКак вас зовут?"
-    new_message = await callback_query.message.answer(text, disable_notification=True)
-    await handler.handle_new_message(new_message, callback_query.message)
-
-
-@users_router.message(filters.StateFilter(UserState.state_Name))
-async def data_name(message: Message, state: FSMContext):
-    await state.set_state(UserState.state_email)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    tg_id = message.from_user.id
-    name = message.text
-    await set_username(tg_id, name)
-    text = f"Спасибо {name}\nТеперь введите ваш email:"
-    new_message = await message.answer(text, disable_notification=True)
-    await handler.handle_new_message(new_message, message)
-
-
-@users_router.message(filters.StateFilter(UserState.state_email))
-async def data_email(message: Message, state: FSMContext):
-    await state.set_state(UserState.state_Phone)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
-    tg_id = message.from_user.id
-    email = message.text
-
-    # Сохраняем email пользователя в БД
-    await set_user_email(tg_id, email)
-    reply_kb = await get_user_kb(text="phone_number")
-    text = ("Последний шаг!\n\n"
-            "Ваш номер телефона:")
-    msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
-    await handler.handle_new_message(msg, message)
-
-
-@users_router.message(filters.StateFilter(UserState.state_Phone))
-async def data_phone(message: Message, state: FSMContext):
-    await state.set_state(UserState.zero)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
-    tg_id = message.from_user.id
-    phone = message.contact.phone_number
-
-    # Сохраняем email пользователя в БД
-    await set_user_phone(tg_id, phone)
-    name, email, phone_number = await get_user_info(tg_id)
-    text = (f"Вы успешно зарегистрировались!\n\n"
-            f"Имя: {name}\n"
-            f"Почта: {email}\n"
-            f"Номер: {phone_number}\n\n▼ Выберите действие в меню")
-    msg = await message.answer(text, disable_notification=True)
-    await handler.handle_new_message(msg, message)
 
 
 @users_router.callback_query(F.data == "make_order")
@@ -263,7 +241,7 @@ async def data_order(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# ai
+# ai_order
 
 @users_router.message(filters.StateFilter(UserState.ai_voice_order),
                       F.content_type.in_([ContentType.VOICE, ContentType.TEXT]))
@@ -345,5 +323,3 @@ async def process_message(message: Message, state: FSMContext):
     await wait_message.delete()
     await handler.handle_new_message(new_message, message)
     await state.set_state(UserState.order_state)
-
-# admin
