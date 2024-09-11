@@ -1,8 +1,8 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Annotated
-from sqlalchemy import ForeignKey, String, BigInteger, Enum, Boolean, DateTime, Text, Float, Date, func, MetaData, text, \
-    Table, JSON
+from sqlalchemy import (ForeignKey, String, BigInteger, Enum, Boolean, DateTime,
+                        Text, Float, Date, func, MetaData, text, Table, JSON, Interval)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, MappedColumn
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
@@ -27,7 +27,6 @@ utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0
 
 
 # Enums
-
 
 class Base(AsyncAttrs, DeclarativeBase):
     # type_annotation_map = {
@@ -75,79 +74,75 @@ class OrderStatus(enum.Enum):
     CANCELLED = "Отменено"
 
 
-class SubscriptionType(enum.Enum):
-    ONE_DAY = 1
-    TEN_DAYS = 10
-    ONE_MONTH = 30
+# class SubscriptionType(enum.Enum):
+#     ONE_DAY = 1
+#     TEN_DAYS = 10
+#     ONE_MONTH = 30
 
 
-# Таблицы
+# Tables
 
 class User(Base):
     __tablename__ = "users"
 
-    # Поля
-    user_id: Mapped[intPK]  # Основной ID пользователя
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     user_tg_id: Mapped[int] = mapped_column(BigInteger)
     user_name: Mapped[str] = mapped_column(String(100), nullable=True)
     user_email: Mapped[str] = mapped_column(String(255), nullable=True)
     user_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     user_registration_date: Mapped[datetime] = mapped_column(DateTime, default=utc_time)
 
-    user_orders: Mapped[int] = mapped_column(Integer, ForeignKey("orders.order_id"), ondelete="CASCADE")
+    orders = relationship("Order", back_populates="user")
 
 
 class Courier(Base):
     __tablename__ = "couriers"
 
-    # Поля
-    courier_id: Mapped[intPK]  # Основной ID пользователя
+    courier_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     courier_tg_id: Mapped[int] = mapped_column(BigInteger)
     courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
     courier_email: Mapped[str] = mapped_column(String(255), nullable=True)
     courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     courier_registration_date: Mapped[datetime] = mapped_column(DateTime, default=utc_time)
 
-    courier_orders: Mapped[int] = mapped_column(Integer, ForeignKey("orders.order_id"), ondelete="CASCADE")
+    orders = relationship("Order", back_populates="courier")
+    subscription = relationship("Subscription", back_populates="couriers")
 
 
 class Order(Base):
     __tablename__ = "orders"
 
     order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
     order_status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
+    distance: Mapped[float] = mapped_column(Float, nullable=True)
+    speed: Mapped[float] = mapped_column(Float, nullable=True)
 
     courier_id: Mapped[int] = mapped_column(Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"))
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"))
 
-    courier = relationship("Courier", back_populates="courier_orders")
-    user = relationship("User", back_populates="user_orders")
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
-
-    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    execution_time: Mapped[float] = mapped_column(Float, nullable=True)
+    courier = relationship("Courier", back_populates="orders")
+    user = relationship("User", back_populates="orders")
 
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
-    subscription_id: Mapped[intPK]
+    subscription_id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # Поле для типа подписки
-    subscription_type: Mapped[SubscriptionType] = mapped_column(Enum(SubscriptionType), nullable=False)
-
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    subscription_cost: Mapped[float] = mapped_column(Float, nullable=False)
     start_date: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=False)
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Стоимость подписки
-    subscription_cost: Mapped[float] = mapped_column(Float, nullable=False)
+    courier_id: Mapped[int] = mapped_column(Integer, ForeignKey("couriers.courier_id"), nullable=False)
 
-    # Связь с пользователем
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id"), nullable=False)
-
-    user = relationship("User", back_populates="subscriptions")
+    couriers = relationship("Courier", back_populates="subscription")
 
 
 class DailyEvent(Base):
