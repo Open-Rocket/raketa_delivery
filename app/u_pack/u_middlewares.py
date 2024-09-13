@@ -2,12 +2,16 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
 
-
 import os
 from dotenv import load_dotenv
 
+from app.u_pack.u_states import UserState
+
 load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
+
+
+class RegistrationMiddleware(BaseMiddleware): pass
 
 
 class OuterMiddleware(BaseMiddleware):
@@ -28,11 +32,36 @@ class OuterMiddleware(BaseMiddleware):
             message_text = event.text
 
             print("--------------------")
-            print("Users")
+            print("Users - 🧍")
             print("Outer_mw")
             print(f"User message: {message_text}")
             print(f"User ID: {user_id}")
             print(f"User state previous: {state}")
+
+            if state == UserState.regstate.state:
+                if message_text == "/start":
+                    return await handler(event, data)
+                else:
+                    await event.delete()
+                return
+
+            if state == UserState.set_Name.state:
+                if message_text.startswith("/"):
+                    if message_text in ["/order", "/profile", "/ai", "/rules", "/help", "/become_courier", "/start"]:
+                        await event.delete()
+                        return
+
+            if state == UserState.set_Phone.state:
+                if event.text:
+                    await event.delete()
+                    return
+                elif event.content_type == "contact":
+                    return await handler(event, data)
+                else:
+                    await event.delete()
+                return
+
+
 
         # Обработка callback-запроса
         elif isinstance(event, CallbackQuery):
@@ -40,7 +69,7 @@ class OuterMiddleware(BaseMiddleware):
             callback_data = event.data
 
             print("--------------------")
-            print("Users")
+            print("Users - 🧍")
             print("Outer_mw")
             print(f"Callback data: {callback_data}")
             print(f"User ID: {user_id}")
@@ -63,7 +92,7 @@ class InnerMiddleware(BaseMiddleware):
             message_text = event.text
 
             print("--------------------")
-            print("Users")
+            print("Users - 🧍")
             print("Inner_mw")
             print(f"User message: {message_text}")
             print(f"User ID: {user_id}")
@@ -74,7 +103,7 @@ class InnerMiddleware(BaseMiddleware):
             callback_data = event.data
 
             print("--------------------")
-            print("Users")
+            print("Users - 🧍")
             print("Inner_mw")
             print(f"Callback data: {callback_data}")
             print(f"User ID: {user_id}")

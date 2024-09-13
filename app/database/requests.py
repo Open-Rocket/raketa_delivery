@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database.models import async_session_factory, moscow_time, Order
-from app.database.models import User, Courier
+from app.database.models import async_session_factory, moscow_time, Order, utc_time
+from app.database.models import User, Courier, OrderStatus
 from sqlalchemy import select, update, delete, desc
 import json
 
@@ -17,18 +17,11 @@ class UserData:
                 session.add(new_user)
                 await session.commit()
 
-    async def set_username(self, tg_id: int, name: str):
+    async def set_user_name(self, tg_id: int, name: str):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
                 user.user_name = name
-                await session.commit()
-
-    async def set_user_email(self, tg_id: int, email: str):
-        async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
-                user.user_email = email
                 await session.commit()
 
     async def set_user_phone(self, tg_id: int, phone: str):
@@ -42,8 +35,8 @@ class UserData:
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
-                return (user.user_name or "...", user.user_email or "...", user.user_phone_number or "...")
-            return ("...", "...", "...")
+                return (user.user_name or "...", user.user_phone_number or "...")
+            return ("...", "...")
 
 
 class CourierData:
@@ -84,8 +77,80 @@ class CourierData:
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
             if courier:
                 return (
-                courier.courier_name or "...", courier.courier_email or "...", courier.courier_phone_number or "...")
+                    courier.courier_name or "...", courier.courier_email or "...",
+                    courier.courier_phone_number or "...")
             return ("...", "...", "...")
+
+
+class OrderData:
+    def __init__(self, async_session_factory):
+        self.async_session_factory = async_session_factory
+
+    async def create_order(self, user_tg_id: int, order_description: str):
+        async with self.async_session_factory() as session:  # Открываем асинхронный сеанс
+            async with session.begin():  # Начинаем транзакцию
+                # Ищем пользователя по tg_id
+                user = await session.scalar(select(User).where(User.user_tg_id == user_tg_id))
+                if not user:
+                    raise ValueError("Пользователь не найден")
+
+                # Создаем новый заказ без курьера
+                new_order = Order(user_id=user.user_id, order_description=order_description)
+                session.add(new_order)
+
+            # Коммитим изменения (также можно использовать `session.commit()` внутри `session.begin()`)
+            await session.commit()
+            # return new_order.order_id
+
+    async def assign_courier_to_order(self, order_id: int, courier_tg_id: int):
+        async with self.async_session_factory() as session:
+            # Ищем курьера по tg_id
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == courier_tg_id))
+            if not courier:
+                raise ValueError("Курьер не найден")
+
+            # Ищем заказ и обновляем его
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            if not order:
+                raise ValueError("Заказ не найден")
+
+            order.courier_id = courier.courier_id
+            await session.commit()
+
+    async def update_order_status(self, order_id: int, new_status: OrderStatus):
+        async with self.async_session_factory() as session:
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            if order:
+                order.order_status = new_status
+                if new_status == OrderStatus.COMPLETED:
+                    order.completed_at = utc_time()
+                await session.commit()
+
+    async def get_order_info(self, order_id: int):
+        async with self.async_session_factory() as session:
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            if order:
+                return {
+                    "order_id": order.order_id,
+                    "status": order.order_status,
+                    "created_at": order.created_at,
+                    "completed_at": order.completed_at,
+                    "courier_id": order.courier_id,
+                    "user_id": order.user_id
+                }
+            return None
+
+    async def assign_courier(self, order_id: int, courier_id: int):
+        async with self.async_session_factory() as session:
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            if order:
+                order.courier_id = courier_id
+                await session.commit()
+
+    async def get_pending_orders(self):
+        async with self.async_session_factory() as session:
+            result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
+            return result.all()
 
 
 # async def get_users():
@@ -112,3 +177,4 @@ async def complete_order(order_id: int, session: AsyncSession):
 
 user_data = UserData(async_session_factory)
 courier_data = CourierData(async_session_factory)
+order_data = OrderData(async_session_factory)

@@ -21,20 +21,22 @@ async def get_gpt_text(req, model="gpt-3.5-turbo"):
     return completion.choices[0].message.content
 
 
-async def process_order_text(order_text=None, distance=None, duration=None, price=None):
+async def process_order_text(order_text=None, distance=None, duration=None, price=None, sender_info=None):
+    sender_name, sender_phone = sender_info
     prompt = (
         f"Пожалуйста, извлеките и структурируйте следующую информацию о заказе :{order_text}\n"
         f"(cам Текст в заказ не отправлять), (не дописывай от себя пункты, структура заказа строгая):\n"
         f"Пункт A: г.[Cyty],[Starting point]\n"
         f"Пункт B: г.[Cyty],[Destination point]\n"
         f"Пункт C: г.[Cyty],[Destination point] - Отображать если есть\n\n"
-        f"Дополнительные сведения о заказе: [Order details]\n\n"
+        f"Пункт D: г.[Cyty],[Destination point] - Отображать если есть\n\n"
         f"Оплатит получатель: [Да/Нет/Нет информации]\n"
         f"Предмет доставки: [Delivery object]\n\n"
-        f"Имя отправителя: [Sender name]\n"
-        f"Номер отправителя: [Sender phone]\n"
+        f"Имя отправителя: [{sender_name}]\n"
+        f"Номер отправителя: [{sender_phone}]\n"
         f"Имя получателя: [Receiver name]\n"
         f"Номер получателя: [Receiver phone]\n\n"
+        f"Дополнительные сведения о заказе: [Order details]\n\n"
         f"Комментарий курьеру: [Comments]\n\n"
         f"Расстояние: [{distance} км]\n"
         f"Время: [{duration}]\n\n"

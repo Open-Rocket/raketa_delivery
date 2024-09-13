@@ -31,7 +31,7 @@ async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latit
 
     response = requests.get(url)
     data = response.json()
-    time_coefficient = 1.5
+    time_coefficient = 1.6
 
     if response.status_code == 200:
         if data['routes']:
@@ -46,18 +46,12 @@ async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latit
         return None, None
 
 
-async def get_price(distance, order_time, city="москва"):
-    base_price_per_km = 35  # Базовая цена за километр
+async def get_price(distance, order_time, city=None):
+    city = city
+    base_price_per_km = 38  # Базовая цена за километр
 
-    # Коэффициенты для города
-    city_coefficients = {
-        "москва": 1,
-        "санкт-петербург": 0.9,
-        "новосибирск": 0.8,
-        "екатеринбург": 0.85,
-        # Добавь другие города с их коэффициентами
-    }
-    city_coefficient = city_coefficients.get(city, 1)  # По умолчанию 1, если город не найден
+    # Устанавливаем универсальный коэффициент для всех городов
+    city_coefficient = 1.0
 
     # Коэффициент на основе времени заказа
     if 0 <= order_time.hour < 6:

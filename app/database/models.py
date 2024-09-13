@@ -1,9 +1,9 @@
 import os
 from datetime import datetime, timedelta
-from typing import Optional, Annotated
+from typing import Optional, Annotated, List
 from sqlalchemy import (ForeignKey, String, BigInteger, Enum, Boolean, DateTime,
                         Text, Float, Date, func, MetaData, text, Table, JSON, Interval)
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, MappedColumn
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy import Column, Integer
@@ -16,6 +16,7 @@ from app.database.config_db import settings
 load_dotenv()
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
+textData = Annotated[str, mapped_column(Text, nullable=True)]
 str_256 = Annotated[str, 256]
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
@@ -84,7 +85,7 @@ class User(Base):
 
     user_tg_id: Mapped[int] = mapped_column(BigInteger)
     user_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    user_email: Mapped[str] = mapped_column(String(255), nullable=True)
+    # user_email: Mapped[str] = mapped_column(String(255), nullable=True)
     user_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     user_registration_date: Mapped[datetime] = mapped_column(DateTime, default=utc_time)
 
@@ -95,13 +96,12 @@ class Courier(Base):
     __tablename__ = "couriers"
 
     courier_id: Mapped[intPK]
+    courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
 
     courier_tg_id: Mapped[int] = mapped_column(BigInteger)
     courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
     courier_email: Mapped[str] = mapped_column(String(255), nullable=True)
     courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
-    courier_registration_date: Mapped[datetime] = mapped_column(DateTime, default=utc_time)
-
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
 
@@ -111,6 +111,7 @@ class Order(Base):
 
     order_id: Mapped[intPK]
 
+    order_description: Mapped[textData]
     order_status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
@@ -118,8 +119,10 @@ class Order(Base):
     distance: Mapped[float] = mapped_column(Float, nullable=True)
     speed: Mapped[float] = mapped_column(Float, nullable=True)
 
-    courier_id: Mapped[int] = mapped_column(Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"))
+    courier_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"),
+                                                      nullable=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"),
+                                                   nullable=True)
 
     courier = relationship("Courier", back_populates="orders")
     user = relationship("User", back_populates="orders")

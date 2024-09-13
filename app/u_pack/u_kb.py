@@ -12,25 +12,24 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         ]),
         "phone_number": ReplyKeyboardMarkup(keyboard=[
             [KeyboardButton(text="Поделиться номером", request_contact=True)],
-        ], resize_keyboard=True, one_time_keyboard=False),
+        ], resize_keyboard=True, one_time_keyboard=False, input_field_placeholder="***********"),
         "/ai": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Поддержка", callback_data="support")],
             [InlineKeyboardButton(text="Задать вопрос", callback_data="ask_question")],
             [InlineKeyboardButton(text="Отзывы и предложения", callback_data="reviews")]
         ]),
         "next_kb": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Дальше", callback_data="next")]
+            [InlineKeyboardButton(text="Регистрация", callback_data="reg", )],
         ]),
         "/profile": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
             [InlineKeyboardButton(text="Телефон", callback_data="set_my_phone")],
-            [InlineKeyboardButton(text="Почта", callback_data="set_my_email")],
             [InlineKeyboardButton(text="Мои заказы", callback_data="my_orders")]
         ]),
         "voice_order_accept": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Отмена", callback_data="voice_order_stop"),
              InlineKeyboardButton(text="Перезаписать", callback_data="ai_order")],
-            [InlineKeyboardButton(text="Разместить заказ", callback_data="voice_order_sent")]
+            [InlineKeyboardButton(text="Разместить заказ", callback_data="order_sent")]
 
         ]),
         "/become_courier": InlineKeyboardMarkup(inline_keyboard=[
