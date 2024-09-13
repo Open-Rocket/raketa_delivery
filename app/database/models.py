@@ -17,6 +17,7 @@ load_dotenv()
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
+stringData = Annotated[str, mapped_column(String(256), nullable=True)]
 str_256 = Annotated[str, 256]
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
@@ -111,18 +112,34 @@ class Order(Base):
 
     order_id: Mapped[intPK]
 
-    order_description: Mapped[textData]
     order_status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer,
+                                                   ForeignKey("users.user_id", ondelete="CASCADE"),
+                                                   nullable=True)
+    courier_id: Mapped[Optional[int]] = mapped_column(Integer,
+                                                      ForeignKey("couriers.courier_id", ondelete="CASCADE"),
+                                                      nullable=True)
+
+    order_city: Mapped[stringData]
+    starting_point_a: Mapped[textData]
+    destination_point_b: Mapped[textData]
+    destination_point_c: Mapped[textData]
+    destination_point_d: Mapped[textData]
+    payer: Mapped[stringData]
+    delivery_object: Mapped[stringData]
+    sender_name: Mapped[stringData]
+    sender_phone: Mapped[stringData]
+    receiver_name: Mapped[stringData]
+    receiver_phone: Mapped[stringData]
+    order_details: Mapped[textData]
+    comments: Mapped[textData]
+    distance: Mapped[stringData]
+    duration: Mapped[stringData]
+    price: Mapped[stringData]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
     execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
-    distance: Mapped[float] = mapped_column(Float, nullable=True)
-    speed: Mapped[float] = mapped_column(Float, nullable=True)
-
-    courier_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"),
-                                                      nullable=True)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"),
-                                                   nullable=True)
 
     courier = relationship("Courier", back_populates="orders")
     user = relationship("User", back_populates="orders")

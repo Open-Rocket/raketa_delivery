@@ -11,7 +11,7 @@ from app.u_pack.u_middlewares import AdminPasswordAcception, InnerMiddleware, Ou
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
-from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, get_city
+from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses
 from app.u_pack.u_coordinates import get_coordinates, calculate_osrm_route, get_price
 
 from app.common.message_handler import MessageHandler
@@ -215,16 +215,109 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 # ai_order
 
 
-@users_router.message(filters.StateFilter(UserState.ai_voice_order),
-                      F.content_type.in_([ContentType.VOICE, ContentType.TEXT]))
+# @users_router.message(filters.StateFilter(UserState.ai_voice_order),
+#                       F.content_type.in_([ContentType.VOICE, ContentType.TEXT]))
+# async def process_message(message: Message, state: FSMContext):
+#     wait_message = await message.answer("Сообщение обрабатывается, подождите немного ...")
+#     handler = MessageHandler(state, message.bot)
+#     await handler.delete_previous_message(message.chat.id)
+#     reply_kb = await get_user_kb(text="voice_order_accept")
+#     new_message = "Заказ не было обработан ..."
+#     order_time = datetime.now().replace(microsecond=0)
+#
+#     if message.content_type == ContentType.VOICE:
+#         voice = message.voice
+#         file_info = await message.bot.get_file(voice.file_id)
+#         file = await message.bot.download_file(file_info.file_path)
+#         audio_data = file.read()
+#         recognized_text = await process_audio_data(audio_data)
+#     else:
+#         recognized_text = message.text
+#
+#     if not recognized_text:
+#         recognized_text = "Ошибка распознавания. Попробуйте снова."
+#         structured_text = recognized_text
+#     else:
+#         # Отправляем текст в OpenAI для обработки
+#         addresses = await get_parsed_addresses(recognized_text)
+#
+#         # Проверяем, что ИИ вернул два адреса
+#         if len(addresses) == 2:
+#             pickup_address, delivery_address = addresses
+#
+#             # Получаем координаты для адресов
+#             pickup_latitude, pickup_longitude = await get_coordinates(pickup_address)
+#             delivery_latitude, delivery_longitude = await get_coordinates(delivery_address)
+#
+#             if pickup_latitude and pickup_longitude and delivery_latitude and delivery_longitude:
+#                 yandex_maps_url = (
+#                     f"https://yandex.ru/maps/?rtext={pickup_latitude},{pickup_longitude}~{delivery_latitude},{delivery_longitude}&rtt=auto")
+#                 pickup_point = (
+#                     f"https://yandex.ru/maps/?ll={pickup_longitude},{pickup_latitude}&pt={pickup_longitude},{pickup_latitude}&z=14")
+#                 delivery_point = (
+#                     f"https://yandex.ru/maps/?ll={delivery_longitude},{delivery_latitude}&pt={delivery_longitude},{delivery_latitude}&z=14")
+#                 distance, duration = await calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latitude,
+#                                                                 delivery_longitude)
+#
+#                 tg_id = message.from_user.id
+#                 sender_info = await user_data.get_user_info(tg_id)
+#
+#                 duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут."
+#                 city_order = await get_city(recognized_text)
+#                 price = await get_price(distance, order_time, city_order)
+#                 structured_text = await process_order_text(recognized_text, distance, duration_text, price, sender_info)
+#
+#                 new_message = await message.answer(
+#                     text=(f"Ваш заказ ✍︎\n"
+#                           f"---------------------------------------------\n"
+#                           f"Дата/Время: {order_time}\n\n"
+#                           f"{structured_text}\n"
+#                           f"---------------------------------------------\n\n"
+#                           f"* Проверьте ваш заказ и если все верно, то разместите. "
+#                           f"Подождите немного пока найдется свободный курьер и откликнется на него.\n\n"
+#                           f"* Курьер может связатсья с вами для уточнения деталей!\n\n"
+#                           f"Вот ссылка на маршрут в Яндекс.Картах:\n{yandex_maps_url}\n\n"
+#                           f"Откуда забрать:\n{pickup_point}\n\n"
+#                           f"Куда отвезти:\n{delivery_point}\n\n"),
+#                     reply_markup=reply_kb, disable_notification=True
+#                 )
+#             else:
+#                 new_message = await message.answer(
+#                     text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
+#                          f"Проверьте ваш заказ и если все верно, то разместите его "
+#                          f"и ждите ответа от курьера.",
+#                     reply_markup=reply_kb, disable_notification=True
+#                 )
+#         else:
+#             new_message = await message.answer(
+#                 text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
+#                      f"Проверьте ваш заказ и если все верно, то разместите его "
+#                      f"и ждите ответа от курьера.",
+#                 reply_markup=reply_kb, disable_notification=True
+#             )
+#
+#     await wait_message.delete()
+#     await handler.handle_new_message(new_message, message)
+#     await state.set_state(UserState.waiting_Courier)
+
+
+# ai order
+@users_router.message(
+    filters.StateFilter(UserState.ai_voice_order),
+    F.content_type.in_([ContentType.VOICE, ContentType.TEXT])
+)
 async def process_message(message: Message, state: FSMContext):
+    await state.set_state(UserState.waiting_Courier)
     wait_message = await message.answer("Сообщение обрабатывается, подождите немного ...")
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
-    reply_kb = await get_user_kb(text="voice_order_accept")
-    new_message = "Заказ не было обработан ..."
-    order_time = datetime.now().replace(microsecond=0)
 
+    # Инициализация переменных
+    reply_kb = await get_user_kb(text="voice_order_accept")
+    order_time = datetime.now().replace(microsecond=0)
+    recognized_text = None
+
+    # Обработка сообщения в зависимости от типа контента
     if message.content_type == ContentType.VOICE:
         voice = message.voice
         file_info = await message.bot.get_file(voice.file_id)
@@ -234,73 +327,129 @@ async def process_message(message: Message, state: FSMContext):
     else:
         recognized_text = message.text
 
+    # Если распознавание не удалось
     if not recognized_text:
         recognized_text = "Ошибка распознавания. Попробуйте снова."
-        structured_text = recognized_text
-    else:
-        # Отправляем текст в OpenAI для обработки
-        addresses = await get_parsed_addresses(recognized_text)
+        new_message = await message.answer(recognized_text, reply_markup=reply_kb)
+        await wait_message.delete()
+        await handler.handle_new_message(new_message, message)
+        return
 
-        # Проверяем, что ИИ вернул два адреса
-        if len(addresses) == 2:
-            pickup_address, delivery_address = addresses
+    # Обработка текста через ИИ
+    addresses = await get_parsed_addresses(recognized_text)
+    if len(addresses) == 2:
+        pickup_address, delivery_address = addresses
+        # Получаем координаты для адресов
+        pickup_coords = await get_coordinates(pickup_address)
+        delivery_coords = await get_coordinates(delivery_address)
 
-            # Получаем координаты для адресов
-            pickup_latitude, pickup_longitude = await get_coordinates(pickup_address)
-            delivery_latitude, delivery_longitude = await get_coordinates(delivery_address)
-
-            if pickup_latitude and pickup_longitude and delivery_latitude and delivery_longitude:
-                yandex_maps_url = (
-                    f"https://yandex.ru/maps/?rtext={pickup_latitude},{pickup_longitude}~{delivery_latitude},{delivery_longitude}&rtt=auto")
-                pickup_point = (
-                    f"https://yandex.ru/maps/?ll={pickup_longitude},{pickup_latitude}&pt={pickup_longitude},{pickup_latitude}&z=14")
-                delivery_point = (
-                    f"https://yandex.ru/maps/?ll={delivery_longitude},{delivery_latitude}&pt={delivery_longitude},{delivery_latitude}&z=14")
-                distance, duration = await calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latitude,
-                                                                delivery_longitude)
-
-                tg_id = message.from_user.id
-                sender_info = await user_data.get_user_info(tg_id)
-
-                duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут."
-                city_order = await get_city(recognized_text)
-                price = await get_price(distance, order_time, city_order)
-                structured_text = await process_order_text(recognized_text, distance, duration_text, price, sender_info)
-
-                new_message = await message.answer(
-                    text=(f"Ваш заказ ✍︎\n"
-                          f"---------------------------------------------\n"
-                          f"Дата/Время: {order_time}\n\n"
-                          f"{structured_text}\n"
-                          f"---------------------------------------------\n\n"
-                          f"* Проверьте ваш заказ и если все верно, то разместите. "
-                          f"Подождите немного пока найдется свободный курьер и откликнется на него.\n\n"
-                          f"* Курьер может связатсья с вами для уточнения деталей!\n\n"
-                          f"Вот ссылка на маршрут в Яндекс.Картах:\n{yandex_maps_url}\n\n"
-                          f"Откуда забрать:\n{pickup_point}\n\n"
-                          f"Куда отвезти:\n{delivery_point}\n\n"),
-                    reply_markup=reply_kb, disable_notification=True
-                )
-            else:
-                new_message = await message.answer(
-                    text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
-                         f"Проверьте ваш заказ и если все верно, то разместите его "
-                         f"и ждите ответа от курьера.",
-                    reply_markup=reply_kb, disable_notification=True
-                )
-        else:
-            new_message = await message.answer(
-                text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
-                     f"Проверьте ваш заказ и если все верно, то разместите его "
-                     f"и ждите ответа от курьера.",
-                reply_markup=reply_kb, disable_notification=True
+        if all(pickup_coords) and all(delivery_coords):
+            # Формируем маршрут и другие данные
+            yandex_maps_url = (
+                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
+                f"~{delivery_coords[0]},{delivery_coords[1]}&rtt=auto"
+            )
+            pickup_point = (
+                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+            )
+            delivery_point = (
+                f"https://yandex.ru/maps/?ll={delivery_coords[1]},{delivery_coords[0]}"
+                f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
             )
 
+            # Расчет расстояния и времени
+            tg_id = message.from_user.id
+            distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
+            distance_text = f"{distance} км"
+            duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+            # city_order = await get_city(recognized_text)
+            sender_name, sender_phone = await user_data.get_user_info(tg_id)
+
+            # Структурирование данных заказа
+            structured_data = await process_order_text(recognized_text)
+
+            # Декомпозиция данных
+            city = structured_data.get('City')
+            starting_point_a = structured_data.get('Starting point A')
+            destination_point_b = structured_data.get('Destination point B')
+            destination_point_c = structured_data.get('Destination point C')
+            destination_point_d = structured_data.get('Destination point D')
+            payer = structured_data.get('Payer')
+            delivery_object = structured_data.get('Delivery object')
+            receiver_name = structured_data.get('Receiver name')
+            receiver_phone = structured_data.get('Receiver phone')
+            order_details = structured_data.get('Order details', None)
+            comments = structured_data.get('Comments', None)
+            price = await get_price(distance, order_time)
+            price_text = f"{int(price)}₽"
+
+            await state.update_data(
+                city=city,
+                destination_point_a=starting_point_a,
+                destination_point_b=destination_point_b,
+                destination_point_c=destination_point_c,
+                destination_point_d=destination_point_d,
+                payer=payer,
+                delivery_object=delivery_object,
+                sender_name=sender_name,
+                sender_phone=sender_phone,
+                receiver_name=receiver_name,
+                receiver_phone=receiver_phone,
+                order_details=order_details,
+                comments=comments,
+                distance=distance_text,
+                duration=duration_text,
+                price=price_text,
+                order_time=order_time,
+                yandex_maps_url=yandex_maps_url,
+                pickup_point=pickup_point,
+                delivery_point=delivery_point
+            )
+
+            order_forma = (
+                f"Оформлен: {order_time}\n"
+                f"Ваш заказ ✍︎\n"
+                f"---------------------------------------------\n"
+                f"Город: {city}\n"
+                f"Адрес 1: {starting_point_a}\n"
+                f"Адрес 2: {destination_point_b}\n\n"
+                f"Предмет доставки: {delivery_object}\n"
+                f"Детали доставки: {order_details}\n\n"
+                f"Имя отправителя: {sender_name}\n"
+                f"Номер отправителя: {sender_phone}\n\n"
+                f"Имя получателя: {receiver_name}\n"
+                f"Номер получателя: {receiver_phone}\n\n"
+                f"Оплатит: {payer}\n"
+                f"Комментарии курьеру: {comments}\n\n"
+                f"Расстояние: {distance_text}\n"
+                f"Примерное время доставки: {duration_text}\n\n"
+                f"Оплата: {price_text}\n"
+                f"---------------------------------------------\n\n"
+                f"* Проверьте ваш заказ и если все верно, то разместите. "
+                f"Подождите немного, пока найдется свободный курьер.\n\n"
+                f"* Курьер может связаться с вами для уточнения деталей!\n\n"
+                f"Ссылка на маршрут в Яндекс.Картах:\n{yandex_maps_url}\n\n"
+                f"Откуда забрать:\n{pickup_point}\n\n"
+                f"Куда отвезти:\n{delivery_point}\n\n"
+            )
+
+            # Отправка итогового сообщения
+            new_message = await message.answer(text=order_forma, reply_markup=reply_kb, disable_notification=True)
+        else:
+            new_message = await message.answer(
+                text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
+                reply_markup=reply_kb, disable_notification=True
+            )
+    else:
+        new_message = await message.answer(
+            text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
+            reply_markup=reply_kb, disable_notification=True
+        )
+
+    # Завершение обработки
     await wait_message.delete()
     await handler.handle_new_message(new_message, message)
-    await state.set_state(UserState.waiting_Courier)
-    await state.update_data(order_message=message.text)
-
 
 
 @users_router.callback_query(F.data == "order_sent")
@@ -308,22 +457,19 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние
     await state.set_state(UserState.waiting_Courier)
 
-
     # Создаем обработчик сообщений
     handler = MessageHandler(state, callback_query.bot)
 
     # Получаем ID пользователя
     tg_id = callback_query.from_user.id
-    order_description = await state.get_data()
-
+    data = await state.get_data()
 
     try:
         # Асинхронно создаем заказ
-        await order_data.create_order(tg_id, order_description)
+        await order_data.create_order(tg_id, data)
     except Exception as e:
         # Обработка возможных ошибок
-        await callback_query.message.answer(f"Ошибка при создании заказа: {str(e)}")
-        return
+        print(f"Ошибка при создании заказа: {str(e)}")
 
     # Отправляем уведомление пользователю
     text = "Заказ создан!\nИщем курьера 🔎"

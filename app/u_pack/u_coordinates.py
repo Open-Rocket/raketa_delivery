@@ -46,7 +46,7 @@ async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latit
         return None, None
 
 
-async def get_price(distance, order_time, city=None):
+async def get_price(distance, order_time, city=None) -> str:
     city = city
     base_price_per_km = 38  # Базовая цена за километр
 

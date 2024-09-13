@@ -86,7 +86,7 @@ class OrderData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def create_order(self, user_tg_id: int, order_description: str):
+    async def create_order(self, user_tg_id: int, data: dict):
         async with self.async_session_factory() as session:  # Открываем асинхронный сеанс
             async with session.begin():  # Начинаем транзакцию
                 # Ищем пользователя по tg_id
@@ -94,13 +94,33 @@ class OrderData:
                 if not user:
                     raise ValueError("Пользователь не найден")
 
-                # Создаем новый заказ без курьера
-                new_order = Order(user_id=user.user_id, order_description=order_description)
+                # Создаем новый заказ на основе данных из состояния FSM
+                new_order = Order(
+                    user_id=user.user_id,
+                    order_city=data.get('city'),
+                    starting_point_a=data.get('destination_point_a'),
+                    destination_point_b=data.get('destination_point_b'),
+                    destination_point_c=data.get('destination_point_c'),
+                    destination_point_d=data.get('destination_point_d'),
+                    payer=data.get('payer'),
+                    delivery_object=data.get('delivery_object'),
+                    sender_name=data.get('sender_name'),
+                    sender_phone=data.get('sender_phone'),
+                    receiver_name=data.get('receiver_name'),
+                    receiver_phone=data.get('receiver_phone'),
+                    order_details=data.get('order_details'),
+                    comments=data.get('comments'),
+                    distance=data.get('distance'),
+                    duration=data.get('duration'),
+                    price=data.get('price'),
+                    created_at=data.get('order_time')
+                )
+
+                # Добавляем новый заказ в сессию
                 session.add(new_order)
 
-            # Коммитим изменения (также можно использовать `session.commit()` внутри `session.begin()`)
+            # Коммитим изменения
             await session.commit()
-            # return new_order.order_id
 
     async def assign_courier_to_order(self, order_id: int, courier_tg_id: int):
         async with self.async_session_factory() as session:
@@ -125,20 +145,6 @@ class OrderData:
                 if new_status == OrderStatus.COMPLETED:
                     order.completed_at = utc_time()
                 await session.commit()
-
-    async def get_order_info(self, order_id: int):
-        async with self.async_session_factory() as session:
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
-            if order:
-                return {
-                    "order_id": order.order_id,
-                    "status": order.order_status,
-                    "created_at": order.created_at,
-                    "completed_at": order.completed_at,
-                    "courier_id": order.courier_id,
-                    "user_id": order.user_id
-                }
-            return None
 
     async def assign_courier(self, order_id: int, courier_id: int):
         async with self.async_session_factory() as session:
