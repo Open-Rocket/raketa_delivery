@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import async_session_factory, moscow_time, Order, utc_time
 from app.database.models import User, Courier, OrderStatus
 from sqlalchemy import select, update, delete, desc
+from sqlalchemy import select, and_
+
 import json
 
 
@@ -37,6 +39,15 @@ class UserData:
             if user:
                 return (user.user_name or "...", user.user_phone_number or "...")
             return ("...", "...")
+
+    async def get_username_userphone(self, tg_id: int):
+        async with self.async_session_factory() as session:
+            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
+
+            if user:
+                return user.user_name, user.user_phone_number
+            else:
+                return None, None
 
 
 class CourierData:
@@ -99,7 +110,15 @@ class OrderData:
                     user_id=user.user_id,
                     order_city=data.get('city'),
                     starting_point_a=data.get('destination_point_a'),
+                    a_coordinates=data.get('a_coordinates'),
+                    a_latitude=data.get("a_latitude"),
+                    a_longitude=data.get("a_longitude"),
+                    a_url=data.get("a_url"),
                     destination_point_b=data.get('destination_point_b'),
+                    b_coordinates=data.get('b_coordinates'),
+                    b_latitude=data.get("b_latitude"),
+                    b_longitude=data.get("b_longitude"),
+                    b_url=data.get("b_url"),
                     destination_point_c=data.get('destination_point_c'),
                     destination_point_d=data.get('destination_point_d'),
                     payer=data.get('payer'),
@@ -110,9 +129,9 @@ class OrderData:
                     receiver_phone=data.get('receiver_phone'),
                     order_details=data.get('order_details'),
                     comments=data.get('comments'),
-                    distance=data.get('distance'),
-                    duration=data.get('duration'),
-                    price=data.get('price'),
+                    distance_km=data.get('distance_km'),
+                    duration_min=data.get('duration_min'),
+                    price_rub=data.get('price_rub'),
                     created_at=data.get('order_time')
                 )
 
@@ -157,6 +176,33 @@ class OrderData:
         async with self.async_session_factory() as session:
             result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
             return result.all()
+
+    async def get_available_orders(courier_tg_id: int, courier_lat: float, courier_lon: float, radius_km: float):
+        async with async_session_factory() as session:
+            # Находим курьера по его tg_id
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == courier_tg_id))
+            if not courier:
+                raise ValueError("Курьер не найден")
+
+            # Запрашиваем заказы со статусом PENDING и проверяем, что курьер не является создателем заказа
+            orders_query = await session.execute(
+                select(Order)
+                .where(and_(
+                    Order.order_status == OrderStatus.PENDING,
+                    Order.user_id != courier.courier_id  # Проверяем, что курьер не является создателем заказа
+                ))
+            )
+            orders = orders_query.scalars().all()
+
+            available_orders = []
+
+            # Проверяем расстояние каждого заказа от курьера
+            for order in orders:
+                distance = calculate_distance(order.lat, order.lon, courier_lat, courier_lon)
+                if distance <= radius_km:
+                    available_orders.append(order)
+
+            return available_orders
 
 
 # async def get_users():

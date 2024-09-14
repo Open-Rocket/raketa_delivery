@@ -12,7 +12,7 @@ from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
 from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses
-from app.u_pack.u_coordinates import get_coordinates, calculate_osrm_route, get_price
+from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
 
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
@@ -39,30 +39,41 @@ admins_router_pass.message.middleware(AdminPasswordAcception())
 @users_router.message(CommandStart())
 async def cmd_start_user(message: Message, state: FSMContext) -> None:
     await state.set_state(UserState.regstate)
-
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    photo_title = await get_image_title_user("/start")
-    text = ("Ракета — это новый, современный сервис доставки, созданный для вашего комфорта. "
-            "Мы используем технологии искусственного интеллекта, "
-            "чтобы обеспечить максимально удобное оформление и отслеживание заказов.\n\n"
-            "Почему стоит выбрать Нас?\n\n"
-            "◉ Низкие цены:\n"
-            "Самые низкие цены и полная свобода выбора! Вы всегда видите доступные заказы и выбираете тех курьеров, "
-            "кто наиболее подходит вашим требованиям по времени и местоположению.\n\n"
-            "◉ Максимальное удобство:\n"
-            "Простой и понятный интерфейс, быстрая обработка заказов и никаких сложностей. "
-            "С Ракетой вы получаете доставку тогда, когда вам нужно, без лишних ожиданий.\n\n"
-            "Ракета — это ваша гарантия доступной и быстрой доставки. Присоединяйтесь и ощутите, "
-            "как легко и удобно пользоваться современным сервисом!")
-    reply_kb = await get_user_kb(message)
+    user = await user_data.get_username_userphone(message.from_user.id)
+    user_name, user_phone = user
 
-    new_message = await message.answer_photo(photo=photo_title,
-                                             caption=text,
-                                             reply_markup=reply_kb,
-                                             disable_notification=True)
-    await handler.handle_new_message(new_message, message)
-    await user_data.set_user(message.from_user.id)
+    # Если пользователь уже зарегистрирован
+    if user_name and user_phone:
+        await state.set_state(UserState.zero)
+        await handler.delete_previous_message(message.chat.id)
+        text = ("▼ Выберите действие в меню")
+        new_message = await message.answer(text)
+        await handler.handle_new_message(new_message, message)
+        return
+    else:
+        await user_data.set_user(message.from_user.id)
+        await handler.delete_previous_message(message.chat.id)
+        photo_title = await get_image_title_user("/start")
+        text = ("Ракета — это новый, современный сервис доставки, созданный для вашего комфорта. "
+                "Мы используем технологии искусственного интеллекта, "
+                "чтобы обеспечить максимально удобное оформление и отслеживание заказов.\n\n"
+                "Почему стоит выбрать Нас?\n\n"
+                "◉ Низкие цены:\n"
+                "Самые низкие цены и полная свобода выбора! Вы всегда видите доступные заказы и выбираете тех курьеров, "
+                "кто наиболее подходит вашим требованиям по времени и местоположению.\n\n"
+                "◉ Максимальное удобство:\n"
+                "Простой и понятный интерфейс, быстрая обработка заказов и никаких сложностей. "
+                "С Ракетой вы получаете доставку тогда, когда вам нужно, без лишних ожиданий.\n\n"
+                "Ракета — это ваша гарантия доступной и быстрой доставки. Присоединяйтесь и ощутите, "
+                "как легко и удобно пользоваться современным сервисом!")
+        reply_kb = await get_user_kb(message)
+
+        new_message = await message.answer_photo(photo=photo_title,
+                                                 caption=text,
+                                                 reply_markup=reply_kb,
+                                                 disable_notification=True)
+        await handler.handle_new_message(new_message, message)
 
 
 # registration
@@ -71,7 +82,6 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.set_Name)
     handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.set_Name)
     text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
     await callback_query.answer(text, show_alert=True)
     new_message = await callback_query.message.answer("Как вас зовут?", disable_notification=True)
@@ -168,21 +178,19 @@ async def cmd_ai(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.message(F.text == "/commands")
-async def cmd_help(message: Message, state: FSMContext):
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    await asyncio.sleep(0)
-
-    text = ("/order — Оформить доставку. C помощью голоса или вручную.\n"
-            "/profile — Просмотр и редактирование профиля.\n"
-            "/ai — Взаимодействие с ИИ ассистентом для поддержки и оформления заказов.\n"
-            "/rules — Ознакомление с правилами использования сервиса.\n"
-            "/become_courier - Станьте курьером и зарабатывайте.\n\n"
-            )
-
-    new_message = await message.answer(text, disable_notification=True)
-    await handler.handle_new_message(new_message, message)
+# @users_router.message(F.text == "/commands")
+# async def cmd_help(message: Message, state: FSMContext):
+#     handler = MessageHandler(state, message.bot)
+#     await handler.delete_previous_message(message.chat.id)
+#     await asyncio.sleep(0)
+#
+#     text = ("/order — Оформить доставку.\n"
+#             "/profile — Ваш профиль.\n"
+#             "/become_courier - Станьте курьером и зарабатывайте.\n\n"
+#             )
+#
+#     new_message = await message.answer(text, disable_notification=True)
+#     await handler.handle_new_message(new_message, message)
 
 
 @users_router.message(F.text == "/become_courier")
@@ -382,12 +390,20 @@ async def process_message(message: Message, state: FSMContext):
             order_details = structured_data.get('Order details', None)
             comments = structured_data.get('Comments', None)
             price = await get_price(distance, order_time)
-            price_text = f"{int(price)}₽"
+            price_text = f"{price}₽"
 
             await state.update_data(
                 city=city,
                 destination_point_a=starting_point_a,
+                a_latitude=float(pickup_coords[0]),
+                a_longitude=float(pickup_coords[1]),
+                a_coordinates=pickup_coords,
+                a_url=pickup_point,
                 destination_point_b=destination_point_b,
+                b_latitude=float(delivery_coords[0]),
+                b_longitude=float(delivery_coords[1]),
+                b_coordinates=delivery_coords,
+                b_url=delivery_point,
                 destination_point_c=destination_point_c,
                 destination_point_d=destination_point_d,
                 payer=payer,
@@ -398,9 +414,9 @@ async def process_message(message: Message, state: FSMContext):
                 receiver_phone=receiver_phone,
                 order_details=order_details,
                 comments=comments,
-                distance=distance_text,
-                duration=duration_text,
-                price=price_text,
+                distance_km=distance,
+                duration_min=duration,
+                price_rub=price,
                 order_time=order_time,
                 yandex_maps_url=yandex_maps_url,
                 pickup_point=pickup_point,
@@ -415,7 +431,6 @@ async def process_message(message: Message, state: FSMContext):
                 f"Адрес 1: {starting_point_a}\n"
                 f"Адрес 2: {destination_point_b}\n\n"
                 f"Предмет доставки: {delivery_object}\n"
-                f"Детали доставки: {order_details}\n\n"
                 f"Имя отправителя: {sender_name}\n"
                 f"Номер отправителя: {sender_phone}\n\n"
                 f"Имя получателя: {receiver_name}\n"
@@ -423,7 +438,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"Оплатит: {payer}\n"
                 f"Комментарии курьеру: {comments}\n\n"
                 f"Расстояние: {distance_text}\n"
-                f"Примерное время доставки: {duration_text}\n\n"
+                f"Время доставки ≈ {duration_text}\n\n"
                 f"Оплата: {price_text}\n"
                 f"---------------------------------------------\n\n"
                 f"* Проверьте ваш заказ и если все верно, то разместите. "
@@ -472,8 +487,24 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
         print(f"Ошибка при создании заказа: {str(e)}")
 
     # Отправляем уведомление пользователю
-    text = "Заказ создан!\nИщем курьера 🔎"
+    text = "Заказ успешно создан!\nИщем курьера 🔎"
     new_message = await callback_query.message.answer(text, disable_notification=True)
 
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
+
+
+# test
+@users_router.message(F.text == "/test")
+async def send_welcome(message: Message):
+    reply_kb = await get_user_kb(message)
+    await message.answer("Это оригинальное сообщение", reply_markup=reply_kb)
+
+
+@users_router.callback_query(F.data == "press_button")
+async def on_button_press(callback_query: CallbackQuery):
+    # Отредактируем существующее сообщение
+    await callback_query.message.edit_text(
+        "Сообщение было обновлено! Но это то же самое сообщение.",
+        reply_markup=callback_query.message.reply_markup  # Сохраняем те же кнопки
+    )

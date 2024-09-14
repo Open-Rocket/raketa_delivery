@@ -18,6 +18,9 @@ load_dotenv()
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
 stringData = Annotated[str, mapped_column(String(256), nullable=True)]
+intData = Annotated[int, mapped_column(Integer, nullable=True)]
+floatData = Annotated[float, mapped_column(Float, nullable=True)]
+coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
@@ -121,10 +124,29 @@ class Order(Base):
                                                       nullable=True)
 
     order_city: Mapped[stringData]
+
     starting_point_a: Mapped[textData]
+    a_latitude: Mapped[floatData]
+    a_longitude: Mapped[floatData]
+    a_coordinates: Mapped[coordinates]
+    a_url: Mapped[stringData]
+
     destination_point_b: Mapped[textData]
+    b_latitude: Mapped[floatData]
+    b_longitude: Mapped[floatData]
+    b_coordinates: Mapped[coordinates]
+    b_url: Mapped[stringData]
+
     destination_point_c: Mapped[textData]
+    c_latitude: Mapped[floatData]
+    c_longitude: Mapped[floatData]
+    c_coordinates: Mapped[coordinates]
+
     destination_point_d: Mapped[textData]
+    d_latitude: Mapped[floatData]
+    d_longitude: Mapped[floatData]
+    d_coordinates: Mapped[coordinates]
+
     payer: Mapped[stringData]
     delivery_object: Mapped[stringData]
     sender_name: Mapped[stringData]
@@ -133,9 +155,9 @@ class Order(Base):
     receiver_phone: Mapped[stringData]
     order_details: Mapped[textData]
     comments: Mapped[textData]
-    distance: Mapped[stringData]
-    duration: Mapped[stringData]
-    price: Mapped[stringData]
+    distance_km: Mapped[intData]
+    duration_min: Mapped[intData]
+    price_rub: Mapped[intData]
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     execution_speed: Mapped[float] = mapped_column(Float, nullable=True)

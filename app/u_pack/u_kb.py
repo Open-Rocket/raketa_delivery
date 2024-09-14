@@ -35,6 +35,9 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         "/become_courier": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Go", url="https://t.me/raketadeliverywork_bot")]
         ]),
+        "/test": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Нажми меня", callback_data="press_button")]
+        ]),
     }
 
     if message:

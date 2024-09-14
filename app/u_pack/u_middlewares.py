@@ -46,12 +46,15 @@ class OuterMiddleware(BaseMiddleware):
                 return
 
             if state == UserState.set_Name.state:
-                if message_text.startswith("/"):
-                    if message_text in ["/order", "/profile", "/ai", "/rules", "/help", "/become_courier", "/start"]:
-                        await event.delete()
-                        return
+                if message_text == "/start":
+                    return await handler(event, data)
+                if message_text in ["/order", "/profile", "/ai", "/rules", "/help", "/become_courier"]:
+                    await event.delete()
+                    return
 
             if state == UserState.set_Phone.state:
+                if message_text == "/start":
+                    return await handler(event, data)
                 if event.text:
                     await event.delete()
                     return

@@ -61,7 +61,7 @@ async def get_gpt_text(req, model="gpt-3.5-turbo"):
 async def process_order_text(order_text: str) -> dict:
     # Формируем запрос для модели ассистента
     prompt = (
-        f"Пожалуйста, извлеките и структурируйте в формате JSON следующую информацию о заказе "
+        f"Пожалуйста, извлеките и структурируйте (только формате JSON!!!) следующую информацию о заказе "
         f"(Текст самого заказа не отправлять):\n\n"
         f"Заказ{order_text}"
         f"{{\n"
@@ -73,7 +73,6 @@ async def process_order_text(order_text: str) -> dict:
         f"  'Delivery object': 'Объект доставки',\n"
         f"  'Receiver name': 'Имя получателя (если указывается)',\n"
         f"  'Receiver phone': 'Номер получателя (если указывается)',\n"
-        f"  'Order details': 'Детали заказа',\n"
         f"  'Comments': 'Комментарии',\n"
         f"  'Payer': 'Кто будет платить - Отправитель/Получатель/Не указано',\n"
         f"}}"
