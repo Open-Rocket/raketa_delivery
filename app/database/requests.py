@@ -3,7 +3,7 @@ from app.database.models import async_session_factory, moscow_time, Order, utc_t
 from app.database.models import User, Courier, OrderStatus
 from sqlalchemy import select, update, delete, desc
 from sqlalchemy import select, and_
-
+from app.common.coords_and_price import calculate_distance
 import json
 
 
@@ -177,28 +177,21 @@ class OrderData:
             result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
             return result.all()
 
-    async def get_available_orders(courier_tg_id: int, courier_lat: float, courier_lon: float, radius_km: float):
+    async def get_available_orders(self, courier_id: int, courier_lat: float, courier_lon: float, radius_km: float):
         async with async_session_factory() as session:
-            # Находим курьера по его tg_id
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == courier_tg_id))
-            if not courier:
-                raise ValueError("Курьер не найден")
-
-            # Запрашиваем заказы со статусом PENDING и проверяем, что курьер не является создателем заказа
             orders_query = await session.execute(
                 select(Order)
                 .where(and_(
                     Order.order_status == OrderStatus.PENDING,
-                    Order.user_id != courier.courier_id  # Проверяем, что курьер не является создателем заказа
+                    Order.user_id != courier_id
                 ))
             )
             orders = orders_query.scalars().all()
 
             available_orders = []
 
-            # Проверяем расстояние каждого заказа от курьера
             for order in orders:
-                distance = calculate_distance(order.lat, order.lon, courier_lat, courier_lon)
+                distance = calculate_distance(order.a_latitude, order.a_longitude, courier_lat, courier_lon)
                 if distance <= radius_km:
                     available_orders.append(order)
 

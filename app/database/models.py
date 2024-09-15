@@ -100,12 +100,15 @@ class Courier(Base):
     __tablename__ = "couriers"
 
     courier_id: Mapped[intPK]
-    courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
 
     courier_tg_id: Mapped[int] = mapped_column(BigInteger)
     courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    courier_email: Mapped[str] = mapped_column(String(255), nullable=True)
     courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
+
+    courier_lat: Mapped[floatData]
+    courier_lon: Mapped[floatData]
+
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
 
