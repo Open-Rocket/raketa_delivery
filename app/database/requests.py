@@ -129,7 +129,7 @@ class OrderData:
                     distance_km=data.get('distance_km'),
                     duration_min=data.get('duration_min'),
                     price_rub=data.get('price_rub'),
-                    created_at=data.get('order_time'),
+                    created_at_moscow_time=data.get('order_time'),
                     full_rout=data.get("yandex_maps_url")
                 )
 

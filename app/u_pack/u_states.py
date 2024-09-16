@@ -9,6 +9,6 @@ class UserState(StatesGroup):
     set_Phone = State()
     zero = State()
 
-    waiting_Courier = ()
+    waiting_Courier = State()
 
     ai_voice_order = State()

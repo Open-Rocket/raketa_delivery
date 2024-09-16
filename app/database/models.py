@@ -152,8 +152,8 @@ class Order(Base):
     distance_km: Mapped[intData]
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=True)
-    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=True)
+    completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
     execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
 

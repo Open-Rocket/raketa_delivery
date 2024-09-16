@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
-from app.u_pack.u_middlewares import AdminPasswordAcception, InnerMiddleware, OuterMiddleware
+from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
@@ -22,18 +22,17 @@ from app.database.requests import user_data, order_data
 from datetime import datetime
 import pytz
 
-moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
+# ------------------------------------------------------------------------------------------------------------------- #
 
 users_router = Router()
-admins_router_pass = Router()
 
+# middleware_Outer
 users_router.message.outer_middleware(OuterMiddleware())
 users_router.callback_query.outer_middleware(OuterMiddleware())
 
+# middleware_Inner
 users_router.message.middleware(InnerMiddleware())
 users_router.callback_query.middleware(InnerMiddleware())
-
-admins_router_pass.message.middleware(AdminPasswordAcception())
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -50,7 +49,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
     if user_name and user_phone:
         await state.set_state(UserState.zero)
         await handler.delete_previous_message(message.chat.id)
-        text = ("▼ Выберите действие в меню")
+        text = ("▼ <b>Выберите действие в меню</b>")
         new_message = await message.answer(text)
         await handler.handle_new_message(new_message, message)
         return
@@ -71,6 +70,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
         new_message = await message.answer_photo(photo=photo_title,
                                                  caption=text,
                                                  reply_markup=reply_kb,
+                                                 parse_mode="HTML",
                                                  disable_notification=True)
         await handler.handle_new_message(new_message, message)
 
@@ -82,9 +82,10 @@ async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
     # await callback_query.answer(text, show_alert=True)
-    new_message = await callback_query.message.answer("Пройдите небольшую регистрацию, "
-                                                      "это не займет много времени.\n\n"
-                                                      "Как вас зовут?", disable_notification=True)
+    text = ("Пройдите небольшую регистрацию.\n"
+            "Это не займет много времени.\n\n"
+            "<b>Как вас зовут?</b>")
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, callback_query.message)
 
 
@@ -100,10 +101,10 @@ async def data_email_user(message: Message, state: FSMContext):
 
     await user_data.set_user_name(tg_id, name)
     reply_kb = await get_user_kb(text="phone_number")
-    text = (f"Привет, {name}!\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
+    text = (f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
             f"в случае необходимости, пожалуйста, укажите ваш номер телефона.\n\n"
-            f"Ваш номер:")
-    msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
+            f"<b>Ваш номер:</b>")
+    msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML")
     await handler.handle_new_message(msg, message)
 
 
@@ -119,10 +120,10 @@ async def data_phone_user(message: Message, state: FSMContext):
 
     await user_data.set_user_phone(tg_id, phone)
     name, phone_number = await user_data.get_user_info(tg_id)
-    text = (f"Вы успешно зарегистрировались!\n\n"
+    text = (f"Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {name}\n"
-            f"Номер: {phone_number}\n\n▼ Выберите действие в меню")
-    msg = await message.answer(text, disable_notification=True)
+            f"Номер: {phone_number}\n\n▼ <b>Выберите действие в меню</b>")
+    msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(msg, message)
 
 
@@ -159,17 +160,19 @@ async def cmd_order(message: Message, state: FSMContext):
     else:
         # Если инструкция уже была показана, сразу переходим к процессу заказа
         text = ("◉ Укажите в описании к заказу:\n\n"
-                "• Город:\n"
-                "⦿ Адрес 1: Откуда забрать заказ.\n"
-                "⦿ Адрес 2: Куда доставить заказ.\n"
-                "⌑ Предмет доставки:\n"
-                "⍲ Имя получателя:\n"
-                "✆ Номер получателя:\n\n"
+                "Город:\n"
+                "Адрес 1: Откуда забрать заказ.\n"
+                "Адрес 2: Куда доставить заказ.\n"
+                "Предмет доставки:\n"
+                "Имя получателя:\n"
+                "Номер получателя:\n"
+                "Комментарии курьеру:\n\n"
                 "*Вы можете отрпвить как голосовое сообщение так и текстовое, "
                 "заказ будет оформлен в считанные секунды.")
 
-        new_message = await message.answer(text=f"{text}\n\nゞ Опишите ваш заказ ...",
-                                           disable_notification=True)
+        new_message = await message.answer(text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
+                                           disable_notification=True,
+                                           parse_mode="HTML")
         # Вновь устанавливаем стейт для корректной работы хендлера
         await state.set_state(UserState.ai_voice_order)
 
@@ -222,17 +225,19 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
     handler = MessageHandler(state, callback_query.bot)
     text = ("◉ Укажите в описании к заказу:\n\n"
-            "• Город:\n"
-            "⦿ Адрес 1: Откуда забрать заказ.\n"
-            "⦿ Адрес 2: Куда доставить заказ.\n"
-            "⌑ Предмет доставки:\n"
-            "⍲ Имя получателя:\n"
-            "✆ Номер получателя:\n\n"
+            "Город:\n"
+            "Адрес 1: Откуда забрать заказ.\n"
+            "Адрес 2: Куда доставить заказ.\n"
+            "Предмет доставки:\n"
+            "Имя получателя:\n"
+            "Номер получателя:\n"
+            "Комментарии курьеру:\n\n"
             "*Вы можете отрпвить как голосовое сообщение так и текстовое, "
             "заказ будет оформлен в считанные секунды.")
 
-    new_message = await callback_query.message.answer(text=f"{text}\n\nゞ Опишите ваш заказ ...",
-                                                      disable_notification=True)
+    new_message = await callback_query.message.answer(text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
+                                                      disable_notification=True,
+                                                      parse_mode="HTML")
     await handler.handle_new_message(new_message, callback_query.message)
 
 
@@ -252,7 +257,7 @@ async def process_message(message: Message, state: FSMContext):
 
     # Инициализация переменных
     reply_kb = await get_user_kb(text="voice_order_accept")
-    order_time = datetime.now().replace(tzinfo=None, microsecond=0)
+    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
     recognized_text = None
 
     # Обработка сообщения в зависимости от типа контента
@@ -316,7 +321,7 @@ async def process_message(message: Message, state: FSMContext):
             receiver_phone = structured_data.get('Receiver phone')
             order_details = structured_data.get('Order details', None)
             comments = structured_data.get('Comments', None)
-            price = await get_price(distance, order_time)
+            price = await get_price(distance, moscow_time)
             price_text = f"{price}₽"
 
             await state.update_data(
@@ -341,7 +346,7 @@ async def process_message(message: Message, state: FSMContext):
                 distance_km=distance,
                 duration_min=duration,
                 price_rub=price,
-                order_time=order_time,
+                order_time=moscow_time,
                 yandex_maps_url=yandex_maps_url,
                 pickup_point=pickup_point,
                 delivery_point=delivery_point,
@@ -404,6 +409,7 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
     # Получаем ID пользователя
     tg_id = callback_query.from_user.id
     data = await state.get_data()
+    await state.set_state(UserState.zero)
 
     try:
         # Асинхронно создаем заказ
@@ -413,8 +419,13 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
         print(f"Ошибка при создании заказа: {str(e)}")
 
     # Отправляем уведомление пользователю
-    text = "Заказ успешно создан!\nИщем курьера 🔎"
-    new_message = await callback_query.message.answer(text, disable_notification=True)
+    text = (
+        "Заказ успешно создан! 🎉\n"
+        "Мы ищем курьера для вашего заказа 🔎\n\n"
+        "Все ваши заказы и их статус можно отслеживать в вашем профиле, в разделе '<b>Мои заказы</b>'.\n"
+        "☟"
+    )
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
 
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
@@ -523,18 +534,3 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
     # await handler.handle_new_message(new_message, callback_query.message)
 
 # ------------------------------------------------------------------------------------------------------------------- #
-
-
-# @users_router.message(F.text == "/commands")
-# async def cmd_help(message: Message, state: FSMContext):
-#     handler = MessageHandler(state, message.bot)
-#     await handler.delete_previous_message(message.chat.id)
-#     await asyncio.sleep(0)
-#
-#     text = ("/order — Оформить доставку.\n"
-#             "/profile — Ваш профиль.\n"
-#             "/become_courier - Станьте курьером и зарабатывайте.\n\n"
-#             )
-#
-#     new_message = await message.answer(text, disable_notification=True)
-#     await handler.handle_new_message(new_message, message)
