@@ -37,8 +37,6 @@ admins_router_pass.message.middleware(AdminPasswordAcception())
 
 
 # start
-
-
 @users_router.message(CommandStart())
 async def cmd_start_user(message: Message, state: FSMContext) -> None:
     await state.set_state(UserState.regstate)
@@ -76,7 +74,6 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 
 
 # registration
-
 @users_router.callback_query(F.data == "reg")
 async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.set_Name)
@@ -88,7 +85,7 @@ async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
                                                       "Как вас зовут?", disable_notification=True)
     await handler.handle_new_message(new_message, callback_query.message)
 
-
+# registration
 @users_router.message(filters.StateFilter(UserState.set_Name))
 async def data_email_user(message: Message, state: FSMContext):
     await state.set_state(UserState.set_Phone)
@@ -106,7 +103,7 @@ async def data_email_user(message: Message, state: FSMContext):
     msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
     await handler.handle_new_message(msg, message)
 
-
+# registration
 @users_router.message(filters.StateFilter(UserState.set_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
     await state.set_state(UserState.zero)
@@ -126,8 +123,6 @@ async def data_phone_user(message: Message, state: FSMContext):
 
 
 # commands
-
-
 @users_router.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -174,7 +169,7 @@ async def cmd_order(message: Message, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, message)
 
-
+# commands
 @users_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
@@ -210,6 +205,7 @@ async def cmd_profile(message: Message, state: FSMContext):
 #     await handler.handle_new_message(new_message, message)
 
 
+
 @users_router.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем флаг прочитанной информации
@@ -234,21 +230,6 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
 
 # callbacks
-
-
-@users_router.callback_query(F.data == "ai_order")
-async def data_ai(callback_query: CallbackQuery, state: FSMContext):
-    read_info = True
-    await state.set_state(UserState.ai_voice_order)
-    await state.update_data(read_info=read_info)
-    handler = MessageHandler(state, callback_query.bot)
-    text = ("◉ Укажите в описании к заказу:\n"
-            "Город,адреса, что доставляем, имя и номер получателя, кто оплатит заказ.")
-    new_message = await callback_query.message.answer(text=f"{text}\n\nゞ Опишите ваш заказ ...",
-                                                      disable_notification=True)
-    await handler.handle_new_message(new_message, callback_query.message)
-
-
 # ai_order
 
 
