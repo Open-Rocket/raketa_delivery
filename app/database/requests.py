@@ -1,10 +1,10 @@
+import json
+from sqlalchemy import select, update, delete, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import async_session_factory, moscow_time, Order, utc_time
 from app.database.models import User, Courier, OrderStatus
-from sqlalchemy import select, update, delete, desc
 from sqlalchemy import select, and_
 from app.common.coords_and_price import calculate_distance
-import json
 
 
 class UserData:
@@ -109,7 +109,7 @@ class OrderData:
                 new_order = Order(
                     user_id=user.user_id,
                     order_city=data.get('city'),
-                    starting_point_a=data.get('destination_point_a'),
+                    starting_point_a=data.get('starting_point_a'),
                     a_coordinates=data.get('a_coordinates'),
                     a_latitude=data.get("a_latitude"),
                     a_longitude=data.get("a_longitude"),
@@ -119,9 +119,6 @@ class OrderData:
                     b_latitude=data.get("b_latitude"),
                     b_longitude=data.get("b_longitude"),
                     b_url=data.get("b_url"),
-                    destination_point_c=data.get('destination_point_c'),
-                    destination_point_d=data.get('destination_point_d'),
-                    payer=data.get('payer'),
                     delivery_object=data.get('delivery_object'),
                     sender_name=data.get('sender_name'),
                     sender_phone=data.get('sender_phone'),
@@ -132,7 +129,8 @@ class OrderData:
                     distance_km=data.get('distance_km'),
                     duration_min=data.get('duration_min'),
                     price_rub=data.get('price_rub'),
-                    created_at=data.get('order_time')
+                    created_at=data.get('order_time'),
+                    full_rout=data.get("yandex_maps_url")
                 )
 
                 # Добавляем новый заказ в сессию
@@ -177,13 +175,13 @@ class OrderData:
             result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
             return result.all()
 
-    async def get_available_orders(self, courier_id: int, courier_lat: float, courier_lon: float, radius_km: float):
+    async def get_available_orders(self, courier_tg_id: int, courier_lat: float, courier_lon: float, radius_km: float):
         async with async_session_factory() as session:
             orders_query = await session.execute(
                 select(Order)
                 .where(and_(
                     Order.order_status == OrderStatus.PENDING,
-                    Order.user_id != courier_id
+                    # User.user_tg_id != Courier.courier_tg_id
                 ))
             )
             orders = orders_query.scalars().all()

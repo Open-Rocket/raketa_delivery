@@ -140,17 +140,8 @@ class Order(Base):
     b_coordinates: Mapped[coordinates]
     b_url: Mapped[stringData]
 
-    destination_point_c: Mapped[textData]
-    c_latitude: Mapped[floatData]
-    c_longitude: Mapped[floatData]
-    c_coordinates: Mapped[coordinates]
+    full_rout: Mapped[stringData]
 
-    destination_point_d: Mapped[textData]
-    d_latitude: Mapped[floatData]
-    d_longitude: Mapped[floatData]
-    d_coordinates: Mapped[coordinates]
-
-    payer: Mapped[stringData]
     delivery_object: Mapped[stringData]
     sender_name: Mapped[stringData]
     sender_phone: Mapped[stringData]
@@ -161,7 +152,7 @@ class Order(Base):
     distance_km: Mapped[intData]
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_time, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
     execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
