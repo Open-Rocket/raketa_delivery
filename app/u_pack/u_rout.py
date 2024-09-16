@@ -36,6 +36,8 @@ users_router.callback_query.middleware(InnerMiddleware())
 admins_router_pass.message.middleware(AdminPasswordAcception())
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+
 # start
 @users_router.message(CommandStart())
 async def cmd_start_user(message: Message, state: FSMContext) -> None:
@@ -85,7 +87,8 @@ async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
                                                       "Как вас зовут?", disable_notification=True)
     await handler.handle_new_message(new_message, callback_query.message)
 
-# registration
+
+# registration_Name
 @users_router.message(filters.StateFilter(UserState.set_Name))
 async def data_email_user(message: Message, state: FSMContext):
     await state.set_state(UserState.set_Phone)
@@ -103,7 +106,8 @@ async def data_email_user(message: Message, state: FSMContext):
     msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
     await handler.handle_new_message(msg, message)
 
-# registration
+
+# registration_Phone
 @users_router.message(filters.StateFilter(UserState.set_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
     await state.set_state(UserState.zero)
@@ -122,7 +126,10 @@ async def data_phone_user(message: Message, state: FSMContext):
     await handler.handle_new_message(msg, message)
 
 
-# commands
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+# commands_Order
 @users_router.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -169,7 +176,8 @@ async def cmd_order(message: Message, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, message)
 
-# commands
+
+# commands_Profile
 @users_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
@@ -190,22 +198,21 @@ async def cmd_profile(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# @users_router.message(F.text == "/commands")
-# async def cmd_help(message: Message, state: FSMContext):
-#     handler = MessageHandler(state, message.bot)
-#     await handler.delete_previous_message(message.chat.id)
-#     await asyncio.sleep(0)
-#
-#     text = ("/order — Оформить доставку.\n"
-#             "/profile — Ваш профиль.\n"
-#             "/become_courier - Станьте курьером и зарабатывайте.\n\n"
-#             )
-#
-#     new_message = await message.answer(text, disable_notification=True)
-#     await handler.handle_new_message(new_message, message)
+# commands_BecomeCourier
+@users_router.message(F.text == "/become_courier")
+async def cmd_become_courier(message: Message, state: FSMContext):
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    photo_title = await get_image_title_user("/become_courier")
+    reply_kb = await get_user_kb(message)
+    new_message = await message.answer_photo(photo=photo_title,
+                                             reply_markup=reply_kb,
+                                             disable_notification=True)
+
+    await handler.handle_new_message(new_message, message)
 
 
-
+# read_Info
 @users_router.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем флаг прочитанной информации
@@ -229,97 +236,10 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# callbacks
-# ai_order
+# ------------------------------------------------------------------------------------------------------------------- #
 
 
-# @users_router.message(filters.StateFilter(UserState.ai_voice_order),
-#                       F.content_type.in_([ContentType.VOICE, ContentType.TEXT]))
-# async def process_message(message: Message, state: FSMContext):
-#     wait_message = await message.answer("Сообщение обрабатывается, подождите немного ...")
-#     handler = MessageHandler(state, message.bot)
-#     await handler.delete_previous_message(message.chat.id)
-#     reply_kb = await get_user_kb(text="voice_order_accept")
-#     new_message = "Заказ не было обработан ..."
-#     order_time = datetime.now().replace(microsecond=0)
-#
-#     if message.content_type == ContentType.VOICE:
-#         voice = message.voice
-#         file_info = await message.bot.get_file(voice.file_id)
-#         file = await message.bot.download_file(file_info.file_path)
-#         audio_data = file.read()
-#         recognized_text = await process_audio_data(audio_data)
-#     else:
-#         recognized_text = message.text
-#
-#     if not recognized_text:
-#         recognized_text = "Ошибка распознавания. Попробуйте снова."
-#         structured_text = recognized_text
-#     else:
-#         # Отправляем текст в OpenAI для обработки
-#         addresses = await get_parsed_addresses(recognized_text)
-#
-#         # Проверяем, что ИИ вернул два адреса
-#         if len(addresses) == 2:
-#             pickup_address, delivery_address = addresses
-#
-#             # Получаем координаты для адресов
-#             pickup_latitude, pickup_longitude = await get_coordinates(pickup_address)
-#             delivery_latitude, delivery_longitude = await get_coordinates(delivery_address)
-#
-#             if pickup_latitude and pickup_longitude and delivery_latitude and delivery_longitude:
-#                 yandex_maps_url = (
-#                     f"https://yandex.ru/maps/?rtext={pickup_latitude},{pickup_longitude}~{delivery_latitude},{delivery_longitude}&rtt=auto")
-#                 pickup_point = (
-#                     f"https://yandex.ru/maps/?ll={pickup_longitude},{pickup_latitude}&pt={pickup_longitude},{pickup_latitude}&z=14")
-#                 delivery_point = (
-#                     f"https://yandex.ru/maps/?ll={delivery_longitude},{delivery_latitude}&pt={delivery_longitude},{delivery_latitude}&z=14")
-#                 distance, duration = await calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latitude,
-#                                                                 delivery_longitude)
-#
-#                 tg_id = message.from_user.id
-#                 sender_info = await user_data.get_user_info(tg_id)
-#
-#                 duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут."
-#                 city_order = await get_city(recognized_text)
-#                 price = await get_price(distance, order_time, city_order)
-#                 structured_text = await process_order_text(recognized_text, distance, duration_text, price, sender_info)
-#
-#                 new_message = await message.answer(
-#                     text=(f"Ваш заказ ✍︎\n"
-#                           f"---------------------------------------------\n"
-#                           f"Дата/Время: {order_time}\n\n"
-#                           f"{structured_text}\n"
-#                           f"---------------------------------------------\n\n"
-#                           f"* Проверьте ваш заказ и если все верно, то разместите. "
-#                           f"Подождите немного пока найдется свободный курьер и откликнется на него.\n\n"
-#                           f"* Курьер может связатсья с вами для уточнения деталей!\n\n"
-#                           f"Вот ссылка на маршрут в Яндекс.Картах:\n{yandex_maps_url}\n\n"
-#                           f"Откуда забрать:\n{pickup_point}\n\n"
-#                           f"Куда отвезти:\n{delivery_point}\n\n"),
-#                     reply_markup=reply_kb, disable_notification=True
-#                 )
-#             else:
-#                 new_message = await message.answer(
-#                     text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
-#                          f"Проверьте ваш заказ и если все верно, то разместите его "
-#                          f"и ждите ответа от курьера.",
-#                     reply_markup=reply_kb, disable_notification=True
-#                 )
-#         else:
-#             new_message = await message.answer(
-#                 text=f"Ваш заказ ✍︎\n\n{recognized_text} \n\n"
-#                      f"Проверьте ваш заказ и если все верно, то разместите его "
-#                      f"и ждите ответа от курьера.",
-#                 reply_markup=reply_kb, disable_notification=True
-#             )
-#
-#     await wait_message.delete()
-#     await handler.handle_new_message(new_message, message)
-#     await state.set_state(UserState.waiting_Courier)
-
-
-# ai order
+# form_Order
 @users_router.message(
     filters.StateFilter(UserState.ai_voice_order),
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT])
@@ -472,6 +392,7 @@ async def process_message(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# send_Order
 @users_router.callback_query(F.data == "order_sent")
 async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние
@@ -498,6 +419,9 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
     # await state.clear()
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
 
 
 # test
@@ -597,3 +521,20 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
     )
 
     # await handler.handle_new_message(new_message, callback_query.message)
+
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+# @users_router.message(F.text == "/commands")
+# async def cmd_help(message: Message, state: FSMContext):
+#     handler = MessageHandler(state, message.bot)
+#     await handler.delete_previous_message(message.chat.id)
+#     await asyncio.sleep(0)
+#
+#     text = ("/order — Оформить доставку.\n"
+#             "/profile — Ваш профиль.\n"
+#             "/become_courier - Станьте курьером и зарабатывайте.\n\n"
+#             )
+#
+#     new_message = await message.answer(text, disable_notification=True)
+#     await handler.handle_new_message(new_message, message)
