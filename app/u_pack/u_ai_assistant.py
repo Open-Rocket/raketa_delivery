@@ -9,10 +9,66 @@ from dotenv import load_dotenv
 load_dotenv()
 proxy = os.getenv("PROXY")
 apy_key = os.getenv("OPENAI_API")
+assistant_id = os.getenv("AI_ASSISTANT_ID")
+user_threads = {}
 
 client = AsyncOpenAI(api_key=apy_key,
                      http_client=httpx.AsyncClient(proxies=proxy,
                                                    transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0")))
+
+
+async def get_gpt_text(req, model="gpt-3.5-turbo"):
+    completion = await client.chat.completions.create(
+        messages=[{"role": "user", "content": req}],
+        model=model
+    )
+    return completion.choices[0].message.content
+
+
+async def assistant_run(req: str) -> str:
+    try:
+        # Создаем новый поток
+        thread = await client.beta.threads.create()
+
+        # Запускаем задание в потоке
+        run = await client.beta.threads.runs.create_and_poll(
+            thread_id=thread.id,
+            assistant_id=assistant_id,
+            instructions=(
+                f"Ты — ИИ ассистент поддержки в сервисе пешей доставки. "
+                f"Наш сервис помогает доставлять личные вещи или товары клиентов до нужного адреса, "
+                f"используя пеших курьеров. Твоя задача — помочь пользователям оформить заказ на доставку. "
+                f"Пожалуйста, сосредоточься только на процессе оформления заказа и помогай пользователям "
+                f"с этим процессом. {req}"
+            )
+
+        )
+
+        # Проверяем статус задания
+        if run.status == 'completed':
+            # Получаем сообщения из потока
+            messages_page = await client.beta.threads.messages.list(thread_id=thread.id)
+
+            # Собираем сообщения
+            messages = []
+            async for message in messages_page:
+                messages.append(message)
+
+            # Проверяем, есть ли сообщения и извлекаем текст
+            if messages:
+                message = messages[0]
+                # print(f"Message structure: {message}")  # Для отладки структуры
+                if message.content and isinstance(message.content, list) and len(message.content) > 0:
+                    text_block = message.content[0]
+                    if hasattr(text_block, 'text') and hasattr(text_block.text, 'value'):
+                        return text_block.text.value
+                return "Не удалось извлечь текст сообщения."
+            else:
+                return "Нет ответа от ассистента."
+        else:
+            return f"Ошибка при получении ответа от ассистента. Статус: {run.status}"
+    except Exception as e:
+        print(f"Ошибка при взаимодействии с ассистентом: {e}")
 
 
 async def parse_response(response: str) -> dict:
@@ -26,37 +82,6 @@ async def parse_response(response: str) -> dict:
 
     return structured_data
 
-
-async def get_gpt_text(req, model="gpt-3.5-turbo"):
-    completion = await client.chat.completions.create(
-        messages=[{"role": "user", "content": req}],
-        model=model
-    )
-    return completion.choices[0].message.content
-
-
-# async def process_order_text(order_text=None, distance=None, duration=None, price=None, sender_info=None):
-#     sender_name, sender_phone = sender_info
-#     prompt = (
-#         f"Пожалуйста, извлеките и структурируйте следующую информацию о заказе :{order_text}\n"
-#         f"(cам Текст в заказ не отправлять), (не дописывай от себя пункты, структура заказа строгая):\n"
-#         f"Пункт A: г.[Cyty],[Starting point]\n"
-#         f"Пункт B: г.[Cyty],[Destination point]\n"
-#         f"Пункт C: г.[Cyty],[Destination point] - Отображать если есть\n\n"
-#         f"Пункт D: г.[Cyty],[Destination point] - Отображать если есть\n\n"
-#         f"Оплатит: [отправитель/получатель/Нет информации]\n"
-#         f"Предмет доставки: [Delivery object]\n\n"
-#         f"Имя отправителя: [{sender_name}]\n"
-#         f"Номер отправителя: [{sender_phone}]\n"
-#         f"Имя получателя: [Receiver name]\n"
-#         f"Номер получателя: [Receiver phone]\n\n"
-#         f"Дополнительные сведения о заказе: [Order details]\n\n"
-#         f"Комментарий курьеру: [Comments]\n\n"
-#         f"Расстояние: [{distance} км]\n"
-#         f"Время: [{duration}]\n\n"
-#         f"Оплата: [{int(price)}₽]\n")
-#     response = await get_gpt_text(prompt)
-#     return response
 
 async def process_order_text(order_text: str) -> dict:
     # Формируем запрос для модели ассистента
@@ -102,15 +127,3 @@ async def get_parsed_addresses(order_text):
             addresses.append(match.strip())
 
     return addresses
-
-# async def get_city(order_text):
-#     prompt = (f"Пожалуйста извлеки из этого текста только город заказа:\n"
-#               f"text: {order_text} - верни только название города например 'Москва'")
-#     response = await get_gpt_text(prompt)
-#
-#     if response:
-#         # Попробуем извлечь название города
-#         city = response.strip()  # Убираем лишние пробелы и символы переноса строк
-#         return city.lower()
-#     else:
-#         return None

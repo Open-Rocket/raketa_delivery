@@ -1,3 +1,5 @@
+# --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
+
 import asyncio
 
 from aiogram import Router, F
@@ -11,7 +13,7 @@ from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
-from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses
+from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, assistant_run
 from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
 
 from app.common.message_handler import MessageHandler
@@ -22,6 +24,8 @@ from app.database.requests import user_data, order_data
 from datetime import datetime
 import pytz
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                             ⇣ Initializing Variables ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 users_router = Router()
@@ -36,11 +40,13 @@ users_router.callback_query.middleware(InnerMiddleware())
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
+#                                              ⇣ Registration steps ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 
 # start
 @users_router.message(CommandStart())
 async def cmd_start_user(message: Message, state: FSMContext) -> None:
-    await state.set_state(UserState.regstate)
+    await state.set_state(UserState.reg_state)
     handler = MessageHandler(state, message.bot)
     user = await user_data.get_username_userphone(message.from_user.id)
     user_name, user_phone = user
@@ -78,7 +84,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 # registration
 @users_router.callback_query(F.data == "reg")
 async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.set_Name)
+    await state.set_state(UserState.reg_Name)
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
     # await callback_query.answer(text, show_alert=True)
@@ -90,9 +96,9 @@ async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
 
 
 # registration_Name
-@users_router.message(filters.StateFilter(UserState.set_Name))
+@users_router.message(filters.StateFilter(UserState.reg_Name))
 async def data_email_user(message: Message, state: FSMContext):
-    await state.set_state(UserState.set_Phone)
+    await state.set_state(UserState.reg_Phone)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -109,7 +115,7 @@ async def data_email_user(message: Message, state: FSMContext):
 
 
 # registration_Phone
-@users_router.message(filters.StateFilter(UserState.set_Phone))
+@users_router.message(filters.StateFilter(UserState.reg_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
     await state.set_state(UserState.zero)
     handler = MessageHandler(state, message.bot)
@@ -127,6 +133,8 @@ async def data_phone_user(message: Message, state: FSMContext):
     await handler.handle_new_message(msg, message)
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ Bot functions ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
@@ -183,6 +191,7 @@ async def cmd_order(message: Message, state: FSMContext):
 # commands_Profile
 @users_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
+    await state.set_state(UserState.zero)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
@@ -241,6 +250,44 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+# cancel_Order
+@users_router.callback_query(F.data == "calcel_order")
+async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.zero)
+    handler = MessageHandler(state, callback_query.bot)
+    text = "▼ <b>Выберите действие в меню</b>"
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+@users_router.callback_query(F.data == "set_my_name")
+async def set_name(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.change_Name)
+    handler = MessageHandler(state, callback_query.bot)
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваше новое имя:</b>")
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+@users_router.message(filters.StateFilter(UserState.change_Name))
+async def change_name(message: Message, state: FSMContext):
+    await state.set_state(UserState.zero)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    name = message.text
+
+    await user_data.set_user_name(tg_id, name)
+    text = f"Ваше имя было изменено на {name}. 🎉"
+    new_message = await message.answer(text, disable_notification=True)
+
+    await handler.handle_new_message(new_message, message)
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                               ⇣ Formation of an order ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
@@ -399,7 +446,7 @@ async def process_message(message: Message, state: FSMContext):
 
 # send_Order
 @users_router.callback_query(F.data == "order_sent")
-async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
+async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние
     await state.set_state(UserState.waiting_Courier)
 
@@ -433,6 +480,8 @@ async def set_order_to_DB(callback_query: CallbackQuery, state: FSMContext):
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
+#                                            ⇣ Test courier orders list vision ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 
 
 # test
@@ -444,12 +493,12 @@ async def send_welcome(message: Message, state: FSMContext):
     my_lat = 55.680241  # пример координат курьера
     available_orders = await order_data.get_available_orders(my_tg_id, my_lat, my_lon, radius_km=5)
 
-    # Формируем список заказов для отображения
+    # -------------------- Формируем список заказов для отображения -------------------- #
     orders = []
     for order in available_orders:
         order_forma = (
             f"Заказ №{order.order_id}\n"
-            f"Дата оформления: {order.created_at}\n"
+            f"Дата оформления: {order.created_at_moscow_time}\n"
             f"---------------------------------------------\n"
             f"Город: {order.order_city}\n"
             f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
@@ -466,7 +515,7 @@ async def send_welcome(message: Message, state: FSMContext):
         )
         orders.append(order_forma)
 
-    # Если заказов нет
+    # -------------------- Если заказов нет -------------------- #
     if not orders:
         await handler.delete_previous_message(message.chat.id)
         new_message = await message.answer("Нет доступных заказов в вашем радиусе.")
@@ -476,7 +525,7 @@ async def send_welcome(message: Message, state: FSMContext):
     await state.set_state(UserState.testOrders)
     await handler.delete_previous_message(message.chat.id)
 
-    # Устанавливаем начальный заказ и сохраняем его
+    # -------------------- Устанавливаем начальный заказ и сохраняем его -------------------- #
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
@@ -484,6 +533,8 @@ async def send_welcome(message: Message, state: FSMContext):
     new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
 
     await handler.handle_new_message(new_message, message)
+
+    # -------------- Finish -------------- #
 
 
 # Обработчик кнопки "⇥" для перехода вперёд
@@ -533,4 +584,30 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
 
     # await handler.handle_new_message(new_message, callback_query.message)
 
+
 # ------------------------------------------------------------------------------------------------------------------- #
+#                                                 ⇣ Assistant test ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+# assistant
+@users_router.message(F.text == "/ai")
+async def cmd_ai(message: Message, state: FSMContext):
+    await state.set_state(UserState.assistant_run)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    text = ("Задайте свой вопрос ИИ ассистенту ...")
+    new_message = await message.answer(text, disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
+@users_router.message(filters.StateFilter(UserState.assistant_run))
+async def ai_answer(message: Message, state: FSMContext):
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    user_message = message.text
+    assistant_response = await assistant_run(req=user_message)
+    new_message = await message.answer(assistant_response, disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+# --------------------------------------------------- ✺ The end (u_rout) ✺ ------------------------------------------ #

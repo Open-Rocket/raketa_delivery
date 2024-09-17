@@ -19,16 +19,16 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
         return await handler(event, data)
 
     # Проверка на каждое состояние пользователя
-    if state == UserState.regstate.state:
+    if state == UserState.reg_state.state:
         await event.delete()
         return
 
-    if state == UserState.set_Name.state:
+    if state == UserState.reg_Name.state:
         if message_text in ["/order", "/profile", "/ai", "/rules", "/help", "/become_courier"]:
             await event.delete()
             return
 
-    if state == UserState.set_Phone.state:
+    if state == UserState.reg_Phone.state:
         if event.content_type == "contact":  # Если тип контента - контакт
             return await handler(event, data)
         else:
