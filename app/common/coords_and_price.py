@@ -60,7 +60,14 @@ async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latit
 
 async def get_price(distance, order_time, city=None) -> int:
     city = city
-    base_price_per_km = 38  # Базовая цена за километр
+
+    # Базовая цена за километр
+    if 0 < distance <= 2:
+        base_price_per_km = 85
+    else:
+        base_price_per_km = 38
+
+
 
     # Устанавливаем универсальный коэффициент для всех городов
     city_coefficient = 1.0

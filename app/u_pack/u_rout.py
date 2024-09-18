@@ -55,7 +55,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
     if user_name and user_phone:
         await state.set_state(UserState.zero)
         await handler.delete_previous_message(message.chat.id)
-        text = ("▼ <b>Выберите действие в меню</b>")
+        text = ("▼ <b>Выберите действие ...</b>")
         new_message = await message.answer(text)
         await handler.handle_new_message(new_message, message)
         return
@@ -128,7 +128,7 @@ async def data_phone_user(message: Message, state: FSMContext):
     name, phone_number = await user_data.get_user_info(tg_id)
     text = (f"Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {name}\n"
-            f"Номер: {phone_number}\n\n▼ <b>Выберите действие в меню</b>")
+            f"Номер: {phone_number}\n\n▼ <b>Выберите действие ...</b>")
     msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(msg, message)
 
@@ -161,7 +161,7 @@ async def cmd_order(message: Message, state: FSMContext):
                                                  reply_markup=reply_kb,
                                                  disable_notification=True)
         # Обновляем флаг, чтобы больше не показывать инструкцию
-        await state.update_data(read_info=True)
+        # await state.update_data(read_info=True)
         # Устанавливаем нужный стейт для дальнейшего использования
         await state.set_state(UserState.ai_voice_order)
 
@@ -216,8 +216,12 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     photo_title = await get_image_title_user("/become_courier")
+    text = ("⦿ Стать курьером у нас — это отличный способ заработать без комиссии!\n\n"
+            "⦿ Работайте в удобное время, выбирайте заказы рядом и получайте бонусы за быструю доставку.\n\n"
+            "⦿ Прокачивайте профиль, повышайте рейтинг и зарабатывайте от 3000₽ до 5000₽ в день уже сегодня!")
     reply_kb = await get_user_kb(message)
     new_message = await message.answer_photo(photo=photo_title,
+                                             caption=text,
                                              reply_markup=reply_kb,
                                              disable_notification=True)
 
@@ -227,10 +231,10 @@ async def cmd_become_courier(message: Message, state: FSMContext):
 # read_Info
 @users_router.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
-    # Устанавливаем флаг прочитанной информации
-    await state.update_data(read_info=True)
     # Устанавливаем нужный стейт
     await state.set_state(UserState.ai_voice_order)
+    # Устанавливаем флаг прочитанной информации
+    await state.update_data(read_info=True)
 
     handler = MessageHandler(state, callback_query.bot)
     text = ("◉ Укажите в описании к заказу:\n\n"
@@ -251,11 +255,11 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
 
 # cancel_Order
-@users_router.callback_query(F.data == "calcel_order")
+@users_router.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.zero)
     handler = MessageHandler(state, callback_query.bot)
-    text = "▼ <b>Выберите действие в меню</b>"
+    text = "▼ <b>Выберите действие ...</b>"
     new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, callback_query.message)
 
@@ -270,6 +274,20 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+@users_router.callback_query(F.data == "set_my_phone")
+async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.change_Phone)
+    handler = MessageHandler(state, callback_query.bot)
+    reply_kb = await get_user_kb(text="phone_number")
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваше номер:</b>")
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      reply_markup=reply_kb,
+                                                      parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
 @users_router.message(filters.StateFilter(UserState.change_Name))
 async def change_name(message: Message, state: FSMContext):
     await state.set_state(UserState.zero)
@@ -280,8 +298,26 @@ async def change_name(message: Message, state: FSMContext):
     name = message.text
 
     await user_data.set_user_name(tg_id, name)
-    text = f"Ваше имя было изменено на {name}. 🎉"
-    new_message = await message.answer(text, disable_notification=True)
+    text = (f"Имя было изменено на {name} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+
+    await handler.handle_new_message(new_message, message)
+
+
+@users_router.message(filters.StateFilter(UserState.change_Phone))
+async def change_phone(message: Message, state: FSMContext):
+    await state.set_state(UserState.zero)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    phone = message.contact.phone_number
+
+    await user_data.set_user_phone(tg_id, phone)
+    text = (f"Номер был изменено на {phone} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
 
     await handler.handle_new_message(new_message, message)
 
@@ -413,7 +449,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"Номер получателя: {receiver_phone}\n\n"
                 f"Расстояние: {distance_text}\n"
                 f"Время доставки ≈ {duration_text}\n\n"
-                f"Оплата: {price_text}\n\n"
+                f"Стоимость доставки: {price_text}\n\n"
                 f"Комментарии курьеру: {comments}\n"
                 f"---------------------------------------------\n"
                 f"* Проверьте ваш заказ и если все верно, то разместите. "
@@ -460,23 +496,130 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 
     try:
         # Асинхронно создаем заказ
-        await order_data.create_order(tg_id, data)
+        order_number = await order_data.create_order(tg_id, data)
+        text = (
+            f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
+            f"Мы ищем курьера для вашего заказа 🔎\n\n"
+            f"Информацию о заказах можно посмотреть в вашем профиле, в разделе <u>Мои заказы</u>\n\n"
+            f"▼ <b>Выберите действие ...</b>"
+        )
     except Exception as e:
         # Обработка возможных ошибок
         print(f"Ошибка при создании заказа: {str(e)}")
 
-    # Отправляем уведомление пользователю
-    text = (
-        "Заказ успешно создан! 🎉\n"
-        "Мы ищем курьера для вашего заказа 🔎\n\n"
-        "Все ваши заказы и их статус можно отслеживать в вашем профиле, в разделе '<b>Мои заказы</b>'.\n"
-        "☟"
-    )
-    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
+        text = ("Ошибка при создании заказа.\n"
+                "Попробуйте повторить заказ.")
+
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      parse_mode="HTML")
 
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
-    # await state.clear()
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                   ⇣ User orders ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+# my orders
+@users_router.callback_query(F.data == "get_my_orders")
+async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.myOrders)
+
+    handler = MessageHandler(state, callback_query.bot)
+    my_tg_id = callback_query.from_user.id
+
+    # Получаем заказы, сделанные пользователем
+    user_orders = await order_data.get_user_orders(my_tg_id)
+
+    # -------------------- Формируем список заказов для отображения -------------------- #
+    orders = []
+    for order in user_orders:
+        order_forma = (
+            f"Заказ №{order.order_id} - Всего заказов: {len(orders)}\n"
+            f"Дата оформления: {order.created_at_moscow_time}\n\n"
+            f"Статус заказа: {order.order_status.value}"
+            f"---------------------------------------------\n"
+            f"Город: {order.order_city}\n"
+            f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
+            f"⦿ Адрес 2: <a href='{order.b_url}'>{order.destination_point_b}</a>\n\n"
+            f"Предмет доставки: {order.delivery_object}\n\n"
+            f"Имя отправителя: {order.sender_name}\n"
+            f"Номер отправителя: {order.sender_phone}\n\n"
+            f"Имя получателя: {order.receiver_name}\n"
+            f"Номер получателя: {order.receiver_phone}\n\n"
+            f"Стоимость доставки: {order.price_rub}₽\n"
+            f"---------------------------------------------\n"
+            f"Комментарии: {order.comments}\n\n"
+            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
+        )
+        orders.append(order_forma)
+
+    # -------------------- Если заказов нет -------------------- #
+    if not orders:
+        await handler.delete_previous_message(callback_query.message.chat.id)
+        new_message = await callback_query.message.answer("У вас нет заказов.")
+        await handler.handle_new_message(new_message, callback_query.message)
+        return
+
+    await handler.delete_previous_message(callback_query.message.chat.id)
+
+    # -------------------- Устанавливаем начальный заказ и сохраняем его -------------------- #
+    counter = 0
+    await state.update_data(orders=orders, counter=counter)
+
+    if len(orders) > 1:
+        reply_kb = await get_user_kb(callback_query.message)  # Клавиатура с кнопками для переключения заказов
+        new_message = await callback_query.message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
+    else:
+        new_message = await callback_query.message.answer(orders[counter], parse_mode="HTML")
+
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+# Обработчик кнопки "⇥" для перехода вперёд
+@users_router.callback_query(F.data == "next_right_mo")
+async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    handler = MessageHandler(state, callback_query.bot)
+    await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
+    data = await state.get_data()
+    orders = data.get("orders")
+    counter = data.get("counter", 0)
+
+    # Увеличиваем счётчик и зацикливаем его
+    counter = (counter + 1) % len(orders)
+
+    # Обновляем состояние с новым значением счётчика
+    await state.update_data(counter=counter)
+
+    # Обновляем сообщение с новым заказом
+    await callback_query.message.edit_text(orders[counter],
+                                           reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
+
+
+# Обработчик кнопки "⇤" для перехода назад
+@users_router.callback_query(F.data == "back_left_mo")
+async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    handler = MessageHandler(state, callback_query.bot)
+    await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
+    data = await state.get_data()
+    orders = data.get("orders")
+    counter = data.get("counter", 0)
+
+    # Уменьшаем счётчик и зацикливаем его
+    counter = (counter - 1) % len(orders)
+
+    # Обновляем состояние с новым значением счётчика
+    await state.update_data(counter=counter)
+
+    # Обновляем сообщение с новым заказом
+    await callback_query.message.edit_text(
+        orders[counter],
+        reply_markup=callback_query.message.reply_markup,
+        parse_mode="HTML"
+    )
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -486,7 +629,9 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 
 # test
 @users_router.message(F.text == "/test")
-async def send_welcome(message: Message, state: FSMContext):
+async def send_orders(message: Message, state: FSMContext):
+    await state.set_state(UserState.testOrders)
+
     handler = MessageHandler(state, message.bot)
     my_tg_id = message.from_user.id
     my_lon = 37.483554  # пример координат курьера
@@ -522,15 +667,17 @@ async def send_welcome(message: Message, state: FSMContext):
         await handler.handle_new_message(new_message, message)
         return
 
-    await state.set_state(UserState.testOrders)
     await handler.delete_previous_message(message.chat.id)
 
     # -------------------- Устанавливаем начальный заказ и сохраняем его -------------------- #
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
-    reply_kb = await get_user_kb(message)  # Клавиатура с кнопками для переключения заказов
-    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
+    if len(orders) > 1:
+        reply_kb = await get_user_kb(message)  # Клавиатура с кнопками для переключения заказов
+        new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
+    else:
+        new_message = await message.answer(orders[counter], parse_mode="HTML")
 
     await handler.handle_new_message(new_message, message)
 

@@ -28,7 +28,7 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
             await event.delete()
             return
 
-    if state == UserState.reg_Phone.state:
+    if state == UserState.reg_Phone.state or state == UserState.change_Phone.state:
         if event.content_type == "contact":  # Если тип контента - контакт
             return await handler(event, data)
         else:

@@ -136,8 +136,16 @@ class OrderData:
                 # Добавляем новый заказ в сессию
                 session.add(new_order)
 
+                # Принудительно сохраняем изменения (чтобы объект привязался к сессии и получил ID)
+                await session.flush()
+
+                # Получаем ID заказа после flush
+                order_id = new_order.order_id
+
             # Коммитим изменения
             await session.commit()
+
+        return order_id  # Возвращаем ID созданного заказа
 
     async def assign_courier_to_order(self, order_id: int, courier_tg_id: int):
         async with self.async_session_factory() as session:
@@ -175,7 +183,10 @@ class OrderData:
             result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
             return result.all()
 
-    async def get_available_orders(self, courier_tg_id: int, courier_lat: float, courier_lon: float, radius_km: float):
+    async def get_available_orders(self, courier_tg_id: int,
+                                   courier_lat: float,
+                                   courier_lon: float,
+                                   radius_km: float):
         async with async_session_factory() as session:
             orders_query = await session.execute(
                 select(Order)
@@ -194,6 +205,20 @@ class OrderData:
                     available_orders.append(order)
 
             return available_orders
+
+    async def get_user_orders(self, user_tg_id: int):
+        async with async_session_factory() as session:
+            orders_query = await session.execute(
+                select(Order)
+                .where(
+                    User.user_tg_id == user_tg_id)
+            )
+
+        # Извлекаем все заказы
+        orders = orders_query.scalars().all()
+
+        # Возвращаем список заказов
+        return orders
 
 
 # async def get_users():
