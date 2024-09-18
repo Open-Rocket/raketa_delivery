@@ -32,12 +32,18 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         ]),
         "/test": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⇤", callback_data="back_left"),
-             InlineKeyboardButton(text="⇥", callback_data="next_right")]
+             InlineKeyboardButton(text="⇥", callback_data="next_right")],
+            [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
+
+        ]),
+        "one_order": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
 
         ]),
         "get_my_orders": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
-             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")]
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Удалить", callback_data="delete_order")]
 
         ]),
     }
@@ -49,8 +55,7 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         return kb[message.text]
 
     if callback_data:
-        if callback_data in kb:
-            return kb[callback_data]
+        pass
 
     if text:
         if text in kb:
