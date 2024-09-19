@@ -26,80 +26,98 @@ async def get_gpt_text(req, model="gpt-4o-mini"):
 
 
 async def assistant_censure(req: str) -> str:
-    try:
-        # Создаем новый поток
-        thread = await client.beta.threads.create()
+    censore_data = ["clear", "tobacco_alcohol", "inaudible", "censure"]
+    instructions = {
+        "censure": (
+            f"Ты — ИИ ассистент в сервисе пешей доставки.\n"
+            f"Твоя задача — проверять заказы на предмет цензуры и подозрительных действий.\n"
+            f"Четко следуй инструкциям, чтобы определить правильный статус заказа.\n\n"
 
-        # Запускаем задание в потоке
+            f"Пропускай заказы, содержащие следующие товары, но с пометкой о необходимости дополнительного анализа:\n"
+            f"- Табачные изделия\n"
+            f"- Электронные сигареты\n"
+            f"- Алкоголь\n"
+            f"Эти товары разрешены к заказу, однако они требуют более тщательной проверки для "
+            f"выявления возможных нарушений или подозрительных действий.\n\n"
+
+            f"Запрещённые товары включают:\n"
+            f"- Наркотические вещества\n"
+            f"- Оружие и боеприпасы\n"
+            f"- Взрывчатые вещества\n"
+            f"- Токсичные или опасные химические вещества\n"
+            f"- Предметы, связанные с незаконной деятельностью\n"
+            f"- Украденные товары\n"
+            f"- Животные (если не оговорено иначе)\n"
+            f"- Любые другие товары, запрещённые законом.\n\n"
+
+            f"Анализируй текст заказа на подозрительность. Обрати внимание на следующее:\n"
+            f"- Неправдоподобные или слишком нечеткие описания заказа\n"
+            f"- Чрезмерно завуалированные или двусмысленные формулировки\n"
+            f"- Упоминание действий, связанных с уклонением от закона\n"
+            f"- Намёки на незаконные операции или скрытые действия.\n\n"
+
+            f"Возвращай без лишних комментариев строго одно из следующих значений на основе анализа:\n"
+            f"{censore_data[0]} — если заказ полностью чист и не содержит запрещенных товаров и подозрительности.\n"
+            f"{censore_data[1]} — если заказ содержит табачные изделия, электронные сигареты, алкоголь."
+            f"{censore_data[2]} — если текст заказа неразборчивый, неполный или не может быть обработан.\n\n"
+            f"{censore_data[3]} — если заказ содержит запрещенные товары (наркотики, оружие и прочие), "
+            f"или подозрительный текст, указывающий на незаконную деятельность.\n"
+            f"Заказ: {req}"
+        )
+    }
+
+    try:
+        thread = await client.beta.threads.create()
         run = await client.beta.threads.runs.create_and_poll(
             thread_id=thread.id,
             assistant_id=assistant_id,
-            instructions=(
-                f"Ты — ИИ ассистент в сервисе пешей доставки.\n"
-                f"Твоя задача — фильтровать заказы на наличие неприемлемых или противозаконных товаров, "
-                f"проверять корректность данных и возвращать один из следующих ответов:\n"
-                f"1. 'clear' — если заказ соответствует всем требованиям и нет нарушений.\n"
-                f"2. 'censure' — если в заказе есть противозаконные или неприемлемые товары.\n"
-                f"3. 'zero' — если текст заказа непонятен, содержит бессмысленные символы или не может быть обработан.\n\n"
-                f"**Важно**: есть категории товаров, которые **не подлежат цензуре**, и их **можно** доставлять:\n"
-                f"— Лекарства\n"
-                f"— Медикаменты\n\n"
-                f"Лекарства и медикаменты **должны быть одобрены для доставки**. Их нельзя цензурировать или блокировать.\n"
-                f"Если ты видишь, что заказ содержит такие товары, **не нужно** применять фильтрацию.\n"
-                f"Если заказ законен и не содержит запрещенных товаров, верни 'clear'.\n"
-                f"Если заказ непонятен или незаконен, верни 'censure'.\n\n"
-                f"Важно избегать излишней строгости при оценке разрешенных товаров, таких как лекарства и медикаменты. "
-                f"Убедись, что они пропущены.\n\n"
-                f"Заказ для проверки:\n"
-                f"{req}"
-            )
+            instructions=instructions["censure"]
         )
 
-        # Проверяем статус задания
         if run.status == 'completed':
-            # Получаем сообщения из потока
             messages_page = await client.beta.threads.messages.list(thread_id=thread.id)
-
-            # Собираем сообщения
-            messages = []
             async for message in messages_page:
-                messages.append(message)
-
-            # Проверяем, есть ли сообщения и извлекаем текст
-            if messages:
-                message = messages[0]
-                # print(f"Message structure: {message}")  # Для отладки структуры
-                if message.content and isinstance(message.content, list) and len(message.content) > 0:
-                    text_block = message.content[0]
-                    if hasattr(text_block, 'text') and hasattr(text_block.text, 'value'):
-                        return text_block.text.value
-                return "Не удалось извлечь текст сообщения."
-            else:
-                return "Нет ответа от ассистента."
-        else:
-            return f"Ошибка при получении ответа от ассистента. Статус: {run.status}"
+                if message.content and isinstance(message.content, list):
+                    for content_block in message.content:
+                        if hasattr(content_block, 'text') and hasattr(content_block.text, 'value'):
+                            return content_block.text.value
+            return "Нет ответа от ассистента."
+        return f"Ошибка: статус {run.status}"
     except Exception as e:
-        print(f"Ошибка при взаимодействии с ассистентом: {e}")
+        print(f"Ошибка при работе с ассистентом: {e}")
+        return "Ошибка при взаимодействии с ассистентом."
 
 
 async def parse_response(response: str) -> dict:
     try:
+        # Поиск начала и конца JSON-строки в ответе
+        json_start = response.find('{')
+        json_end = response.rfind('}') + 1
+        clean_response = response[json_start:json_end]
+
         # Пытаемся преобразовать строку ответа в JSON-объект
-        structured_data = json.loads(response)
-    except json.JSONDecodeError:
-        # Если ошибка, возвращаем пустой словарь или обработку ошибки
+        structured_data = json.loads(clean_response)
+    except json.JSONDecodeError as e:
+        # Обработка ошибки разбора JSON
         structured_data = {}
-        print("Ошибка при разборе JSON ответа от модели.")
+        print(f"Ошибка при разборе JSON ответа от модели: {e}")
 
     return structured_data
 
 
 async def process_order_text(order_text: str) -> dict | str | None:
-    # Формируем запрос для модели ассистента
+    # Проверяем текст заказа на цензуру
+    response_assist = await assistant_censure(order_text)
+
+    # Если заказ не прошел проверку, возвращаем None
+    if response_assist in ('censure', 'zero'):
+        return response_assist
+
+    # Если заказ прошел проверку, формируем JSON с извлеченными данными
     prompt = (
-        f"Пожалуйста, извлеките и структурируйте следующую информацию о заказе в формате "
-        f"JSON (без текста самого заказа):\n\n"
+        f"Пожалуйста, извлеките и структурируйте следующую информацию о заказе в формате JSON без дополнительных комментариев и текстов:\n"
         f"Заказ: {order_text}\n"
+        f"Строго в формате JSON:\n"
         f"{{\n"
         f'  "City": "Город",\n'
         f'  "Starting point A": "Первый пункт доставки",\n'
@@ -107,20 +125,14 @@ async def process_order_text(order_text: str) -> dict | str | None:
         f'  "Delivery object": "Объект доставки",\n'
         f'  "Receiver name": "Имя получателя (если указывается)",\n'
         f'  "Receiver phone": "Номер получателя (если указывается)",\n'
-        f'  "Comments": "Комментарии"\n'
+        f'  "Comments": "Комментарии (если указываются)"\n'
         f"}}"
     )
 
-    response_assist = await assistant_censure(order_text)
-    # Отправляем запрос в ассистент
-    if response_assist in ('censure', 'zero'):
-        return None
-    elif response_assist == "clear":
-        response = await get_gpt_text(prompt)
-        # Предполагается, что модель вернет JSON
-        structured_data = await parse_response(response)
-        return structured_data
+    response = await get_gpt_text(prompt)
+    structured_data = await parse_response(response)
 
+    return structured_data
 
 
 async def get_parsed_addresses(order_text):

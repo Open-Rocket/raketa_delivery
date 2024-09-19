@@ -366,16 +366,39 @@ async def process_message(message: Message, state: FSMContext):
         await handler.handle_new_message(new_message, message)
         return
 
-    # Обработка текста через ИИ
+    # Проверка текста через ассистента на цензуру
+    structured_data = await process_order_text(recognized_text)
+
+    # Обработка результата цензуры
+    if structured_data == 'censure':
+        await state.set_state(UserState.zero)
+        new_message = await message.answer(
+            text="<b>Отказ!!!</b> 🚫\n\nВаш заказ подвергается цензуре и может являться противозаконным!",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+        await wait_message.delete()
+        await handler.handle_new_message(new_message, message)
+        return
+
+    if structured_data == 'zero':
+        await state.set_state(UserState.zero)
+        new_message = await message.answer(
+            text="Не удалось сформировать ваш заказ. Попробуйте еще раз!",
+            reply_markup=reply_kb, disable_notification=True
+        )
+        await wait_message.delete()
+        await handler.handle_new_message(new_message, message)
+        return
+
+    # Если цензура пройдена, обрабатываем адреса
     addresses = await get_parsed_addresses(recognized_text)
     if len(addresses) == 2:
         pickup_address, delivery_address = addresses
-        # Получаем координаты для адресов
         pickup_coords = await get_coordinates(pickup_address)
         delivery_coords = await get_coordinates(delivery_address)
 
         if all(pickup_coords) and all(delivery_coords):
-            # Формируем маршрут и другие данные
+            # Формирование маршрута и расчёт данных
             yandex_maps_url = (
                 f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
                 f"~{delivery_coords[0]},{delivery_coords[1]}&rtt=auto"
@@ -389,110 +412,85 @@ async def process_message(message: Message, state: FSMContext):
                 f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
             )
 
-            # Расчет расстояния и времени
             tg_id = message.from_user.id
             distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
             distance_text = f"{distance} км"
             duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
-            # city_order = await get_city(recognized_text)
             sender_name, sender_phone = await user_data.get_user_info(tg_id)
 
-            # Структурирование данных заказа
-            structured_data = await process_order_text(recognized_text)
-            if structured_data not in ('censure', 'zero'):
-                # Декомпозиция данных
-                city = structured_data.get('City')
-                starting_point_a = structured_data.get('Starting point A')
-                destination_point_b = structured_data.get('Destination point B')
-                delivery_object = structured_data.get('Delivery object')
-                receiver_name = structured_data.get('Receiver name')
-                receiver_phone = structured_data.get('Receiver phone')
-                order_details = structured_data.get('Order details', None)
-                comments = structured_data.get('Comments', None)
-                price = await get_price(distance, moscow_time)
-                price_text = f"{price}₽"
+            # Структурирование данных заказа из ассистента
+            city = structured_data.get('City')
+            starting_point_a = structured_data.get('Starting point A')
+            destination_point_b = structured_data.get('Destination point B')
+            delivery_object = structured_data.get('Delivery object')
+            receiver_name = structured_data.get('Receiver name')
+            receiver_phone = structured_data.get('Receiver phone')
+            order_details = structured_data.get('Order details', None)
+            comments = structured_data.get('Comments', None)
+            price = await get_price(distance, moscow_time)
+            price_text = f"{price}₽"
 
-                await state.update_data(
-                    city=city,
-                    starting_point_a=starting_point_a,
-                    a_latitude=float(pickup_coords[0]),
-                    a_longitude=float(pickup_coords[1]),
-                    a_coordinates=pickup_coords,
-                    a_url=pickup_point,
-                    destination_point_b=destination_point_b,
-                    b_latitude=float(delivery_coords[0]),
-                    b_longitude=float(delivery_coords[1]),
-                    b_coordinates=delivery_coords,
-                    b_url=delivery_point,
-                    delivery_object=delivery_object,
-                    sender_name=sender_name,
-                    sender_phone=sender_phone,
-                    receiver_name=receiver_name,
-                    receiver_phone=receiver_phone,
-                    order_details=order_details,
-                    comments=comments,
-                    distance_km=distance,
-                    duration_min=duration,
-                    price_rub=price,
-                    order_time=moscow_time,
-                    yandex_maps_url=yandex_maps_url,
-                    pickup_point=pickup_point,
-                    delivery_point=delivery_point,
-                )
+            # Сохранение данных заказа в состояние
+            await state.update_data(
+                city=city,
+                starting_point_a=starting_point_a,
+                a_latitude=float(pickup_coords[0]),
+                a_longitude=float(pickup_coords[1]),
+                a_coordinates=pickup_coords,
+                a_url=pickup_point,
+                destination_point_b=destination_point_b,
+                b_latitude=float(delivery_coords[0]),
+                b_longitude=float(delivery_coords[1]),
+                b_coordinates=delivery_coords,
+                b_url=delivery_point,
+                delivery_object=delivery_object,
+                sender_name=sender_name,
+                sender_phone=sender_phone,
+                receiver_name=receiver_name,
+                receiver_phone=receiver_phone,
+                order_details=order_details,
+                comments=comments,
+                distance_km=distance,
+                duration_min=duration,
+                price_rub=price,
+                order_time=moscow_time,
+                yandex_maps_url=yandex_maps_url,
+                pickup_point=pickup_point,
+                delivery_point=delivery_point,
+            )
 
-                order_forma = (
-                    # f"Оформлен: {order_time}\n"
-                    f"Ваш заказ ✍︎\n"
-                    f"---------------------------------------------\n"
-                    f"Город: {city}\n"
-                    f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                    f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
-                    f"Предмет доставки: {delivery_object}\n\n"
-                    f"Имя отправителя: {sender_name}\n"
-                    f"Номер отправителя: {sender_phone}\n"
-                    f"Имя получателя: {receiver_name}\n"
-                    f"Номер получателя: {receiver_phone}\n\n"
-                    f"Расстояние: {distance_text}\n"
-                    # f"Время доставки ≈ {duration_text}\n\n"
-                    f"Стоимость доставки: {price_text}\n\n"
-                    f"Комментарии курьеру: {comments}\n"
-                    f"---------------------------------------------\n"
-                    f"* Проверьте ваш заказ и если все верно, то разместите. "
-                    f"Подождите немного, пока найдется свободный курьер.\n\n"
-                    f"* Курьер может связаться с вами для уточнения деталей!\n\n"
-                    f"* Оплачивайте курьеру наличными или переводом."
-                    # f"⦿ <a href='{pickup_point}'>Забрать отсюда</a>\n\n"
-                    # f"⦿ <a href='{delivery_point}'>Доставить сюда</a>\n\n"
-                    f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут</a>\n\n"
+            # Формирование сообщения для пользователя
+            order_forma = (
+                f"Ваш заказ ✍︎\n"
+                f"---------------------------------------------\n"
+                f"Город: {city}\n"
+                f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
+                f"Предмет доставки: {delivery_object if delivery_object else ' -'}\n\n"
+                f"Имя отправителя: {sender_name}\n"
+                f"Номер отправителя: {sender_phone}\n"
+                f"Имя получателя: {receiver_name if receiver_name else ' -'}\n"
+                f"Номер получателя: {receiver_phone if receiver_phone else ' -'}\n\n"
+                f"Расстояние: {distance_text}\n"
+                f"Стоимость доставки: {price_text}\n\n"
+                f"Комментарии курьеру ☟\n"
+                f"✺\n"
+                f"{comments if comments else 'Комментариев нет'}\n"
+                f"---------------------------------------------\n"
+                f"* Проверьте ваш заказ и если все верно, то разместите.\n"
+                f"* Курьер может связаться с вами для уточнения деталей!\n"
+                f"* Оплачивайте курьеру наличными или переводом.\n"
+                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+            )
 
-                )
-
-                # Отправка итогового сообщения
-                new_message = await message.answer(text=order_forma, reply_markup=reply_kb, disable_notification=True,
-                                                   parse_mode="HTML")
-            elif structured_data == "zero":
-                await state.set_state(UserState.zero)
-                text = ("Не удалось сформировать ваш заказ.\n\n"
-                        "Попробуйте еще раз!")
-                new_message = await message.answer(text=text,
-                                                   disable_notification=True)
-            elif structured_data == "censure":
-                await state.set_state(UserState.zero)
-                text = ("<b>Отказ!!!</b> 🚫\n\n"
-                        "Ваш заказ подвергается цензуре и может являться противозаконным!")
-                new_message = await message.answer(text=text,
-                                                   disable_notification=True,
-                                                   parse_mode="HTML")
-            else:
-                text = ("Произошла ошибка при формировании заказа.\n\n"
-                        "Попробуйте еще раз!")
-                await state.set_state(UserState.zero)
-                new_message = await message.answer(text=text,
-                                                   disable_notification=True)
+            # Отправка сообщения
+            new_message = await message.answer(
+                text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+            )
 
         else:
             new_message = await message.answer(
-                text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
+                text=f"Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
                 reply_markup=reply_kb, disable_notification=True
             )
     else:
