@@ -63,7 +63,7 @@ async def get_price(distance, order_time, city=None) -> int:
 
     # Базовая цена за километр
     if 0 < distance <= 2:
-        base_price_per_km = 85
+        base_price_per_km = 101
     else:
         base_price_per_km = 38
 

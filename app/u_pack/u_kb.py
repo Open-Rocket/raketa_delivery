@@ -19,7 +19,6 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         "/profile": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
             [InlineKeyboardButton(text="Номер", callback_data="set_my_phone")],
-            [InlineKeyboardButton(text="Мои заказы", callback_data="get_my_orders")]
         ]),
         "voice_order_accept": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Отмена", callback_data="cancel_order"),
