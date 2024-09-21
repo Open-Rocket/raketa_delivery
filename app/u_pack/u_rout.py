@@ -846,7 +846,7 @@ async def process_message(message: Message, state: FSMContext):
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
         new_message = await message.answer(
-            text="<b>...</b> 🫤 \n\nСделайте заказ!",
+            text="<b>...</b> 🫤 \n\nСделайте корректный заказ!",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
     else:
