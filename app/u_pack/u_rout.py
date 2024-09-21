@@ -14,6 +14,7 @@ from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
 from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, assistant_censure
+
 from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
 from app.common.fuzzy_city import find_most_compatible_response
 
@@ -642,7 +643,8 @@ async def process_message(message: Message, state: FSMContext):
     await state.set_state(UserState.waiting_Courier)
 
     censore_data = ["clear", "tobacco_alcohol", "inaudible", "censure"]
-    wait_message = await message.answer("Заказ обрабатывается, подождите ...", disable_notification=True)
+    wait_message = await message.answer(f"Заказ обрабатывается, подождите ...", disable_notification=True)
+
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -855,4 +857,4 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
 
-# --------------------------------------------------- ✺ The end (u_rout) ✺ ------------------------------------------ #
+# ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
