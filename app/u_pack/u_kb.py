@@ -46,7 +46,7 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Удалить", callback_data="delete_order")]
 
         ]),
-        "tobacco_alcohol": InlineKeyboardMarkup(inline_keyboard=[
+        "overprice": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Не оформлять 🆇", callback_data="reject_notification"),
              InlineKeyboardButton(text="Хорошо", callback_data="accept_notification")]
         ]),

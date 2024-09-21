@@ -198,7 +198,7 @@ async def cmd_order(message: Message, state: FSMContext):
                 "Город: *если нужно\n"
                 "Адрес 1: Откуда забрать заказ.\n"
                 "Адрес 2: Куда доставить заказ.\n"
-                "Предмет доставки:\n"
+                "Предмет доставки: *обязательно\n"
                 "Имя получателя:\n"
                 "Номер получателя:\n"
                 "Комментарии курьеру:\n\n"
@@ -235,6 +235,31 @@ async def cmd_profile(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# commands_Profile
+@users_router.message(F.text == "/faq")
+async def cmd_faq(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    text = (f"Вопросы и ответы")
+
+    new_message = await message.answer(text, disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
+@users_router.message(F.text == "/rules")
+async def cmd_rules(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    text = (f"Правила сервиса")
+
+    new_message = await message.answer(text, disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
 # commands_BecomeCourier
 @users_router.message(F.text == "/become_courier")
 async def cmd_become_courier(message: Message, state: FSMContext):
@@ -266,7 +291,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
             "Город: *если нужно\n"
             "Адрес 1: Откуда забрать заказ.\n"
             "Адрес 2: Куда доставить заказ.\n"
-            "Предмет доставки:\n"
+            "Предмет доставки: *обязательно\n"
             "Имя получателя:\n"
             "Номер получателя:\n"
             "Комментарии курьеру:\n\n"
@@ -642,7 +667,7 @@ async def ai_answer(message: Message, state: FSMContext):
 async def process_message(message: Message, state: FSMContext):
     await state.set_state(UserState.waiting_Courier)
 
-    censore_data = ["clear", "tobacco_alcohol", "inaudible", "censure"]
+    censore_data = ["clear", "overprice", "inaudible", "no_item", "censure", "not_order"]
     wait_message = await message.answer(f"Заказ обрабатывается, подождите ...", disable_notification=True)
 
     handler = MessageHandler(state, message.bot)
@@ -676,9 +701,12 @@ async def process_message(message: Message, state: FSMContext):
 
     # Проверка текста через ассистента на цензуру
     censore_response = await assistant_censure(recognized_text)
+    print(censore_response)
+
 
     # Определение наибольшей совместимости ответа с возможными сценариями
     most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
+    print(most_compatible_response)
 
     # Обработка результата цензуры по наибольшему соответствию
     if most_compatible_response == "clear":
@@ -790,9 +818,9 @@ async def process_message(message: Message, state: FSMContext):
                 reply_markup=reply_kb, disable_notification=True
             )
 
-    elif most_compatible_response == "tobacco_alcohol":
+    elif most_compatible_response == "overprice":
         await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="tobacco_alcohol")
+        reply_kb = await get_user_kb(text="overprice")
         new_message = await message.answer(
             text=("<b>Внимание</b>！ \n\nВаш заказ содержит табачные изделия или алкогольуню продукцию.\n\n"
                   "<b>Доставка будет стоить немного дороже!</b>"),
@@ -807,11 +835,25 @@ async def process_message(message: Message, state: FSMContext):
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
 
+    elif most_compatible_response == "no_item":
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="rerecord")
+        new_message = await message.answer(
+            text="<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+    elif most_compatible_response == "not_order":
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="rerecord")
+        new_message = await message.answer(
+            text="<b>...</b> 🫤 \n\nСделайте заказ!",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
     else:
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
         new_message = await message.answer(
-            text="<b>Отказ!!!</b> 🚫\n\nВаш заказ подвергается цензуре и может являться противозаконным!",
+            text="<b>Отказ!!!</b> 🚫\n\nМы не можем это доставлять!",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
 
