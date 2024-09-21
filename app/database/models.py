@@ -15,6 +15,13 @@ from app.database.config_db import settings
 
 load_dotenv()
 
+sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
+engine = create_async_engine(url=settings.DB_URL_asyncpg, echo=False)  # pool_size=5, max_overflow=10
+async_session_factory = async_sessionmaker(engine)
+
+moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
+utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0)
+
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
 stringData = Annotated[str, mapped_column(String(256), nullable=True)]
@@ -22,13 +29,7 @@ intData = Annotated[int, mapped_column(Integer, nullable=True)]
 floatData = Annotated[float, mapped_column(Float, nullable=True)]
 coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
-
-sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
-engine = create_async_engine(url=settings.DB_URL_asyncpg, echo=False)  # pool_size=5, max_overflow=10
-async_session_factory = async_sessionmaker(engine)
-
-moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
-utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0)
+datetimeData = Annotated[datetime, mapped_column(DateTime, default=utc_time)]
 
 
 # Enums
@@ -87,11 +88,11 @@ class User(Base):
 
     user_id: Mapped[intPK]
 
-    user_tg_id: Mapped[int] = mapped_column(BigInteger)
-    user_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    # user_email: Mapped[str] = mapped_column(String(255), nullable=True)
-    user_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
-    user_registration_date: Mapped[datetime] = mapped_column(DateTime, default=utc_time)
+    user_tg_id: Mapped[intData]
+    user_name: Mapped[stringData]
+    user_phone_number: Mapped[stringData]
+    user_default_city: Mapped[stringData]
+    user_registration_date: Mapped[datetimeData]
 
     orders = relationship("Order", back_populates="user")
 

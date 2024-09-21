@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
@@ -11,7 +13,8 @@ load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
 
 
-async def check_state_and_handle_message(state: str, event: Message, handler: Callable, data: Dict[str, Any]) -> Any:
+async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
+                                         data: Dict[str, Any]) -> Any:
     message_text = event.text
 
     # Обработка команды /start в любом состоянии
@@ -23,10 +26,14 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
         await event.delete()
         return
 
-    if state == UserState.reg_Name.state:
+    if state in (UserState.reg_Name.state, UserState.reg_City.state):
         if message_text in ["/order", "/profile", "/my_orders", "/faq", "/rules", "/become_courier"]:
             await event.delete()
             return
+
+    # if state == UserState.ai_voice_order.state:
+    #     if message_text in ["/order", "/profile", "/my_orders", "/faq", "/rules", "/become_courier", "/test"]:
+    #         return "setdefault"
 
     if state == UserState.reg_Phone.state or state == UserState.change_Phone.state:
         if event.content_type == "contact":  # Если тип контента - контакт

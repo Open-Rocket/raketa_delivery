@@ -15,6 +15,7 @@ from app.u_pack.u_kb import get_user_kb
 from app.u_pack.u_voice_to_text import process_audio_data
 from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, assistant_censure
 from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
+from app.common.fuzzy_city import find_most_compatible_response
 
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
@@ -53,7 +54,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 
     # Если пользователь уже зарегистрирован
     if user_name and user_phone:
-        await state.set_state(UserState.zero)
+        await state.set_state(UserState.default)
         await handler.delete_previous_message(message.chat.id)
         text = ("▼ <b>Выберите действие ...</b>")
         new_message = await message.answer(text)
@@ -122,7 +123,7 @@ async def data_email_user(message: Message, state: FSMContext):
 # registration_Phone
 @users_router.message(filters.StateFilter(UserState.reg_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
-    await state.set_state(UserState.zero)
+    await state.set_state(UserState.reg_City)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -130,10 +131,31 @@ async def data_phone_user(message: Message, state: FSMContext):
     phone = message.contact.phone_number
 
     await user_data.set_user_phone(tg_id, phone)
-    name, phone_number = await user_data.get_user_info(tg_id)
+    text = (f"Последний шаг!\n\n"
+            f"Для того чтобы каждый раз не указывать город доставки, "
+            f"скажите в каком городе вы будете в основном делать заказы "
+            f"и он автоматически будет подставляться.\n\n"
+            f"<b>Ваш город:</b>")
+    msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(msg, message)
+
+
+@users_router.message(filters.StateFilter(UserState.reg_City))
+async def data_phone_user(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    city = message.text
+
+    await user_data.set_user_city(tg_id, city)
+    name, phone_number, city = await user_data.get_user_info(tg_id)
     text = (f"Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {name}\n"
-            f"Номер: {phone_number}\n\n▼ <b>Выберите действие ...</b>")
+            f"Номер: {phone_number}\n"
+            f"Ваш город: {city}\n\n"
+            f"▼ <b>Выберите действие ...</b>")
     msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(msg, message)
 
@@ -153,6 +175,7 @@ async def cmd_order(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
 
     if not read_info:
+        await state.set_state(UserState.default)
         # Отправляем инструкцию пользователю
         photo_title = await get_image_title_user(message.text)
         text = ("◉ Вы можете сделать заказ с помощью текста или голоса, "
@@ -165,15 +188,13 @@ async def cmd_order(message: Message, state: FSMContext):
                                                  caption=text,
                                                  reply_markup=reply_kb,
                                                  disable_notification=True)
-        # Обновляем флаг, чтобы больше не показывать инструкцию
-        # await state.update_data(read_info=True)
-        # Устанавливаем нужный стейт для дальнейшего использования
-        # await state.set_state(UserState.ai_voice_order)
+
 
     else:
-        # Если инструкция уже была показана, сразу переходим к процессу заказа
+        await state.update_data(read_info=True)
+        await state.set_state(UserState.ai_voice_order)
         text = ("◉ Укажите в описании к заказу:\n\n"
-                "Город:\n"
+                "Город: *если нужно\n"
                 "Адрес 1: Откуда забрать заказ.\n"
                 "Адрес 2: Куда доставить заказ.\n"
                 "Предмет доставки:\n"
@@ -186,8 +207,6 @@ async def cmd_order(message: Message, state: FSMContext):
         new_message = await message.answer(text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
                                            disable_notification=True,
                                            parse_mode="HTML")
-        # Вновь устанавливаем стейт для корректной работы хендлера
-        await state.set_state(UserState.ai_voice_order)
 
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, message)
@@ -196,17 +215,17 @@ async def cmd_order(message: Message, state: FSMContext):
 # commands_Profile
 @users_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
-    await state.set_state(UserState.zero)
+    await state.set_state(UserState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
     photo_title = await get_image_title_user(message.text)
-    name, phone_number = await user_data.get_user_info(tg_id)
+    name, phone_number, city = await user_data.get_user_info(tg_id)
 
     text = (f"Имя: {name} \n"
-            f"Номер: {phone_number}")
+            f"Номер: {phone_number}\n"
+            f"Город: {city}")
     reply_kb = await get_user_kb(message=message)
-    await asyncio.sleep(0)
 
     new_message = await message.answer_photo(photo=photo_title,
                                              caption=text,
@@ -243,7 +262,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
     handler = MessageHandler(state, callback_query.bot)
     text = ("◉ Укажите в описании к заказу:\n\n"
-            "Город: *Обязательно\n"
+            "Город: *если нужно\n"
             "Адрес 1: Откуда забрать заказ.\n"
             "Адрес 2: Куда доставить заказ.\n"
             "Предмет доставки:\n"
@@ -262,7 +281,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 # cancel_Order
 @users_router.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.zero)
+    await state.set_state(UserState.default)
     handler = MessageHandler(state, callback_query.bot)
     text = "▼ <b>Выберите действие ...</b>"
     new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
@@ -274,7 +293,7 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.change_Name)
     handler = MessageHandler(state, callback_query.bot)
     text = (f"Изменить данные профиля.\n\n"
-            f"<b>Ваше новое имя:</b>")
+            f"<b>Ваше имя:</b>")
     new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, callback_query.message)
 
@@ -285,7 +304,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
     reply_kb = await get_user_kb(text="phone_number")
     text = (f"Изменить данные профиля.\n\n"
-            f"<b>Ваше номер:</b>")
+            f"<b>Ваш номер:</b>")
     new_message = await callback_query.message.answer(text,
                                                       disable_notification=True,
                                                       reply_markup=reply_kb,
@@ -293,9 +312,21 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+@users_router.callback_query(F.data == "set_my_city")
+async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.change_City)
+    handler = MessageHandler(state, callback_query.bot)
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваш город:</b>")
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
 @users_router.message(filters.StateFilter(UserState.change_Name))
 async def change_name(message: Message, state: FSMContext):
-    await state.set_state(UserState.zero)
+    await state.set_state(UserState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -312,7 +343,7 @@ async def change_name(message: Message, state: FSMContext):
 
 @users_router.message(filters.StateFilter(UserState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
-    await state.set_state(UserState.zero)
+    await state.set_state(UserState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -327,219 +358,21 @@ async def change_phone(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                               ⇣ Formation of an order ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
-
-
-# form_Order
-@users_router.message(
-    filters.StateFilter(UserState.ai_voice_order),
-    F.content_type.in_([ContentType.VOICE, ContentType.TEXT])
-)
-async def process_message(message: Message, state: FSMContext):
-    await state.set_state(UserState.waiting_Courier)
-    wait_message = await message.answer("Заказ обрабатывается, подождите ...", disable_notification=True)
+@users_router.message(filters.StateFilter(UserState.change_City))
+async def change_name(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
-    # Инициализация переменных
-    reply_kb = await get_user_kb(text="voice_order_accept")
-    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
-    recognized_text = None
+    tg_id = message.from_user.id
+    city = message.text
 
-    # Обработка сообщения в зависимости от типа контента
-    if message.content_type == ContentType.VOICE:
-        voice = message.voice
-        file_info = await message.bot.get_file(voice.file_id)
-        file = await message.bot.download_file(file_info.file_path)
-        audio_data = file.read()
-        recognized_text = await process_audio_data(audio_data)
-    else:
-        recognized_text = message.text
+    await user_data.set_user_city(tg_id, city)
+    text = (f"Город был изменен на {city} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
 
-    # Если распознавание не удалось
-    if not recognized_text:
-        recognized_text = "Ошибка распознавания. Попробуйте снова."
-        new_message = await message.answer(recognized_text, reply_markup=reply_kb)
-        await wait_message.delete()
-        await handler.handle_new_message(new_message, message)
-        return
-
-    # Проверка текста через ассистента на цензуру
-    structured_data = await process_order_text(recognized_text)
-
-    # Обработка результата цензуры
-    if structured_data == 'censure':
-        await state.set_state(UserState.zero)
-        new_message = await message.answer(
-            text="<b>Отказ!!!</b> 🚫\n\nВаш заказ подвергается цензуре и может являться противозаконным!",
-            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
-        )
-        await wait_message.delete()
-        await handler.handle_new_message(new_message, message)
-        return
-
-    if structured_data == 'zero':
-        await state.set_state(UserState.zero)
-        new_message = await message.answer(
-            text="Не удалось сформировать ваш заказ. Попробуйте еще раз!",
-            reply_markup=reply_kb, disable_notification=True
-        )
-        await wait_message.delete()
-        await handler.handle_new_message(new_message, message)
-        return
-
-    # Если цензура пройдена, обрабатываем адреса
-    addresses = await get_parsed_addresses(recognized_text)
-    if len(addresses) == 2:
-        pickup_address, delivery_address = addresses
-        pickup_coords = await get_coordinates(pickup_address)
-        delivery_coords = await get_coordinates(delivery_address)
-
-        if all(pickup_coords) and all(delivery_coords):
-            # Формирование маршрута и расчёт данных
-            yandex_maps_url = (
-                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
-                f"~{delivery_coords[0]},{delivery_coords[1]}&rtt=auto"
-            )
-            pickup_point = (
-                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
-                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
-            )
-            delivery_point = (
-                f"https://yandex.ru/maps/?ll={delivery_coords[1]},{delivery_coords[0]}"
-                f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
-            )
-
-            tg_id = message.from_user.id
-            distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
-            distance_text = f"{distance} км"
-            duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
-            sender_name, sender_phone = await user_data.get_user_info(tg_id)
-
-            # Структурирование данных заказа из ассистента
-            city = structured_data.get('City')
-            starting_point_a = structured_data.get('Starting point A')
-            destination_point_b = structured_data.get('Destination point B')
-            delivery_object = structured_data.get('Delivery object')
-            receiver_name = structured_data.get('Receiver name')
-            receiver_phone = structured_data.get('Receiver phone')
-            order_details = structured_data.get('Order details', None)
-            comments = structured_data.get('Comments', None)
-            price = await get_price(distance, moscow_time)
-            price_text = f"{price}₽"
-
-            # Сохранение данных заказа в состояние
-            await state.update_data(
-                city=city,
-                starting_point_a=starting_point_a,
-                a_latitude=float(pickup_coords[0]),
-                a_longitude=float(pickup_coords[1]),
-                a_coordinates=pickup_coords,
-                a_url=pickup_point,
-                destination_point_b=destination_point_b,
-                b_latitude=float(delivery_coords[0]),
-                b_longitude=float(delivery_coords[1]),
-                b_coordinates=delivery_coords,
-                b_url=delivery_point,
-                delivery_object=delivery_object,
-                sender_name=sender_name,
-                sender_phone=sender_phone,
-                receiver_name=receiver_name,
-                receiver_phone=receiver_phone,
-                order_details=order_details,
-                comments=comments,
-                distance_km=distance,
-                duration_min=duration,
-                price_rub=price,
-                order_time=moscow_time,
-                yandex_maps_url=yandex_maps_url,
-                pickup_point=pickup_point,
-                delivery_point=delivery_point,
-            )
-
-            # Формирование сообщения для пользователя
-            order_forma = (
-                f"Ваш заказ ✍︎\n"
-                f"---------------------------------------------\n"
-                f"Город: {city}\n"
-                f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
-                f"Предмет доставки: {delivery_object if delivery_object else ' -'}\n\n"
-                f"Имя отправителя: {sender_name}\n"
-                f"Номер отправителя: {sender_phone}\n"
-                f"Имя получателя: {receiver_name if receiver_name else ' -'}\n"
-                f"Номер получателя: {receiver_phone if receiver_phone else ' -'}\n\n"
-                f"Расстояние: {distance_text}\n"
-                f"Стоимость доставки: {price_text}\n\n"
-                f"Комментарии курьеру ☟\n"
-                f"✺\n"
-                f"{comments if comments else 'Комментариев нет'}\n"
-                f"---------------------------------------------\n"
-                f"* Проверьте ваш заказ и если все верно, то разместите.\n"
-                f"* Курьер может связаться с вами для уточнения деталей!\n"
-                f"* Оплачивайте курьеру наличными или переводом.\n"
-                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
-            )
-
-            # Отправка сообщения
-            new_message = await message.answer(
-                text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
-            )
-
-        else:
-            new_message = await message.answer(
-                text=f"Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
-                reply_markup=reply_kb, disable_notification=True
-            )
-    else:
-        new_message = await message.answer(
-            text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
-            reply_markup=reply_kb, disable_notification=True
-        )
-
-    # Завершение обработки
-    await wait_message.delete()
     await handler.handle_new_message(new_message, message)
-
-
-# send_Order
-@users_router.callback_query(F.data == "order_sent")
-async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
-    # Устанавливаем состояние
-    await state.set_state(UserState.waiting_Courier)
-
-    # Создаем обработчик сообщений
-    handler = MessageHandler(state, callback_query.bot)
-
-    # Получаем ID пользователя
-    tg_id = callback_query.from_user.id
-    data = await state.get_data()
-    await state.set_state(UserState.zero)
-
-    try:
-        # Асинхронно создаем заказ
-        order_number = await order_data.create_order(tg_id, data)
-        text = (
-            f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
-            f"Мы ищем курьера для вашего заказа 🔎\n\n"
-            f"Информацию о заказах можно посмотреть в разделе <u>Мои заказы</u>\n\n"
-            f"▼ <b>Выберите действие ...</b>"
-        )
-    except Exception as e:
-        # Обработка возможных ошибок
-        print(f"Ошибка при создании заказа: {str(e)}")
-
-        text = ("Ошибка при создании заказа.\n"
-                "Попробуйте повторить заказ.")
-
-    new_message = await callback_query.message.answer(text,
-                                                      disable_notification=True,
-                                                      parse_mode="HTML")
-
-    # Обрабатываем новое сообщение
-    await handler.handle_new_message(new_message, callback_query.message)
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -549,7 +382,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 # my orders
 @users_router.message(F.text == "/my_orders")
 async def send_user_orders(message: Message, state: FSMContext):
-    await state.set_state(UserState.myOrders)
+    await state.set_state(UserState.default)
 
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
@@ -571,15 +404,15 @@ async def send_user_orders(message: Message, state: FSMContext):
             f"Город: {order.order_city}\n"
             f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
             f"⦿ Адрес 2: <a href='{order.b_url}'>{order.destination_point_b}</a>\n\n"
-            f"Предмет доставки: {order.delivery_object}\n\n"
+            f"Предмет доставки: {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"Имя отправителя: {order.sender_name}\n"
             f"Номер отправителя: {order.sender_phone}\n\n"
-            f"Имя получателя: {order.receiver_name}\n"
-            f"Номер получателя: {order.receiver_phone}\n\n"
+            f"Имя получателя: {order.receiver_name if order.receiver_name else '-'}\n"
+            f"Номер получателя: {order.receiver_phone if order.receiver_phone else '-'}\n\n"
             f"Расстояние: {order.distance_km} км\n"
             f"Стоимость доставки: {order.price_rub}₽\n"
             f"---------------------------------------------\n"
-            f"Комментарии: {order.comments}\n\n"
+            f"Комментарии: {order.comments if order.comments else '-'}\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
         orders.append(order_forma)
@@ -614,7 +447,7 @@ async def send_user_orders(message: Message, state: FSMContext):
 @users_router.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
+    await state.set_state(UserState.default)  # Состояние для "моих заказов"
     data = await state.get_data()
     orders = data.get("orders")
     counter = data.get("counter", 0)
@@ -635,7 +468,7 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
 @users_router.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
+    await state.set_state(UserState.default)  # Состояние для "моих заказов"
     data = await state.get_data()
     orders = data.get("orders")
     counter = data.get("counter", 0)
@@ -682,16 +515,16 @@ async def send_orders(message: Message, state: FSMContext):
             f"Город: {order.order_city}\n"
             f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
             f"⦿ Адрес 2: <a href='{order.b_url}'>{order.destination_point_b}</a>\n\n"
-            f"Предмет доставки: {order.delivery_object}\n\n"
+            f"Предмет доставки: {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"Имя отправителя: {order.sender_name}\n"
             f"Номер отправителя: {order.sender_phone}\n\n"
-            f"Имя получателя: {order.receiver_name}\n"
-            f"Номер получателя: {order.receiver_phone}\n\n"
+            f"Имя получателя: {order.receiver_name if order.receiver_name else '-'}\n"
+            f"Номер получателя: {order.receiver_phone if order.receiver_phone else '-'}\n\n"
             f"Расстояние: {order.distance_km} км\n"
             f"Оплата: {order.price_rub}₽\n"
             f"* Принимайте оптату наличными или переводом.\n"
             f"---------------------------------------------\n"
-            f"Комментарии: {order.comments}\n\n"
+            f"Комментарии: {order.comments if order.comments else '-'}\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
         orders.append(order_forma)
@@ -793,5 +626,233 @@ async def ai_answer(message: Message, state: FSMContext):
     assistant_response = await assistant_censure(req=user_message)
     new_message = await message.answer(assistant_response, disable_notification=True)
     await handler.handle_new_message(new_message, message)
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                               ⇣ Formation of an order ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+# form_Order
+@users_router.message(
+    filters.StateFilter(UserState.ai_voice_order),
+    F.content_type.in_([ContentType.VOICE, ContentType.TEXT])
+)
+async def process_message(message: Message, state: FSMContext):
+    await state.set_state(UserState.waiting_Courier)
+
+    censore_data = ["clear", "tobacco_alcohol", "inaudible", "censure"]
+    wait_message = await message.answer("Заказ обрабатывается, подождите ...", disable_notification=True)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    # Инициализация переменных
+    reply_kb = await get_user_kb(text="voice_order_accept")
+    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
+    tg_id = message.from_user.id
+    user_city = await user_data.get_user_city(tg_id)
+
+    recognized_text = None
+
+    # Обработка сообщения в зависимости от типа контента
+    if message.content_type == ContentType.VOICE:
+        voice = message.voice
+        file_info = await message.bot.get_file(voice.file_id)
+        file = await message.bot.download_file(file_info.file_path)
+        audio_data = file.read()
+        recognized_text = await process_audio_data(audio_data)
+    else:
+        recognized_text = message.text
+
+    # Если распознавание не удалось
+    if not recognized_text:
+        recognized_text = "Ошибка распознавания. Попробуйте снова."
+        new_message = await message.answer(recognized_text, reply_markup=reply_kb)
+        await wait_message.delete()
+        await handler.handle_new_message(new_message, message)
+        return
+
+    # Проверка текста через ассистента на цензуру
+    censore_response = await assistant_censure(recognized_text)
+
+    # Определение наибольшей совместимости ответа с возможными сценариями
+    most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
+
+    # Обработка результата цензуры по наибольшему соответствию
+    if most_compatible_response == "clear":
+        # Обработка для разрешенных заказов (обычные товары)
+        addresses = await get_parsed_addresses(recognized_text, user_city)
+        if len(addresses) == 2:
+            pickup_address, delivery_address = addresses
+            pickup_coords = await get_coordinates(pickup_address)
+            delivery_coords = await get_coordinates(delivery_address)
+
+            if all(pickup_coords) and all(delivery_coords):
+                # Продолжение обработки заказа
+                yandex_maps_url = (
+                    f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
+                    f"~{delivery_coords[0]},{delivery_coords[1]}&rtt=auto"
+                )
+                pickup_point = (
+                    f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+                    f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+                )
+                delivery_point = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords[1]},{delivery_coords[0]}"
+                    f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
+                )
+
+                tg_id = message.from_user.id
+                distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
+                distance_text = f"{distance} км"
+                duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
+                price = await get_price(distance, moscow_time)
+                price_text = f"{price}₽"
+
+                # Структурирование данных заказа
+                structured_data = await process_order_text(recognized_text)
+                city = structured_data.get('City')
+                if not city:
+                    city = user_city
+                starting_point_a = structured_data.get('Starting point A')
+                destination_point_b = structured_data.get('Destination point B')
+                delivery_object = structured_data.get('Delivery object')
+                receiver_name = structured_data.get('Receiver name')
+                receiver_phone = structured_data.get('Receiver phone')
+                order_details = structured_data.get('Order details', None)
+                comments = structured_data.get('Comments', None)
+
+                # Сохранение данных в состоянии
+                await state.update_data(
+                    city=city,
+                    starting_point_a=starting_point_a,
+                    a_latitude=float(pickup_coords[0]),
+                    a_longitude=float(pickup_coords[1]),
+                    a_coordinates=pickup_coords,
+                    a_url=pickup_point,
+                    destination_point_b=destination_point_b,
+                    b_latitude=float(delivery_coords[0]),
+                    b_longitude=float(delivery_coords[1]),
+                    b_coordinates=delivery_coords,
+                    b_url=delivery_point,
+                    delivery_object=delivery_object,
+                    sender_name=sender_name,
+                    sender_phone=sender_phone,
+                    receiver_name=receiver_name,
+                    receiver_phone=receiver_phone,
+                    order_details=order_details,
+                    comments=comments,
+                    distance_km=distance,
+                    duration_min=duration,
+                    price_rub=price,
+                    order_time=moscow_time,
+                    yandex_maps_url=yandex_maps_url,
+                    pickup_point=pickup_point,
+                    delivery_point=delivery_point,
+                )
+
+                # Отправка ответа пользователю
+                order_forma = (
+                    f"Ваш заказ ✍︎\n"
+                    f"---------------------------------------------\n"
+                    f"Город: {city}\n"
+                    f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
+                    f"Предмет доставки: {delivery_object if delivery_object else ' -'}\n\n"
+                    f"Имя отправителя: {sender_name}\n"
+                    f"Номер отправителя: {sender_phone}\n"
+                    f"Имя получателя: {receiver_name if receiver_name else '-'}\n"
+                    f"Номер получателя: {receiver_phone if receiver_phone else '-'}\n\n"
+                    f"Расстояние: {distance_text}\n"
+                    f"Стоимость доставки: {price_text}\n\n"
+                    f"Комментарии курьеру: {comments if comments else '-'}\n"
+                    f"---------------------------------------------\n"
+                    f"* Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"* Курьер может связаться с вами для уточнения деталей!\n"
+                    f"* Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+                )
+                new_message = await message.answer(
+                    text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+                )
+
+            else:
+                new_message = await message.answer(
+                    text=f"Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
+                    reply_markup=reply_kb, disable_notification=True
+                )
+        else:
+            new_message = await message.answer(
+                text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
+                reply_markup=reply_kb, disable_notification=True
+            )
+
+    elif most_compatible_response == "tobacco_alcohol":
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="tobacco_alcohol")
+        new_message = await message.answer(
+            text=("<b>Внимание</b>！ \n\nВаш заказ содержит табачные изделия или алкогольуню продукцию.\n\n"
+                  "<b>Доставка будет стоить немного дороже!</b>"),
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+
+    elif most_compatible_response == "inaudible":
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="rerecord")
+        new_message = await message.answer(
+            text="<b>Ошибка</b> ⸘\n\nТекст сообщения неразборчив.\nПопробуйте отправить заказ снова.",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+
+    else:
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="rerecord")
+        new_message = await message.answer(
+            text="<b>Отказ!!!</b> 🚫\n\nВаш заказ подвергается цензуре и может являться противозаконным!",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+
+    # Завершение обработки
+    await wait_message.delete()
+    await handler.handle_new_message(new_message, message)
+
+
+# send_Order
+@users_router.callback_query(F.data == "order_sent")
+async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
+    # Устанавливаем состояние
+    await state.set_state(UserState.waiting_Courier)
+
+    # Создаем обработчик сообщений
+    handler = MessageHandler(state, callback_query.bot)
+
+    # Получаем ID пользователя
+    tg_id = callback_query.from_user.id
+    data = await state.get_data()
+    await state.set_state(UserState.default)
+
+    try:
+        # Асинхронно создаем заказ
+        order_number = await order_data.create_order(tg_id, data)
+        text = (
+            f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
+            f"Мы ищем курьера для вашего заказа 🔎\n\n"
+            f"Информацию о заказах можно посмотреть в разделе <u>Мои заказы</u>\n\n"
+            f"▼ <b>Выберите действие ...</b>"
+        )
+    except Exception as e:
+        # Обработка возможных ошибок
+        print(f"Ошибка при создании заказа: {str(e)}")
+
+        text = ("Ошибка при создании заказа.\n"
+                "Попробуйте повторить заказ.")
+
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      parse_mode="HTML")
+
+    # Обрабатываем новое сообщение
+    await handler.handle_new_message(new_message, callback_query.message)
 
 # --------------------------------------------------- ✺ The end (u_rout) ✺ ------------------------------------------ #

@@ -12,18 +12,19 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         ]),
         "phone_number": ReplyKeyboardMarkup(keyboard=[
             [KeyboardButton(text="Поделиться номером", request_contact=True)],
-        ], resize_keyboard=True, one_time_keyboard=False, input_field_placeholder="***********"),
+        ], resize_keyboard=True, one_time_keyboard=False, input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎"),
         "next_kb": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Регистрация", callback_data="reg", )],
         ]),
         "/profile": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
             [InlineKeyboardButton(text="Номер", callback_data="set_my_phone")],
+            [InlineKeyboardButton(text="Город", callback_data="set_my_city")],
         ]),
         "voice_order_accept": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Отмена", callback_data="cancel_order"),
-             InlineKeyboardButton(text="Перезаписать", callback_data="ai_order")],
-            [InlineKeyboardButton(text="Разместить заказ", callback_data="order_sent")]
+            [InlineKeyboardButton(text="Отмена 🆇", callback_data="cancel_order"),
+             InlineKeyboardButton(text="Перезаписать ゞ", callback_data="ai_order")],
+            [InlineKeyboardButton(text="Разместить заказ ✎", callback_data="order_sent")]
 
         ]),
         "/become_courier": InlineKeyboardMarkup(inline_keyboard=[
@@ -43,6 +44,14 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
              InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
             [InlineKeyboardButton(text="Удалить", callback_data="delete_order")]
+
+        ]),
+        "tobacco_alcohol": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Не оформлять 🆇", callback_data="reject_notification"),
+             InlineKeyboardButton(text="Хорошо", callback_data="accept_notification")]
+        ]),
+        "rerecord": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Перезаписать ゞ", callback_data="ai_order")],
 
         ]),
     }

@@ -33,12 +33,19 @@ class UserData:
                 user.user_phone_number = phone
                 await session.commit()
 
+    async def set_user_city(self, tg_id: int, city: str):
+        async with self.async_session_factory() as session:
+            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
+            if user:
+                user.user_default_city = city
+                await session.commit()
+
     async def get_user_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
-                return (user.user_name or "...", user.user_phone_number or "...")
-            return ("...", "...")
+                return (user.user_name or "...", user.user_phone_number or "...", user.user_default_city or "...")
+            return ("...", "...", "...")
 
     async def get_username_userphone(self, tg_id: int):
         async with self.async_session_factory() as session:
@@ -48,6 +55,15 @@ class UserData:
                 return user.user_name, user.user_phone_number
             else:
                 return None, None
+
+    async def get_user_city(self, tg_id: int):
+        async with self.async_session_factory() as session:
+            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
+
+            if user:
+                return user.user_default_city
+            else:
+                return None
 
 
 class CourierData:
