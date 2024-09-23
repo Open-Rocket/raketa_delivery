@@ -1,6 +1,6 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
 
-import asyncio
+# import asyncio
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -9,22 +9,24 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
+from app.common.coords_and_price import calculate_osrm_route, get_coordinates, get_price
+from app.common.fuzzy_city import find_most_compatible_response
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb
-from app.u_pack.u_voice_to_text import process_audio_data
-from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, assistant_censure
-
-from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
-from app.common.fuzzy_city import find_most_compatible_response
+from app.u_pack.u_ai_assistant import assistant_censure, process_order_text, get_parsed_addresses
 
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
+
+# from app.u_pack.u_order_utills import (handle_censorship, handle_message_content, process_censorship_response)
 
 from app.database.requests import user_data, order_data
 
 from datetime import datetime
 import pytz
+
+from app.u_pack.u_voice_to_text import process_audio_data
 
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                             ⇣ Initializing Variables ⇣
@@ -115,7 +117,7 @@ async def data_email_user(message: Message, state: FSMContext):
         reply_kb = await get_user_kb(text="phone_number")
         text = (f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
                 f"в случае необходимости, пожалуйста, укажите ваш номер телефона.\n\n"
-                f"<b>Ваш номер:</b>")
+                f"<b>Ваш Телефон:</b>")
 
         msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML")
     await handler.handle_new_message(msg, message)
@@ -154,7 +156,7 @@ async def data_phone_user(message: Message, state: FSMContext):
     name, phone_number, city = await user_data.get_user_info(tg_id)
     text = (f"Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {name}\n"
-            f"Номер: {phone_number}\n"
+            f"Телефон: {phone_number}\n"
             f"Ваш город: {city}\n\n"
             f"▼ <b>Выберите действие ...</b>")
     msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
@@ -224,7 +226,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     name, phone_number, city = await user_data.get_user_info(tg_id)
 
     text = (f"Имя: {name} \n"
-            f"Номер: {phone_number}\n"
+            f"Телефон: {phone_number}\n"
             f"Город: {city}")
     reply_kb = await get_user_kb(message=message)
 
@@ -330,7 +332,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
     reply_kb = await get_user_kb(text="phone_number")
     text = (f"Изменить данные профиля.\n\n"
-            f"<b>Ваш номер:</b>")
+            f"<b>Ваш Телефон:</b>")
     new_message = await callback_query.message.answer(text,
                                                       disable_notification=True,
                                                       reply_markup=reply_kb,
@@ -411,62 +413,75 @@ async def send_user_orders(message: Message, state: FSMContext):
     await state.set_state(UserState.default)
 
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
     my_tg_id = message.from_user.id
 
     # Получаем заказы, сделанные пользователем
     user_orders = await order_data.get_user_orders(my_tg_id)
 
+    # Функция для формирования адреса и информации о получателе
+    def format_address(number, address, name, phone, url):
+        return (
+            f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
+            f"Имя: {name if name else '-'}\n"
+            f"Телефон: {phone if phone else '-'}\n\n"
+        )
+
     # -------------------- Формируем список заказов для отображения -------------------- #
     orders = []
     for order in user_orders:
-        order_forma = (
+        base_info = (
             f"Всего заказов: {len(user_orders)}\n\n"
             f"Заказ №{order.order_id}\n"
-            f"Дата оформления: {order.created_at_moscow_time}\n\n"
+            f"Дата оформления: {order.created_at_moscow_time}\n"
             f"Статус заказа: {order.order_status.value}\n"
             f"---------------------------------------------\n"
             f"Город: {order.order_city}\n"
-            f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
-            f"⦿ Адрес 2: <a href='{order.b_url}'>{order.destination_point_b}</a>\n\n"
-            f"Предмет доставки: {order.delivery_object if order.delivery_object else '-'}\n\n"
-            f"Имя отправителя: {order.sender_name}\n"
-            f"Номер отправителя: {order.sender_phone}\n\n"
-            f"Имя получателя: {order.receiver_name if order.receiver_name else '-'}\n"
-            f"Номер получателя: {order.receiver_phone if order.receiver_phone else '-'}\n\n"
+            f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
+        )
+
+        # Динамическое добавление адресов до 3-х
+        if order.destination_point_b:
+            base_info += format_address(2, order.destination_point_b,
+                                        order.receiver_name_1,
+                                        order.receiver_phone_1,
+                                        order.b_url)
+
+        if order.destination_point_c:
+            base_info += format_address(3, order.destination_point_c,
+                                        order.receiver_name_2,
+                                        order.receiver_phone_2,
+                                        order.c_url)
+
+        # Дополнительная информация о заказе
+        base_info += (
+            f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"Расстояние: {order.distance_km} км\n"
             f"Стоимость доставки: {order.price_rub}₽\n"
             f"---------------------------------------------\n"
             f"Комментарии: {order.comments if order.comments else '-'}\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
-        orders.append(order_forma)
+
+        orders.append(base_info)
 
     # -------------------- Если заказов нет -------------------- #
     if not orders:
-        new_message = await message.answer("У вас нет заказов.", disable_notification=True)
+        await handler.delete_previous_message(message.chat.id)
+        new_message = await message.answer("У вас нет заказов.")
         await handler.handle_new_message(new_message, message)
         return
 
-    # await handler.delete_previous_message(callback_query.message.chat.id)
+    await handler.delete_previous_message(message.chat.id)
 
     # -------------------- Устанавливаем начальный заказ и сохраняем его -------------------- #
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
-    if len(orders) > 1:
-        reply_kb = await get_user_kb(text="get_my_orders")  # Клавиатура с кнопками для переключения заказов
-        new_message = await message.answer(orders[counter],
-                                           reply_markup=reply_kb,
-                                           disable_notification=True,
-                                           parse_mode="HTML")
-    else:
-        new_message = await message.answer(orders[counter],
-                                           disable_notification=True,
-                                           parse_mode="HTML")
-
+    reply_kb = await get_user_kb("one_order" if len(orders) == 1 else message)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
+
+    # -------------- Finish -------------- #
 
 
 # Обработчик кнопки "⇥" для перехода вперёд
@@ -529,31 +544,64 @@ async def send_orders(message: Message, state: FSMContext):
     my_lat = 55.680241  # пример координат курьера
     available_orders = await order_data.get_available_orders(my_tg_id, my_lat, my_lon, radius_km=5)
 
+    # Функция для формирования адреса и информации о получателе
+    def format_address(number, address, name, phone, url):
+        return (
+            f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
+            f"Имя: {name if name else '-'}\n"
+            f"Телефон: {phone if phone else '-'}\n\n"
+        )
+
     # -------------------- Формируем список заказов для отображения -------------------- #
     orders = []
     for order in available_orders:
-        order_forma = (
+        base_info = (
             f"Заказов рядом: {len(available_orders)}\n\n"
             f"Заказ №{order.order_id}\n"
             f"Дата оформления: {order.created_at_moscow_time}\n"
             f"Статус заказа: {order.order_status.value}\n"
             f"---------------------------------------------\n"
             f"Город: {order.order_city}\n"
-            f"⦿ Адрес 1: <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
-            f"⦿ Адрес 2: <a href='{order.b_url}'>{order.destination_point_b}</a>\n\n"
-            f"Предмет доставки: {order.delivery_object if order.delivery_object else '-'}\n\n"
-            f"Имя отправителя: {order.sender_name}\n"
-            f"Номер отправителя: {order.sender_phone}\n\n"
-            f"Имя получателя: {order.receiver_name if order.receiver_name else '-'}\n"
-            f"Номер получателя: {order.receiver_phone if order.receiver_phone else '-'}\n\n"
+            f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
+        )
+
+        # Динамическое добавление адресов до 5-ти
+        if order.destination_point_b:
+            base_info += format_address(2, order.destination_point_b,
+                                        order.receiver_name_1,
+                                        order.receiver_phone_1,
+                                        order.b_url)
+
+        if order.destination_point_c:
+            base_info += format_address(3, order.destination_point_c,
+                                        order.receiver_name_2,
+                                        order.receiver_phone_2,
+                                        order.c_url)
+
+        if order.destination_point_d:
+            base_info += format_address(4, order.destination_point_d,
+                                        order.receiver_name_3,
+                                        order.receiver_phone_3,
+                                        order.d_url)
+
+        if order.destination_point_e:
+            base_info += format_address(5, order.destination_point_e,
+                                        order.receiver_name_4,
+                                        order.receiver_phone_4,
+                                        order.e_url)
+
+        # Дополнительная информация о заказе
+        base_info += (
+            f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"Расстояние: {order.distance_km} км\n"
             f"Оплата: {order.price_rub}₽\n"
-            f"* Принимайте оптату наличными или переводом.\n"
+            f"* Принимайте оплату наличными или переводом.\n"
             f"---------------------------------------------\n"
             f"Комментарии: {order.comments if order.comments else '-'}\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
-        orders.append(order_forma)
+
+        orders.append(base_info)
 
     # -------------------- Если заказов нет -------------------- #
     if not orders:
@@ -568,13 +616,8 @@ async def send_orders(message: Message, state: FSMContext):
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
-    if len(orders) == 1:
-        reply_kb = await get_user_kb(text="one_order")
-        new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
-    else:
-        reply_kb = await get_user_kb(message)
-        new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
-
+    reply_kb = await get_user_kb("one_order" if len(orders) == 1 else message)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
 
     # -------------- Finish -------------- #
@@ -667,7 +710,7 @@ async def ai_answer(message: Message, state: FSMContext):
 async def process_message(message: Message, state: FSMContext):
     await state.set_state(UserState.waiting_Courier)
 
-    censore_data = ["clear", "overprice", "inaudible", "no_item", "censure", "not_order"]
+    censore_data = ["clear", "overprice", "inaudible", "no_item", "censure", "not_order", "intercity"]
     wait_message = await message.answer(f"Заказ обрабатывается, подождите ...", disable_notification=True)
 
     handler = MessageHandler(state, message.bot)
@@ -678,6 +721,7 @@ async def process_message(message: Message, state: FSMContext):
     moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
     tg_id = message.from_user.id
     user_city = await user_data.get_user_city(tg_id)
+    new_message = "Ошибка распознавания. Попробуйте снова."
 
     recognized_text = None
 
@@ -693,7 +737,7 @@ async def process_message(message: Message, state: FSMContext):
 
     # Если распознавание не удалось
     if not recognized_text:
-        recognized_text = "Ошибка распознавания. Попробуйте снова."
+        recognized_text = new_message
         new_message = await message.answer(recognized_text, reply_markup=reply_kb)
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
@@ -702,7 +746,6 @@ async def process_message(message: Message, state: FSMContext):
     # Проверка текста через ассистента на цензуру
     censore_response = await assistant_censure(recognized_text)
     print(censore_response)
-
 
     # Определение наибольшей совместимости ответа с возможными сценариями
     most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
@@ -732,8 +775,8 @@ async def process_message(message: Message, state: FSMContext):
                     f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
                 )
 
-                tg_id = message.from_user.id
-                distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
+                distance, duration = await calculate_osrm_route(pickup_coords,
+                                                                delivery_coords)
                 distance_text = f"{distance} км"
                 duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
@@ -748,8 +791,8 @@ async def process_message(message: Message, state: FSMContext):
                 starting_point_a = structured_data.get('Starting point A')
                 destination_point_b = structured_data.get('Destination point B')
                 delivery_object = structured_data.get('Delivery object')
-                receiver_name = structured_data.get('Receiver name')
-                receiver_phone = structured_data.get('Receiver phone')
+                receiver_name_1 = structured_data.get('Receiver name 1')
+                receiver_phone_1 = structured_data.get('Receiver phone 1')
                 order_details = structured_data.get('Order details', None)
                 comments = structured_data.get('Comments', None)
 
@@ -769,13 +812,14 @@ async def process_message(message: Message, state: FSMContext):
                     delivery_object=delivery_object,
                     sender_name=sender_name,
                     sender_phone=sender_phone,
-                    receiver_name=receiver_name,
-                    receiver_phone=receiver_phone,
+                    receiver_name_1=receiver_name_1,
+                    receiver_phone_1=receiver_phone_1,
                     order_details=order_details,
                     comments=comments,
                     distance_km=distance,
                     duration_min=duration,
                     price_rub=price,
+                    order_text=recognized_text,
                     order_time=moscow_time,
                     yandex_maps_url=yandex_maps_url,
                     pickup_point=pickup_point,
@@ -788,12 +832,12 @@ async def process_message(message: Message, state: FSMContext):
                     f"---------------------------------------------\n"
                     f"Город: {city}\n"
                     f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                    f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
-                    f"Предмет доставки: {delivery_object if delivery_object else ' -'}\n\n"
-                    f"Имя отправителя: {sender_name}\n"
-                    f"Номер отправителя: {sender_phone}\n"
-                    f"Имя получателя: {receiver_name if receiver_name else '-'}\n"
-                    f"Номер получателя: {receiver_phone if receiver_phone else '-'}\n\n"
+                    f"Имя: {sender_name}\n"
+                    f"Телефон: {sender_phone}\n\n"
+                    f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n"
+                    f"Имя: {receiver_name_1 if receiver_name_1 else '-'}\n"
+                    f"Телефон: {receiver_phone_1 if receiver_phone_1 else '-'}\n\n"
+                    f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
                     f"Расстояние: {distance_text}\n"
                     f"Стоимость доставки: {price_text}\n\n"
                     f"Комментарии курьеру: {comments if comments else '-'}\n"
@@ -812,6 +856,130 @@ async def process_message(message: Message, state: FSMContext):
                     text=f"Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
                     reply_markup=reply_kb, disable_notification=True
                 )
+        elif len(addresses) == 3:
+            pickup_address, delivery_address_1, delivery_address_2 = addresses
+            pickup_coords = await get_coordinates(pickup_address)
+            delivery_coords_1 = await get_coordinates(delivery_address_1)
+            delivery_coords_2 = await get_coordinates(delivery_address_2)
+
+            if all(pickup_coords) and all(delivery_coords_1) and (delivery_coords_2):
+                # Продолжение обработки заказа
+                yandex_maps_url = (
+                    f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
+                    f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
+                    f"~{delivery_coords_2[0]},{delivery_coords_2[1]}&rtt=auto"
+                )
+                pickup_point = (
+                    f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+                    f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+                )
+                delivery_point_1 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
+                    f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
+                )
+                delivery_point_2 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
+                    f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
+                )
+
+                distance, duration = await calculate_osrm_route(pickup_coords,
+                                                                delivery_coords_1,
+                                                                delivery_coords_2)
+                distance_text = f"{distance} км"
+                duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
+                price = await get_price(distance, moscow_time)
+                price_text = f"{price}₽"
+
+                # Структурирование данных заказа
+                structured_data = await process_order_text(recognized_text)
+                city = structured_data.get('City')
+                if not city:
+                    city = user_city
+                starting_point_a = structured_data.get('Starting point A')
+                destination_point_b = structured_data.get('Destination point B')
+                destination_point_c = structured_data.get('Destination point C')
+                delivery_object = structured_data.get('Delivery object')
+                receiver_name_1 = structured_data.get('Receiver name 1')
+                receiver_phone_1 = structured_data.get('Receiver phone 1')
+                receiver_name_2 = structured_data.get('Receiver name 2')
+                receiver_phone_2 = structured_data.get('Receiver phone 2')
+                order_details = structured_data.get('Order details', None)
+                comments = structured_data.get('Comments', None)
+
+                # Сохранение данных в состоянии
+                await state.update_data(
+                    city=city,
+                    starting_point_a=starting_point_a,
+                    a_latitude=float(pickup_coords[0]),
+                    a_longitude=float(pickup_coords[1]),
+                    a_coordinates=pickup_coords,
+                    a_url=pickup_point,
+                    destination_point_b=destination_point_b,
+                    b_latitude=float(delivery_coords_1[0]),
+                    b_longitude=float(delivery_coords_1[1]),
+                    b_coordinates=delivery_coords_1,
+                    b_url=delivery_point_1,
+                    destination_point_c=destination_point_c,
+                    c_latitude=float(delivery_coords_2[0]),
+                    c_longitude=float(delivery_coords_2[1]),
+                    c_coordinates=delivery_coords_2,
+                    c_url=delivery_point_2,
+                    delivery_object=delivery_object,
+                    sender_name=sender_name,
+                    sender_phone=sender_phone,
+                    receiver_name_1=receiver_name_1,
+                    receiver_phone_1=receiver_phone_1,
+                    receiver_name_2=receiver_name_2,
+                    receiver_phone_2=receiver_phone_2,
+                    order_details=order_details,
+                    comments=comments,
+                    distance_km=distance,
+                    duration_min=duration,
+                    price_rub=price,
+                    order_text=recognized_text,
+                    order_time=moscow_time,
+                    yandex_maps_url=yandex_maps_url,
+                    pickup_point=pickup_point,
+                    delivery_point=delivery_point_1,
+                )
+
+                # Отправка ответа пользователю
+                order_forma = (
+                    f"Ваш заказ ✍︎\n"
+                    f"---------------------------------------------\n"
+                    f"Город: {city}\n"
+                    f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"Имя: {sender_name}\n"
+                    f"Телефон: {sender_phone}\n\n"
+                    f"⦿ Адрес 2: <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
+                    f"Имя: {receiver_name_1 if receiver_name_1 else '-'}\n"
+                    f"Телефон: {receiver_phone_1 if receiver_phone_1 else '-'}\n\n"
+                    f"⦿ Адрес 3: <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
+                    f"Имя: {receiver_name_2 if receiver_name_2 else '-'}\n"
+                    f"Телефон: {receiver_phone_2 if receiver_phone_2 else '-'}\n\n"
+                    f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
+                    f"Расстояние: {distance_text}\n"
+                    f"Стоимость доставки: {price_text}\n\n"
+                    f"Комментарии курьеру: {comments if comments else '-'}\n"
+                    f"---------------------------------------------\n"
+                    f"* Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"* Курьер может связаться с вами для уточнения деталей!\n"
+                    f"* Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+                )
+                new_message = await message.answer(
+                    text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+                )
+        elif len(addresses) > 5:
+            new_message = await message.answer(
+                text=f"<b>Слишком много пунктов</b> 𐒀 \n\nМы не оформляем доставки с более чем 5 адресами, "
+                     "так как курьер может запутаться и не выполнить ваш заказ!",
+                reply_markup=reply_kb, disable_notification=True
+            )
+
+
+
         else:
             new_message = await message.answer(
                 text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
@@ -826,7 +994,6 @@ async def process_message(message: Message, state: FSMContext):
                   "<b>Доставка будет стоить немного дороже!</b>"),
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
-
     elif most_compatible_response == "inaudible":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
@@ -834,7 +1001,6 @@ async def process_message(message: Message, state: FSMContext):
             text="<b>Ошибка</b> ⸘\n\nТекст сообщения неразборчив.\nПопробуйте отправить заказ снова.",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
-
     elif most_compatible_response == "no_item":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
@@ -849,6 +1015,14 @@ async def process_message(message: Message, state: FSMContext):
             text="<b>...</b> 🫤 \n\nСделайте корректный заказ!",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
+    elif most_compatible_response == "intercity":
+        await state.set_state(UserState.default)
+        reply_kb = await get_user_kb(text="rerecord")
+        new_message = await message.answer(
+            text="<b>Так далеко мы не летаем</b> ⟷⟷ \n\nМы осуществляем доставку только в пределах одного города!",
+            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        )
+
     else:
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")

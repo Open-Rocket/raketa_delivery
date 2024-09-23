@@ -141,18 +141,48 @@ class Order(Base):
     b_coordinates: Mapped[coordinates]
     b_url: Mapped[stringData]
 
+    destination_point_c: Mapped[textData]
+    c_latitude: Mapped[floatData]
+    c_longitude: Mapped[floatData]
+    c_coordinates: Mapped[coordinates]
+    c_url: Mapped[stringData]
+
+    destination_point_d: Mapped[textData]
+    d_latitude: Mapped[floatData]
+    d_longitude: Mapped[floatData]
+    d_coordinates: Mapped[coordinates]
+    d_url: Mapped[stringData]
+
+    destination_point_e: Mapped[textData]
+    e_latitude: Mapped[floatData]
+    e_longitude: Mapped[floatData]
+    e_coordinates: Mapped[coordinates]
+    e_url: Mapped[stringData]
+
     full_rout: Mapped[stringData]
 
     delivery_object: Mapped[stringData]
+
     sender_name: Mapped[stringData]
     sender_phone: Mapped[stringData]
-    receiver_name: Mapped[stringData]
-    receiver_phone: Mapped[stringData]
-    order_details: Mapped[textData]
+
+    receiver_name_1: Mapped[stringData]
+    receiver_phone_1: Mapped[stringData]
+
+    receiver_name_2: Mapped[stringData]
+    receiver_phone_2: Mapped[stringData]
+
+    receiver_name_3: Mapped[stringData]
+    receiver_phone_3: Mapped[stringData]
+
+    receiver_name_4: Mapped[stringData]
+    receiver_phone_4: Mapped[stringData]
+
     comments: Mapped[textData]
     distance_km: Mapped[intData]
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
+    order_text = Mapped[textData]
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=True)
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
