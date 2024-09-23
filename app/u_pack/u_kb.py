@@ -40,10 +40,14 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
 
         ]),
-        "get_my_orders": InlineKeyboardMarkup(inline_keyboard=[
+        "one_order_my": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Удалить", callback_data="delete_my_order")]
+
+        ]),
+        "/my_orders": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
              InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
-            [InlineKeyboardButton(text="Удалить", callback_data="delete_order")]
+            [InlineKeyboardButton(text="Удалить", callback_data="delete_my_order")]
 
         ]),
         "overprice": InlineKeyboardMarkup(inline_keyboard=[

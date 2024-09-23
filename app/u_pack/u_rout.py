@@ -410,13 +410,16 @@ async def change_name(message: Message, state: FSMContext):
 # my orders
 @users_router.message(F.text == "/my_orders")
 async def send_user_orders(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(UserState.myOrders)
 
     handler = MessageHandler(state, message.bot)
     my_tg_id = message.from_user.id
 
     # Получаем заказы, сделанные пользователем
     user_orders = await order_data.get_user_orders(my_tg_id)
+    # Сохраняем заказы в состоянии с их ID
+    orders_dict = {order.order_id: order for order in user_orders}  # Словарь ID -> заказ
+    await state.update_data(orders=orders_dict)
 
     # Функция для формирования адреса и информации о получателе
     def format_address(number, address, name, phone, url):
@@ -477,8 +480,10 @@ async def send_user_orders(message: Message, state: FSMContext):
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
-    reply_kb = await get_user_kb("one_order" if len(orders) == 1 else message)
-    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
+    reply_kb = await get_user_kb(text="one_order_my" if len(orders) == 1 else message.text)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb,
+                                       parse_mode="HTML",
+                                       disable_notification=True)
     await handler.handle_new_message(new_message, message)
 
     # -------------- Finish -------------- #
@@ -487,8 +492,7 @@ async def send_user_orders(message: Message, state: FSMContext):
 # Обработчик кнопки "⇥" для перехода вперёд
 @users_router.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.default)  # Состояние для "моих заказов"
+    # await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
     data = await state.get_data()
     orders = data.get("orders")
     counter = data.get("counter", 0)
@@ -508,8 +512,7 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
 # Обработчик кнопки "⇤" для перехода назад
 @users_router.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(UserState.default)  # Состояние для "моих заказов"
+    # await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
     data = await state.get_data()
     orders = data.get("orders")
     counter = data.get("counter", 0)
@@ -526,6 +529,19 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
         reply_markup=callback_query.message.reply_markup,
         parse_mode="HTML"
     )
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                   ⇣ User orders ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+@users_router.callback_query(F.data == "delete_my_order")
+async def delete_order(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    orders_dict = data.get("orders")
+    order_id = callback_query.data.split("_")[-1]
+    await order_data.delete_order_from_db(order_id)
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -616,8 +632,10 @@ async def send_orders(message: Message, state: FSMContext):
     counter = 0
     await state.update_data(orders=orders, counter=counter)
 
-    reply_kb = await get_user_kb("one_order" if len(orders) == 1 else message)
-    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML")
+    reply_kb = await get_user_kb(text="one_order" if len(orders) == 1 else message.text)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb,
+                                       parse_mode="HTML",
+                                       disable_notification=True)
     await handler.handle_new_message(new_message, message)
 
     # -------------- Finish -------------- #
@@ -888,7 +906,7 @@ async def process_message(message: Message, state: FSMContext):
                 distance_text = f"{distance} км"
                 duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
-                price = await get_price(distance, moscow_time)
+                price = await get_price(distance, moscow_time, over_price=50)
                 price_text = f"{price}₽"
 
                 # Структурирование данных заказа
