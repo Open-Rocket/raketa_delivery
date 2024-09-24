@@ -18,4 +18,8 @@ class UserState(StatesGroup):
 
     testOrders = State()
     myOrders = State()
+    myOrders_active = State()
+    myOrders_pending = State()
+    myOrders_completed = State()
+    myOrders_canceled = State()
     assistant_run = State()

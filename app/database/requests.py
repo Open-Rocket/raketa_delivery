@@ -205,10 +205,18 @@ class OrderData:
                 order.courier_id = courier_id
                 await session.commit()
 
-    async def get_pending_orders(self):
+    async def get_pending_orders(self,user_tg_id:int):
         async with self.async_session_factory() as session:
-            result = await session.scalars(select(Order).where(Order.order_status == OrderStatus.PENDING))
-            return result.all()
+            orders_query = await session.execute(
+                select(Order)
+                .where(and_(
+                    User.user_tg_id == user_tg_id,
+                    Order.order_status == OrderStatus.PENDING
+                )
+            ))
+
+            pending_orders = orders_query.scalars().all()
+            return pending_orders
 
     async def get_available_orders(self, courier_tg_id: int,
                                    courier_lat: float,
@@ -246,6 +254,22 @@ class OrderData:
 
         # Возвращаем список заказов
         return orders
+
+    async def delete_order_from_db(self, order_id: int):
+        async with async_session_factory() as session:
+            # Находим заказ по его ID
+            order_query = await session.execute(
+                select(Order).where(Order.order_id == order_id)
+            )
+
+            order = order_query.scalars().first()  # Извлекаем первый найденный заказ
+
+            if order:
+                await session.delete(order)  # Удаляем заказ
+                await session.commit()  # Подтверждаем изменения
+                return True  # Успешно удалено
+            else:
+                return False  # Заказ не найден
 
 
 # async def get_users():

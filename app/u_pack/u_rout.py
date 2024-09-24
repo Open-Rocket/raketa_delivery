@@ -230,10 +230,9 @@ async def cmd_profile(message: Message, state: FSMContext):
             f"Город: {city}")
     reply_kb = await get_user_kb(message=message)
 
-    new_message = await message.answer_photo(photo=photo_title,
-                                             caption=text,
-                                             reply_markup=reply_kb,
-                                             disable_notification=True)
+    new_message = await message.answer(text,
+                                       reply_markup=reply_kb,
+                                       disable_notification=True)
     await handler.handle_new_message(new_message, message)
 
 
@@ -407,21 +406,36 @@ async def change_name(message: Message, state: FSMContext):
 #                                                   ⇣ User orders ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
-# my orders
 @users_router.message(F.text == "/my_orders")
-async def send_user_orders(message: Message, state: FSMContext):
+async def cmd_my_orders(message: Message, state: FSMContext):
     await state.set_state(UserState.myOrders)
-
     handler = MessageHandler(state, message.bot)
     my_tg_id = message.from_user.id
+    user_orders = await order_data.get_user_orders(my_tg_id)
+    await handler.delete_previous_message(message.chat.id)
+    reply_kb = await get_user_kb(message)
+    text = f"Всего заказов: {len(user_orders)}"
+    # Отправляем новое сообщение с меню
+    new_message = await message.answer(text,
+                                       reply_markup=reply_kb,
+                                       disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
+# my orders1
+@users_router.callback_query(F.data == "pending_orders")
+async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.myOrders_pending)
+
+    handler = MessageHandler(state, callback_query.message)
+    my_tg_id = callback_query.from_user.id
 
     # Получаем заказы, сделанные пользователем
-    user_orders = await order_data.get_user_orders(my_tg_id)
-    # Сохраняем заказы в состоянии с их ID
+    user_orders = await order_data.get_pending_orders(my_tg_id)
     orders_dict = {order.order_id: order for order in user_orders}  # Словарь ID -> заказ
     await state.update_data(orders=orders_dict)
 
-    # Функция для формирования адреса и информации о получателе
+    # Функция для форматирования информации об адресе и получателе
     def format_address(number, address, name, phone, url):
         return (
             f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
@@ -429,8 +443,8 @@ async def send_user_orders(message: Message, state: FSMContext):
             f"Телефон: {phone if phone else '-'}\n\n"
         )
 
-    # -------------------- Формируем список заказов для отображения -------------------- #
-    orders = []
+    # Формируем список текстов заказов для отображения
+    orders_text = []
     for order in user_orders:
         base_info = (
             f"Всего заказов: {len(user_orders)}\n\n"
@@ -442,7 +456,7 @@ async def send_user_orders(message: Message, state: FSMContext):
             f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
         )
 
-        # Динамическое добавление адресов до 3-х
+        # Динамическое добавление адресов до 5-ти
         if order.destination_point_b:
             base_info += format_address(2, order.destination_point_b,
                                         order.receiver_name_1,
@@ -455,7 +469,18 @@ async def send_user_orders(message: Message, state: FSMContext):
                                         order.receiver_phone_2,
                                         order.c_url)
 
-        # Дополнительная информация о заказе
+        if order.destination_point_d:
+            base_info += format_address(4, order.destination_point_d,
+                                        order.receiver_name_3,
+                                        order.receiver_phone_3,
+                                        order.d_url)
+
+        if order.destination_point_e:
+            base_info += format_address(5, order.destination_point_e,
+                                        order.receiver_name_4,
+                                        order.receiver_phone_4,
+                                        order.e_url)
+
         base_info += (
             f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"Расстояние: {order.distance_km} км\n"
@@ -465,46 +490,45 @@ async def send_user_orders(message: Message, state: FSMContext):
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
 
-        orders.append(base_info)
+        orders_text.append(base_info)
 
-    # -------------------- Если заказов нет -------------------- #
-    if not orders:
-        await handler.delete_previous_message(message.chat.id)
-        new_message = await message.answer("У вас нет заказов.")
-        await handler.handle_new_message(new_message, message)
+    # Проверка на наличие заказов
+    if not orders_text:
+        await handler.delete_previous_message(callback_query.message.chat.id)
+        new_message = await callback_query.message.answer("У вас нет ожидающих заказов.")
+        await handler.handle_new_message(new_message, callback_query.message)
         return
 
-    await handler.delete_previous_message(message.chat.id)
-
-    # -------------------- Устанавливаем начальный заказ и сохраняем его -------------------- #
+    # Устанавливаем начальный заказ и сохраняем его в состояние
     counter = 0
-    await state.update_data(orders=orders, counter=counter)
+    current_order_id = user_orders[counter].order_id
+    await state.update_data(orders_text=orders_text, counter=counter, current_order_id=current_order_id)
 
-    reply_kb = await get_user_kb(text="one_order_my" if len(orders) == 1 else message.text)
-    new_message = await message.answer(orders[counter], reply_markup=reply_kb,
-                                       parse_mode="HTML",
-                                       disable_notification=True)
-    await handler.handle_new_message(new_message, message)
-
-    # -------------- Finish -------------- #
+    reply_kb = await get_user_kb(text="one_order" if len(orders_text) == 1 else "pending_orders")
+    new_message = await callback_query.message.answer(orders_text[counter], reply_markup=reply_kb,
+                                                      parse_mode="HTML",
+                                                      disable_notification=True)
+    await handler.handle_new_message(new_message, callback_query.message)
 
 
 # Обработчик кнопки "⇥" для перехода вперёд
 @users_router.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    # await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
     data = await state.get_data()
-    orders = data.get("orders")
+    orders_text = data.get("orders_text")
+    orders = data.get("orders")  # Словарь с заказами
     counter = data.get("counter", 0)
 
-    # Увеличиваем счётчик и зацикливаем его
-    counter = (counter + 1) % len(orders)
+    # Увеличиваем счетчик и зацикливаем его
+    counter = (counter + 1) % len(orders_text)
 
-    # Обновляем состояние с новым значением счётчика
-    await state.update_data(counter=counter)
+    # Обновляем состояние с новым значением счетчика и ID текущего заказа
+    current_order_id = list(orders.keys())[counter]  # Получаем ID нового активного заказа
+    await state.update_data(counter=counter, current_order_id=current_order_id)
 
     # Обновляем сообщение с новым заказом
-    await callback_query.message.edit_text(orders[counter],
+    new_order_info = orders_text[counter]
+    await callback_query.message.edit_text(new_order_info,
                                            reply_markup=callback_query.message.reply_markup,
                                            parse_mode="HTML")
 
@@ -512,36 +536,78 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
 # Обработчик кнопки "⇤" для перехода назад
 @users_router.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    # await state.set_state(UserState.myOrders)  # Состояние для "моих заказов"
     data = await state.get_data()
+    orders_text = data.get("orders_text")
     orders = data.get("orders")
     counter = data.get("counter", 0)
 
-    # Уменьшаем счётчик и зацикливаем его
-    counter = (counter - 1) % len(orders)
+    # Уменьшаем счетчик и зацикливаем его
+    counter = (counter - 1) % len(orders_text)
 
-    # Обновляем состояние с новым значением счётчика
-    await state.update_data(counter=counter)
+    # Обновляем состояние с новым значением счетчика
+    current_order_id = list(orders.keys())[counter]
+    await state.update_data(counter=counter, current_order_id=current_order_id)
 
     # Обновляем сообщение с новым заказом
-    await callback_query.message.edit_text(
-        orders[counter],
-        reply_markup=callback_query.message.reply_markup,
-        parse_mode="HTML"
-    )
-
+    new_order_info = orders_text[counter]
+    await callback_query.message.edit_text(new_order_info,
+                                           reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
 
 # ------------------------------------------------------------------------------------------------------------------- #
-#                                                   ⇣ User orders ⇣
+#                                                     ⇣ Go back ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+'''some code'''
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                   ⇣ Cancel order ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+'''some code'''
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                   ⇣ Delete order ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
 @users_router.callback_query(F.data == "delete_my_order")
 async def delete_order(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    orders_dict = data.get("orders")
-    order_id = callback_query.data.split("_")[-1]
+    orders_dict = data.get("orders")  # Словарь ID -> заказ
+    orders_text = data.get("orders_text")  # Список текстов заказов
+    counter = data.get("counter", 0)
+
+    # Проверяем, что заказы остались
+    if not orders_dict:
+        await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
+        return
+
+    # Получаем ID текущего заказа
+    order_id = list(orders_dict.keys())[counter]
+
+    # Удаляем заказ из базы данных
     await order_data.delete_order_from_db(order_id)
+
+    # Удаляем заказ из состояния
+    del orders_dict[order_id]
+    await state.update_data(orders=orders_dict)
+
+    # Если заказы остались, обновляем сообщение
+    if orders_dict:
+        # Фильтруем тексты оставшихся заказов
+        new_orders_text = [text for i, text in enumerate(orders_text) if list(orders_dict.keys())[i] in orders_dict]
+
+        # Если новый список заказов пуст
+        if not new_orders_text:
+            await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
+            return
+
+        new_counter = counter % len(new_orders_text)  # Счетчик для нового списка заказов
+        await state.update_data(counter=new_counter)
+
+        new_order_info = new_orders_text[new_counter]
+        await callback_query.message.edit_text(new_order_info,
+                                               reply_markup=callback_query.message.reply_markup,
+                                               parse_mode="HTML")
+    else:
+        await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
 
 
 # ------------------------------------------------------------------------------------------------------------------- #

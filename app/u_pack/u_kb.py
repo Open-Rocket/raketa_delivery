@@ -40,18 +40,27 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
 
         ]),
-        "one_order_my": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Удалить", callback_data="delete_my_order")]
+        "one_pending": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Отменить заказ", callback_data="cancel_my_order")]
+
+        ]),
+        "pending_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Отменить заказ", callback_data="cancel_my_order")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
 
         ]),
         "/my_orders": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
-             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
-            [InlineKeyboardButton(text="Удалить", callback_data="delete_my_order")]
+            [InlineKeyboardButton(text="Ожидают", callback_data="pending_orders"),
+             InlineKeyboardButton(text="Активные", callback_data="active_orders")],
+            [InlineKeyboardButton(text="Отмененные", callback_data="canceled_orders"),
+             InlineKeyboardButton(text="Выполненные", callback_data="completed_orders")],
+            [InlineKeyboardButton(text="Моя статистика", callback_data="my_statistic")]
 
         ]),
         "overprice": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Не оформлять 🆇", callback_data="reject_notification"),
+            [InlineKeyboardButton(text="Не оформлять 🆇", callback_data="cancel_order"),
              InlineKeyboardButton(text="Хорошо", callback_data="accept_notification")]
         ]),
         "rerecord": InlineKeyboardMarkup(inline_keyboard=[
@@ -63,6 +72,8 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
     if message:
         if message.text == "/start":
             return kb["next_kb"]
+        else:
+            return kb[message.text]
     if message and message.text in kb:
         return kb[message.text]
 
@@ -73,4 +84,4 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
         if text in kb:
             return kb[text]
 
-    return kb["ok_kb"]
+    # return kb["ok_kb"]
