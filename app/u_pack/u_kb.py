@@ -40,8 +40,13 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
 
         ]),
-        "one_pending": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Отменить заказ", callback_data="cancel_my_order")]
+
+        "/my_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Ожидают", callback_data="pending_orders"),
+             InlineKeyboardButton(text="Активные", callback_data="active_orders")],
+            [InlineKeyboardButton(text="Отмененные", callback_data="canceled_orders"),
+             InlineKeyboardButton(text="Завершенные", callback_data="completed_orders")],
+            [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")]
 
         ]),
         "pending_orders": InlineKeyboardMarkup(inline_keyboard=[
@@ -51,12 +56,31 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
 
         ]),
-        "/my_orders": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Ожидают", callback_data="pending_orders"),
-             InlineKeyboardButton(text="Активные", callback_data="active_orders")],
-            [InlineKeyboardButton(text="Отмененные", callback_data="canceled_orders"),
-             InlineKeyboardButton(text="Выполненные", callback_data="completed_orders")],
-            [InlineKeyboardButton(text="Моя статистика", callback_data="my_statistic")]
+        "one_my_order": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+
+        ]),
+        "one_my_pending": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Отменить заказ", callback_data="cancel_my_order")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+
+        ]),
+        "active_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+
+        ]),
+        "canceled_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+
+        ]),
+        "completed_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
 
         ]),
         "overprice": InlineKeyboardMarkup(inline_keyboard=[
@@ -85,3 +109,17 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             return kb[text]
 
     # return kb["ok_kb"]
+
+
+async def get_my_orders_kb(pending_count: int, active_count: int,
+                           canceled_count: int, completed_count: int) -> InlineKeyboardMarkup:
+    my_orders_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Ожидают {pending_count}", callback_data="pending_orders"),
+         InlineKeyboardButton(text=f"Активные {active_count}", callback_data="active_orders")],
+        [InlineKeyboardButton(text=f"Отмененные {canceled_count}", callback_data="canceled_orders"),
+         InlineKeyboardButton(text=f"Выполненные {completed_count}", callback_data="completed_orders")],
+        [InlineKeyboardButton(text="Моя статистика", callback_data="my_statistic")]
+
+    ])
+
+    return my_orders_kb

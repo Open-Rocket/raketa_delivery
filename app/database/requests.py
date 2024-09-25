@@ -1,5 +1,5 @@
 import json
-from sqlalchemy import select, update, delete, desc
+from sqlalchemy import select, update, delete, desc, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import async_session_factory, moscow_time, Order, utc_time
 from app.database.models import User, Courier, OrderStatus
@@ -205,7 +205,7 @@ class OrderData:
                 order.courier_id = courier_id
                 await session.commit()
 
-    async def get_pending_orders(self,user_tg_id:int):
+    async def get_pending_orders(self, user_tg_id: int):
         async with self.async_session_factory() as session:
             orders_query = await session.execute(
                 select(Order)
@@ -213,10 +213,49 @@ class OrderData:
                     User.user_tg_id == user_tg_id,
                     Order.order_status == OrderStatus.PENDING
                 )
-            ))
+                ))
 
             pending_orders = orders_query.scalars().all()
             return pending_orders
+
+    async def get_active_orders(self, user_tg_id: int):
+        async with self.async_session_factory() as session:
+            orders_query = await session.execute(
+                select(Order)
+                .where(and_(
+                    User.user_tg_id == user_tg_id,
+                    Order.order_status == OrderStatus.IN_PROGRESS
+                )
+                ))
+
+            active_orders = orders_query.scalars().all()
+            return active_orders
+
+    async def get_canceled_orders(self, user_tg_id: int):
+        async with self.async_session_factory() as session:
+            orders_query = await session.execute(
+                select(Order)
+                .where(and_(
+                    User.user_tg_id == user_tg_id,
+                    Order.order_status == OrderStatus.CANCELLED
+                )
+                ))
+
+            canceled_orders = orders_query.scalars().all()
+            return canceled_orders
+
+    async def get_completed_orders(self, user_tg_id: int):
+        async with self.async_session_factory() as session:
+            orders_query = await session.execute(
+                select(Order)
+                .where(and_(
+                    User.user_tg_id == user_tg_id,
+                    Order.order_status == OrderStatus.COMPLETED
+                )
+                ))
+
+            completed_orders = orders_query.scalars().all()
+            return completed_orders
 
     async def get_available_orders(self, courier_tg_id: int,
                                    courier_lat: float,
@@ -245,53 +284,170 @@ class OrderData:
         async with async_session_factory() as session:
             orders_query = await session.execute(
                 select(Order)
+                .where(User.user_tg_id == user_tg_id)
+            )
+
+            # Извлекаем все заказы
+            orders = orders_query.scalars().all()
+
+            # Возвращаем список заказов
+            return orders
+
+    async def get_total_orders(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.count(Order.order_id))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
+
+    async def get_completed_orders_count(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.count(Order.order_id))
                 .where(
-                    User.user_tg_id == user_tg_id)
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.COMPLETED
+                    )
+                )
             )
+            return result.scalar()
 
-        # Извлекаем все заказы
-        orders = orders_query.scalars().all()
-
-        # Возвращаем список заказов
-        return orders
-
-    async def delete_order_from_db(self, order_id: int):
-        async with async_session_factory() as session:
-            # Находим заказ по его ID
-            order_query = await session.execute(
-                select(Order).where(Order.order_id == order_id)
+    async def get_canceled_orders_count(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.count(Order.order_id))
+                .where(
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.CANCELLED
+                    )
+                )
             )
+            return result.scalar()
 
-            order = order_query.scalars().first()  # Извлекаем первый найденный заказ
+    async def get_avg_order_speed(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.avg(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))  # км/ч
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
 
-            if order:
-                await session.delete(order)  # Удаляем заказ
-                await session.commit()  # Подтверждаем изменения
-                return True  # Успешно удалено
-            else:
-                return False  # Заказ не найден
+    async def get_avg_order_distance(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.avg(Order.distance_km))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
 
+    async def get_fastest_order_speed(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.max(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))  # км/ч
+                .where(
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.COMPLETED
+                    )
+                )
+            )
+            return result.scalar()
+
+    async def get_slowest_order_speed(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.min(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))  # км/ч
+                .where(
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.COMPLETED
+                    )
+                )
+            )
+            return result.scalar()
+
+    async def get_avg_order_time(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.avg(extract('epoch', Order.execution_time)))  # среднее время в секундах
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar() / 60  # переводим в минуты
+
+    async def get_fastest_order_time(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.min(extract('epoch', Order.execution_time)))  # минимальное время в секундах
+                .where(
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.COMPLETED
+                    )
+                )
+            )
+            return result.scalar() / 60  # переводим в минуты
+
+    async def get_longest_order_time(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.max(extract('epoch', Order.execution_time)))  # максимальное время в секундах
+                .where(
+                    and_(
+                        Order.user_id == user_id,
+                        Order.order_status == OrderStatus.COMPLETED
+                    )
+                )
+            )
+            return result.scalar() / 60  # переводим в минуты
+
+    async def get_shortest_order_distance(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.min(Order.distance_km))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
+
+    async def get_longest_order_distance(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.max(Order.distance_km))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
+
+    async def get_avg_order_price(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.avg(Order.price_rub))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
+
+    async def get_max_order_price(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.max(Order.price_rub))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
+
+    async def get_min_order_price(self, user_id: int):
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.min(Order.price_rub))
+                .where(Order.user_id == user_id)
+            )
+            return result.scalar()
 
 # async def get_users():
 #     async with async_session_factory() as session:  # Используйте свой async_session
 #         result = await session.execute(select(User))
 #         users = result.scalars().all()  # Получение всех пользователей
 #         print(users)
-
-
-async def complete_order(order_id: int, session: AsyncSession):
-    # Получаем заказ из базы данных
-    order = await session.get(Order, order_id)
-
-    # Устанавливаем время завершения заказа
-    order.completed_at = moscow_time()
-
-    # Рассчитываем время выполнения (разница в минутах)
-    if order.created_at and order.completed_at:
-        order.execution_time = (order.completed_at - order.created_at).total_seconds() // 60
-
-    # Обновляем запись в базе данных
-    await session.commit()
 
 
 user_data = UserData(async_session_factory)

@@ -13,7 +13,7 @@ from app.common.coords_and_price import calculate_osrm_route, get_coordinates, g
 from app.common.fuzzy_city import find_most_compatible_response
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
-from app.u_pack.u_kb import get_user_kb
+from app.u_pack.u_kb import get_user_kb, get_my_orders_kb
 from app.u_pack.u_ai_assistant import assistant_censure, process_order_text, get_parsed_addresses
 
 from app.common.message_handler import MessageHandler
@@ -183,7 +183,7 @@ async def cmd_order(message: Message, state: FSMContext):
         photo_title = await get_image_title_user(message.text)
         text = ("◉ Вы можете сделать заказ с помощью текста или голоса, "
                 "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
-                "◉ При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
+                "*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
                 "ассистент создаст заявку для вашего заказа.")
         reply_kb = await get_user_kb(message)
 
@@ -225,14 +225,16 @@ async def cmd_profile(message: Message, state: FSMContext):
     photo_title = await get_image_title_user(message.text)
     name, phone_number, city = await user_data.get_user_info(tg_id)
 
-    text = (f"Имя: {name} \n"
+    text = (f"<b>Профиль</b>\n\n"
+            f"Имя: {name} \n"
             f"Телефон: {phone_number}\n"
             f"Город: {city}")
     reply_kb = await get_user_kb(message=message)
 
     new_message = await message.answer(text,
                                        reply_markup=reply_kb,
-                                       disable_notification=True)
+                                       disable_notification=True,
+                                       parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
 
 
@@ -406,36 +408,78 @@ async def change_name(message: Message, state: FSMContext):
 #                                                   ⇣ User orders ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
+
 @users_router.message(F.text == "/my_orders")
-async def cmd_my_orders(message: Message, state: FSMContext):
+@users_router.callback_query(F.data == "back_myOrders")
+async def handle_my_orders(event, state: FSMContext):
+    is_callback = isinstance(event, CallbackQuery)
+    user_id = event.from_user.id
+    chat_id = event.message.chat.id if is_callback else event.chat.id
+    bot = event.message.bot if is_callback else event.bot
+
+    if not is_callback:
+        handler = MessageHandler(state, bot)
+        await handler.delete_previous_message(chat_id)
+
     await state.set_state(UserState.myOrders)
-    handler = MessageHandler(state, message.bot)
-    my_tg_id = message.from_user.id
-    user_orders = await order_data.get_user_orders(my_tg_id)
-    await handler.delete_previous_message(message.chat.id)
-    reply_kb = await get_user_kb(message)
-    text = f"Всего заказов: {len(user_orders)}"
-    # Отправляем новое сообщение с меню
-    new_message = await message.answer(text,
-                                       reply_markup=reply_kb,
-                                       disable_notification=True)
-    await handler.handle_new_message(new_message, message)
+
+    pending_count = len(await order_data.get_pending_orders(user_id))
+    active_count = len(await order_data.get_active_orders(user_id))
+    canceled_count = len(await order_data.get_canceled_orders(user_id))
+    completed_count = len(await order_data.get_completed_orders(user_id))
+
+    reply_kb = await get_my_orders_kb(pending_count, active_count, canceled_count, completed_count)
+    text = (f"<b>Мои заказы</b>\n\n"
+            f"Здесь вы можете посмотреть статус ваших заказов, "
+            f"а также статистику за все время использования нашего сервиса.")
+
+    if is_callback:
+        new_message = await event.message.edit_text(text,
+                                                    reply_markup=reply_kb,
+                                                    disable_notification=True,
+                                                    parse_mode="HTML")
+    else:
+        new_message = await event.answer(text,
+                                         reply_markup=reply_kb,
+                                         disable_notification=True,
+                                         parse_mode="HTML")
+
+    # Если это сообщение, вызываем delete
+    if not is_callback:
+        handler = MessageHandler(state, bot)
+        await handler.handle_new_message(new_message, event)
+    else:
+        await event.answer()
 
 
-# my orders1
-@users_router.callback_query(F.data == "pending_orders")
-async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.myOrders_pending)
+@users_router.callback_query(F.data.in_({"pending_orders", "active_orders", "canceled_orders", "completed_orders"}))
+async def get_orders(callback_query: CallbackQuery, state: FSMContext):
+    # Определение состояния на основе типа заказа
+    order_type = callback_query.data
+    if order_type == "pending_orders":
+        await state.set_state(UserState.myOrders_pending)
+        user_orders = await order_data.get_pending_orders(callback_query.from_user.id)
+        keyboard_type = "pending_orders"
+        status_text = "ожидающих"
+    elif order_type == "active_orders":
+        await state.set_state(UserState.myOrders_active)
+        user_orders = await order_data.get_active_orders(callback_query.from_user.id)
+        keyboard_type = "active_orders"
+        status_text = "активных"
+    elif order_type == "canceled_orders":
+        await state.set_state(UserState.myOrders_canceled)
+        user_orders = await order_data.get_canceled_orders(callback_query.from_user.id)
+        keyboard_type = "canceled_orders"
+        status_text = "отмененных"
+    elif order_type == "completed_orders":
+        await state.set_state(UserState.myOrders_completed)
+        user_orders = await order_data.get_completed_orders(callback_query.from_user.id)
+        keyboard_type = "completed_orders"
+        status_text = "завершенных"
 
-    handler = MessageHandler(state, callback_query.message)
-    my_tg_id = callback_query.from_user.id
-
-    # Получаем заказы, сделанные пользователем
-    user_orders = await order_data.get_pending_orders(my_tg_id)
     orders_dict = {order.order_id: order for order in user_orders}  # Словарь ID -> заказ
     await state.update_data(orders=orders_dict)
 
-    # Функция для форматирования информации об адресе и получателе
     def format_address(number, address, name, phone, url):
         return (
             f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
@@ -443,7 +487,6 @@ async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
             f"Телефон: {phone if phone else '-'}\n\n"
         )
 
-    # Формируем список текстов заказов для отображения
     orders_text = []
     for order in user_orders:
         base_info = (
@@ -456,25 +499,21 @@ async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
             f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
         )
 
-        # Динамическое добавление адресов до 5-ти
         if order.destination_point_b:
             base_info += format_address(2, order.destination_point_b,
                                         order.receiver_name_1,
                                         order.receiver_phone_1,
                                         order.b_url)
-
         if order.destination_point_c:
             base_info += format_address(3, order.destination_point_c,
                                         order.receiver_name_2,
                                         order.receiver_phone_2,
                                         order.c_url)
-
         if order.destination_point_d:
             base_info += format_address(4, order.destination_point_d,
                                         order.receiver_name_3,
                                         order.receiver_phone_3,
                                         order.d_url)
-
         if order.destination_point_e:
             base_info += format_address(5, order.destination_point_e,
                                         order.receiver_name_4,
@@ -492,23 +531,85 @@ async def send_user_orders(callback_query: CallbackQuery, state: FSMContext):
 
         orders_text.append(base_info)
 
-    # Проверка на наличие заказов
     if not orders_text:
+        handler = MessageHandler(state, callback_query.message)
         await handler.delete_previous_message(callback_query.message.chat.id)
-        new_message = await callback_query.message.answer("У вас нет ожидающих заказов.")
-        await handler.handle_new_message(new_message, callback_query.message)
+        text = f"У вас нет {status_text} заказов."
+        reply_kb = await get_user_kb(text="one_my_order")
+        new_message = await callback_query.message.edit_text(text,
+                                                             reply_markup=reply_kb,
+                                                             disable_notification=True)
+        # await handler.handle_new_message(new_message, callback_query.message)
         return
 
-    # Устанавливаем начальный заказ и сохраняем его в состояние
     counter = 0
     current_order_id = user_orders[counter].order_id
     await state.update_data(orders_text=orders_text, counter=counter, current_order_id=current_order_id)
 
-    reply_kb = await get_user_kb(text="one_order" if len(orders_text) == 1 else "pending_orders")
-    new_message = await callback_query.message.answer(orders_text[counter], reply_markup=reply_kb,
-                                                      parse_mode="HTML",
-                                                      disable_notification=True)
-    await handler.handle_new_message(new_message, callback_query.message)
+    if order_type == "pending_orders":
+        reply_kb = await get_user_kb(text="one_my_pending" if len(orders_text) == 1 else keyboard_type)
+    else:
+        reply_kb = await get_user_kb(text="one_my_order" if len(orders_text) == 1 else keyboard_type)
+    new_message = await callback_query.message.edit_text(orders_text[counter], reply_markup=reply_kb,
+                                                         parse_mode="HTML",
+                                                         disable_notification=True)
+
+    handler = MessageHandler(state, callback_query.message)
+    # await handler.handle_new_message(new_message, callback_query.message)
+
+
+@users_router.callback_query(F.data == "my_statistic")
+async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+
+    # Получение статистики пользователя
+    total_orders = await order_data.get_total_orders(user_id) or 0
+    completed_orders = await order_data.get_completed_orders_count(user_id) or 0
+    canceled_orders = await order_data.get_canceled_orders_count(user_id) or 0
+    avg_speed = await order_data.get_avg_order_speed(user_id) or 0
+    avg_distance = await order_data.get_avg_order_distance(user_id) or 0
+    fastest_order_speed = await order_data.get_fastest_order_speed(user_id) or 0
+    slowest_order_speed = await order_data.get_slowest_order_speed(user_id) or 0
+    avg_time = await order_data.get_avg_order_time(user_id) or 0
+    fastest_order_time = await order_data.get_fastest_order_time(user_id) or 0
+    longest_order_time = await order_data.get_longest_order_time(user_id) or 0
+    shortest_order_distance = await order_data.get_shortest_order_distance(user_id) or 0
+    longest_order_distance = await order_data.get_longest_order_distance(user_id) or 0
+
+    # Если заказов нет, то процент успешных заказов будет 0
+    success_rate = (completed_orders / total_orders) * 100 if total_orders > 0 else 0
+
+    avg_price = await order_data.get_avg_order_price(user_id) or 0
+    max_price = await order_data.get_max_order_price(user_id) or 0
+    min_price = await order_data.get_min_order_price(user_id) or 0
+
+    # Формирование текста для сообщения
+    text = (
+        f"<b>Статистика:</b>\n\n"
+        f"Общее количество заказов: {total_orders}\n"
+        f"Количество выполненных заказов: {completed_orders}\n"
+        f"Количество отмененных заказов: {canceled_orders}\n"
+        f"Средняя скорость выполнения заказа: {avg_speed:.2f} км/ч\n"
+        f"Среднее расстояние заказа: {avg_distance:.2f} км\n"
+        f"Самый быстрый заказ (по скорости): {fastest_order_speed:.2f} км/ч\n"
+        f"Самый медленный заказ (по скорости): {slowest_order_speed:.2f} км/ч\n"
+        f"Среднее время выполнения заказа: {avg_time:.2f} мин\n"
+        f"Самый быстрый заказ (по времени): {fastest_order_time:.2f} мин\n"
+        f"Самый долгий заказ: {longest_order_time:.2f} мин\n"
+        f"Самое короткое расстояние заказа: {shortest_order_distance:.2f} км\n"
+        f"Самое большое расстояние заказа: {longest_order_distance:.2f} км\n"
+        f"Процент успешных заказов: {success_rate:.2f}%\n"
+        f"Средняя стоимость заказа: {avg_price:.2f} руб.\n"
+        f"Наибольшая стоимость заказа: {max_price:.2f} руб.\n"
+        f"Наименьшая стоимость заказа: {min_price:.2f} руб.\n"
+    )
+
+    reply_kb = await get_user_kb(text="one_my_order")
+
+    # Отправка сообщения пользователю
+    await callback_query.message.edit_text(text,
+                                           reply_markup=reply_kb,
+                                           parse_mode="HTML")
 
 
 # Обработчик кнопки "⇥" для перехода вперёд
@@ -554,60 +655,16 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
                                            reply_markup=callback_query.message.reply_markup,
                                            parse_mode="HTML")
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                     ⇣ Go back ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
-'''some code'''
+
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                   ⇣ Cancel order ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 '''some code'''
+
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                   ⇣ Delete order ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
-
-
-@users_router.callback_query(F.data == "delete_my_order")
-async def delete_order(callback_query: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    orders_dict = data.get("orders")  # Словарь ID -> заказ
-    orders_text = data.get("orders_text")  # Список текстов заказов
-    counter = data.get("counter", 0)
-
-    # Проверяем, что заказы остались
-    if not orders_dict:
-        await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
-        return
-
-    # Получаем ID текущего заказа
-    order_id = list(orders_dict.keys())[counter]
-
-    # Удаляем заказ из базы данных
-    await order_data.delete_order_from_db(order_id)
-
-    # Удаляем заказ из состояния
-    del orders_dict[order_id]
-    await state.update_data(orders=orders_dict)
-
-    # Если заказы остались, обновляем сообщение
-    if orders_dict:
-        # Фильтруем тексты оставшихся заказов
-        new_orders_text = [text for i, text in enumerate(orders_text) if list(orders_dict.keys())[i] in orders_dict]
-
-        # Если новый список заказов пуст
-        if not new_orders_text:
-            await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
-            return
-
-        new_counter = counter % len(new_orders_text)  # Счетчик для нового списка заказов
-        await state.update_data(counter=new_counter)
-
-        new_order_info = new_orders_text[new_counter]
-        await callback_query.message.edit_text(new_order_info,
-                                               reply_markup=callback_query.message.reply_markup,
-                                               parse_mode="HTML")
-    else:
-        await callback_query.message.edit_text("У вас больше нет заказов.", reply_markup=None)
+'''some code'''
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -1103,7 +1160,7 @@ async def process_message(message: Message, state: FSMContext):
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
         new_message = await message.answer(
-            text="<b>Так далеко мы не летаем</b> ⟷⟷ \n\nМы осуществляем доставку только в пределах одного города!",
+            text="<b>Так далеко мы не доставляем</b> ⟷ \n\nМы осуществляем доставку только в пределах одного города!",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
 
