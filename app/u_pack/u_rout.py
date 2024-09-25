@@ -560,28 +560,28 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
 @users_router.callback_query(F.data == "my_statistic")
 async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
-    user_id = callback_query.from_user.id
+    user_tg_id = callback_query.from_user.id
 
     # Получение статистики пользователя
-    total_orders = await order_data.get_total_orders(user_id) or 0
-    completed_orders = await order_data.get_completed_orders_count(user_id) or 0
-    canceled_orders = await order_data.get_canceled_orders_count(user_id) or 0
-    avg_speed = await order_data.get_avg_order_speed(user_id) or 0
-    avg_distance = await order_data.get_avg_order_distance(user_id) or 0
-    fastest_order_speed = await order_data.get_fastest_order_speed(user_id) or 0
-    slowest_order_speed = await order_data.get_slowest_order_speed(user_id) or 0
-    avg_time = await order_data.get_avg_order_time(user_id) or 0
-    fastest_order_time = await order_data.get_fastest_order_time(user_id) or 0
-    longest_order_time = await order_data.get_longest_order_time(user_id) or 0
-    shortest_order_distance = await order_data.get_shortest_order_distance(user_id) or 0
-    longest_order_distance = await order_data.get_longest_order_distance(user_id) or 0
+    total_orders = await order_data.get_total_orders(user_tg_id) or 0
+    completed_orders = await order_data.get_completed_orders_count(user_tg_id) or 0
+    canceled_orders = await order_data.get_canceled_orders_count(user_tg_id) or 0
+    avg_speed = await order_data.get_avg_order_speed(user_tg_id) or 0
+    avg_distance = await order_data.get_avg_order_distance(user_tg_id) or 0
+    fastest_order_speed = await order_data.get_fastest_order_speed(user_tg_id) or 0
+    slowest_order_speed = await order_data.get_slowest_order_speed(user_tg_id) or 0
+    avg_time = await order_data.get_avg_order_time(user_tg_id) or 0
+    fastest_order_time = await order_data.get_fastest_order_time(user_tg_id) or 0
+    longest_order_time = await order_data.get_longest_order_time(user_tg_id) or 0
+    shortest_order_distance = await order_data.get_shortest_order_distance(user_tg_id) or 0
+    longest_order_distance = await order_data.get_longest_order_distance(user_tg_id) or 0
 
     # Если заказов нет, то процент успешных заказов будет 0
     success_rate = (completed_orders / total_orders) * 100 if total_orders > 0 else 0
 
-    avg_price = await order_data.get_avg_order_price(user_id) or 0
-    max_price = await order_data.get_max_order_price(user_id) or 0
-    min_price = await order_data.get_min_order_price(user_id) or 0
+    avg_price = await order_data.get_avg_order_price(user_tg_id) or 0
+    max_price = await order_data.get_max_order_price(user_tg_id) or 0
+    min_price = await order_data.get_min_order_price(user_tg_id) or 0
 
     # Формирование текста для сообщения
     text = (
