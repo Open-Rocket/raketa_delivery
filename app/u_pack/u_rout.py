@@ -585,23 +585,24 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
 
     # Формирование текста для сообщения
     text = (
-        f"<b>Статистика:</b>\n\n"
-        f"Общее количество заказов: {total_orders}\n"
-        f"Количество выполненных заказов: {completed_orders}\n"
-        f"Количество отмененных заказов: {canceled_orders}\n"
-        f"Средняя скорость выполнения заказа: {avg_speed:.2f} км/ч\n"
-        f"Среднее расстояние заказа: {avg_distance:.2f} км\n"
-        f"Самый быстрый заказ (по скорости): {fastest_order_speed:.2f} км/ч\n"
-        f"Самый медленный заказ (по скорости): {slowest_order_speed:.2f} км/ч\n"
-        f"Среднее время выполнения заказа: {avg_time:.2f} мин\n"
-        f"Самый быстрый заказ (по времени): {fastest_order_time:.2f} мин\n"
-        f"Самый долгий заказ: {longest_order_time:.2f} мин\n"
-        f"Самое короткое расстояние заказа: {shortest_order_distance:.2f} км\n"
-        f"Самое большое расстояние заказа: {longest_order_distance:.2f} км\n"
-        f"Процент успешных заказов: {success_rate:.2f}%\n"
-        f"Средняя стоимость заказа: {avg_price:.2f} руб.\n"
-        f"Наибольшая стоимость заказа: {max_price:.2f} руб.\n"
-        f"Наименьшая стоимость заказа: {min_price:.2f} руб.\n"
+        f"<b>Статистика заказов:</b>\n\n"
+        f"Всего заказов: {total_orders}\n"
+        f"Выполненные: {completed_orders}\n"
+        f"Отмененные: {canceled_orders}\n\n"
+        f"Самый медленный (по скорости): {slowest_order_speed:.2f} км/ч\n"
+        f"Самый быстрый (по скорости): {fastest_order_speed:.2f} км/ч\n"
+        f"Средняя скорость выполнения: {avg_speed:.2f} км/ч\n\n"
+        f"Самый долгий: {longest_order_time:.2f} мин\n"
+        f"Самый быстрый (по времени): {fastest_order_time:.2f} мин\n"
+        f"Среднее время выполнения: {avg_time:.2f} мин\n\n"
+        f"Самое короткое расстояние: {shortest_order_distance:.2f} км\n"
+        f"Самое большое расстояние: {longest_order_distance:.2f} км\n"
+        f"Среднее расстояние: {avg_distance:.2f} км\n\n"
+        f"Наименьшая стоимость: {min_price:.2f} руб.\n"
+        f"Наибольшая стоимость: {max_price:.2f} руб.\n"
+        f"Средняя стоимость: {avg_price:.2f} руб.\n\n"
+        f"Процент успешных: {success_rate:.2f}%\n"
+
     )
 
     reply_kb = await get_user_kb(text="one_my_order")

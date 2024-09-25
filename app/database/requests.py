@@ -375,7 +375,8 @@ class OrderData:
                 select(func.avg(extract('epoch', Order.execution_time)))  # среднее время в секундах
                 .where(Order.user_id == user_id)
             )
-            return result.scalar() / 60  # переводим в минуты
+            avg_time = result.scalar()
+            return (avg_time / 60) if avg_time is not None else 0
 
     async def get_fastest_order_time(self, user_id: int):
         async with self.async_session_factory() as session:
@@ -388,20 +389,22 @@ class OrderData:
                     )
                 )
             )
-            return result.scalar() / 60  # переводим в минуты
+            fastest_time = result.scalar()
+            return (fastest_time / 60) if fastest_time is not None else 0
 
     async def get_longest_order_time(self, user_id: int):
-        async with self.async_session_factory() as session:
-            result = await session.execute(
-                select(func.max(extract('epoch', Order.execution_time)))  # максимальное время в секундах
-                .where(
-                    and_(
-                        Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+            async with self.async_session_factory() as session:
+                result = await session.execute(
+                    select(func.max(extract('epoch', Order.execution_time)))  # максимальное время в секундах
+                    .where(
+                        and_(
+                            Order.user_id == user_id,
+                            Order.order_status == OrderStatus.COMPLETED
+                        )
                     )
                 )
-            )
-            return result.scalar() / 60  # переводим в минуты
+                longest_time = result.scalar()
+                return (longest_time / 60) if longest_time is not None else 0
 
     async def get_shortest_order_distance(self, user_id: int):
         async with self.async_session_factory() as session:
@@ -442,6 +445,7 @@ class OrderData:
                 .where(Order.user_id == user_id)
             )
             return result.scalar()
+
 
 # async def get_users():
 #     async with async_session_factory() as session:  # Используйте свой async_session
