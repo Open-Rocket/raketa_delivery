@@ -1,12 +1,17 @@
+import asyncio
+
+import aiohttp
 import os
 import requests
 import math
+import urllib3
 from math import cos, radians, sin, sqrt, atan2
 from dotenv import load_dotenv
 
 load_dotenv()
 
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
@@ -38,35 +43,116 @@ async def get_coordinates(address):
         return None, None
 
 
-async def calculate_osrm_route(*coordinates):
-    """
-    Вычисление маршрута с использованием OSRM для любого количества точек.
-    :param coordinates: пары (latitude, longitude) для каждой точки.
-    :return: общая дистанция в км и общее время в минутах для всего маршрута.
-    """
-    if len(coordinates) < 2:
-        print("Необходимо как минимум две точки для расчета маршрута.")
-        return None, None
+async def calculate_osrm_route(*coords, retries=3):
+    url = 'http://router.project-osrm.org/route/v1/driving/'
+    coords_str = ';'.join([f'{lng},{lat}' for lat, lng in coords])
+    full_url = f"{url}{coords_str}?overview=false"
 
-    # Создаем URL для запроса, соединяя все координаты через точку с запятой
-    coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
-    url = f"https://router.project-osrm.org/route/v1/driving/{coord_str}?overview=false"
+    for attempt in range(retries):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(full_url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        distance = data['routes'][0]['distance'] / 1000  # in kilometers
+                        duration = data['routes'][0]['duration'] / 60  # in minutes
+                        return distance, duration
+                    else:
+                        print(f"Ошибка запроса: {response.status}")
+                        return None, None
 
-    response = requests.get(url)
-    data = response.json()
-    time_coefficient = 1.6  # коэфициент для более точного времени доставки
+        except aiohttp.ClientConnectionError as e:
+            print(f"Попытка {attempt + 1}: Ошибка соединения: {e}")
+        except aiohttp.ClientError as e:
+            print(f"Попытка {attempt + 1}: Ошибка при выполнении запроса: {e}")
+        except Exception as e:
+            print(f"Попытка {attempt + 1}: Неизвестная ошибка: {e}")
 
-    if response.status_code == 200:
-        if data['routes']:
-            total_distance = data['routes'][0]['distance'] / 1000  # расстояние в километрах
-            total_duration = data['routes'][0]['duration'] / 60  # время в минутах
-            return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
-        else:
-            print("Маршрут не найден")
-            return None, None
-    else:
-        print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
-        return None, None
+        # Если попытка не удалась, делаем задержку перед повторной попыткой
+        await asyncio.sleep(2)
+
+    # Если все попытки исчерпаны
+    return None, None
+
+
+
+# async def calculate_osrm_route(*coordinates):
+#     """
+#     Вычисление маршрута с использованием OSRM для любого количества точек.
+#     :param coordinates: пары (latitude, longitude) для каждой точки.
+#     :return: общая дистанция в км и общее время в минутах для всего маршрута.
+#     """
+#     if len(coordinates) < 2:
+#         print("Необходимо как минимум две точки для расчета маршрута.")
+#         return None, None
+#
+#     # Создаем URL для запроса, соединяя все координаты через точку с запятой
+#     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
+#     url = f"http://localhost:5000/route/v1/driving/{coord_str}?overview=false"  # Укажите адрес вашего сервера OSRM
+#
+#     try:
+#         response = requests.get(url)  # Запрос к вашему серверу OSRM
+#         if response.status_code != 200:
+#             print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
+#             return None, None
+#
+#         # Проверяем, что ответ не пустой и данные в формате JSON
+#         try:
+#             data = response.json()
+#         except ValueError:
+#             print("Ошибка: Невозможно декодировать JSON ответ")
+#             return None, None
+#
+#         time_coefficient = 1.6  # коэфициент для более точного времени доставки
+#
+#         if data.get('routes'):
+#             total_distance = data['routes'][0].get('distance', 0) / 1000  # расстояние в километрах
+#             total_duration = data['routes'][0].get('duration')  # время в секундах
+#
+#             # Проверяем, что total_duration не является None
+#             if total_duration is not None:
+#                 total_duration /= 60  # переводим в минуты
+#                 return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
+#             else:
+#                 print("Ошибка: Продолжительность маршрута не найдена")
+#                 return None, None
+#         else:
+#             print("Маршрут не найден")
+#             return None, None
+#     except Exception as e:
+#         print(f"Произошла ошибка: {e}")
+#         return None, None
+
+
+# async def calculate_osrm_route(*coordinates):
+#     """
+#     Вычисление маршрута с использованием OSRM для любого количества точек.
+#     :param coordinates: пары (latitude, longitude) для каждой точки.
+#     :return: общая дистанция в км и общее время в минутах для всего маршрута.
+#     """
+#     if len(coordinates) < 2:
+#         print("Необходимо как минимум две точки для расчета маршрута.")
+#         return None, None
+#
+#     # Создаем URL для запроса, соединяя все координаты через точку с запятой
+#     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
+#     url = f"https://router.project-osrm.org/route/v1/driving/{coord_str}?overview=false"
+#
+#     response = requests.get(url)
+#     data = response.json()
+#     time_coefficient = 1.6  # коэфициент для более точного времени доставки
+#
+#     if response.status_code == 200:
+#         if data['routes']:
+#             total_distance = data['routes'][0]['distance'] / 1000  # расстояние в километрах
+#             total_duration = data['routes'][0]['duration'] / 60  # время в минутах
+#             return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
+#         else:
+#             print("Маршрут не найден")
+#             return None, None
+#     else:
+#         print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
+#         return None, None
 
 
 # async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude):

@@ -11,6 +11,7 @@ from aiogram import filters
 
 from app.common.coords_and_price import calculate_osrm_route, get_coordinates, get_price
 from app.common.fuzzy_city import find_most_compatible_response
+from app.database.models import OrderStatus
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb, get_my_orders_kb
@@ -413,7 +414,7 @@ async def change_name(message: Message, state: FSMContext):
 @users_router.callback_query(F.data == "back_myOrders")
 async def handle_my_orders(event, state: FSMContext):
     is_callback = isinstance(event, CallbackQuery)
-    user_id = event.from_user.id
+    user_tg_id = event.from_user.id
     chat_id = event.message.chat.id if is_callback else event.chat.id
     bot = event.message.bot if is_callback else event.bot
 
@@ -423,10 +424,10 @@ async def handle_my_orders(event, state: FSMContext):
 
     await state.set_state(UserState.myOrders)
 
-    pending_count = len(await order_data.get_pending_orders(user_id))
-    active_count = len(await order_data.get_active_orders(user_id))
-    canceled_count = len(await order_data.get_canceled_orders(user_id))
-    completed_count = len(await order_data.get_completed_orders(user_id))
+    pending_count = len(await order_data.get_pending_orders(user_tg_id))
+    active_count = len(await order_data.get_active_orders(user_tg_id))
+    canceled_count = len(await order_data.get_canceled_orders(user_tg_id))
+    completed_count = len(await order_data.get_completed_orders(user_tg_id))
 
     reply_kb = await get_my_orders_kb(pending_count, active_count, canceled_count, completed_count)
     text = (f"<b>Мои заказы</b>\n\n"
@@ -536,10 +537,9 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         await handler.delete_previous_message(callback_query.message.chat.id)
         text = f"У вас нет {status_text} заказов."
         reply_kb = await get_user_kb(text="one_my_order")
-        new_message = await callback_query.message.edit_text(text,
-                                                             reply_markup=reply_kb,
-                                                             disable_notification=True)
-        # await handler.handle_new_message(new_message, callback_query.message)
+        await callback_query.message.edit_text(text,
+                                               reply_markup=reply_kb,
+                                               disable_notification=True)
         return
 
     counter = 0
@@ -550,12 +550,9 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         reply_kb = await get_user_kb(text="one_my_pending" if len(orders_text) == 1 else keyboard_type)
     else:
         reply_kb = await get_user_kb(text="one_my_order" if len(orders_text) == 1 else keyboard_type)
-    new_message = await callback_query.message.edit_text(orders_text[counter], reply_markup=reply_kb,
-                                                         parse_mode="HTML",
-                                                         disable_notification=True)
-
-    handler = MessageHandler(state, callback_query.message)
-    # await handler.handle_new_message(new_message, callback_query.message)
+    await callback_query.message.edit_text(orders_text[counter], reply_markup=reply_kb,
+                                           parse_mode="HTML",
+                                           disable_notification=True)
 
 
 @users_router.callback_query(F.data == "my_statistic")
@@ -660,7 +657,33 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                   ⇣ Cancel order ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
-'''some code'''
+@users_router.callback_query(F.data == "cancel_my_order")
+async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
+    # Извлекаем данные из состояния
+    data = await state.get_data()
+    current_order_id = data.get("current_order_id")  # Получаем ID текущего заказа
+
+    if not current_order_id:
+        await callback_query.message.answer("Не удалось найти заказ для отмены.")
+        return
+
+    # Получаем статус заказа
+    order = await order_data.get_order_by_id(current_order_id)
+
+    # Проверяем статус заказа перед отменой
+    if order.order_status != OrderStatus.PENDING:
+        await callback_query.message.answer(
+            f"Заказ №{current_order_id} нельзя отменить, так как он не в статусе ожидания.")
+        return
+
+    # Обновляем статус заказа в базе данных
+    await order_data.update_order_status(current_order_id, OrderStatus.CANCELLED)
+
+    # Отправляем подтверждение пользователю
+    await callback_query.message.answer(f"Заказ №{current_order_id} успешно отменен.")
+
+    # Можно добавить логику для обновления интерфейса или возврата к списку заказов
+
 
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                   ⇣ Delete order ⇣
@@ -917,10 +940,19 @@ async def process_message(message: Message, state: FSMContext):
                     f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
                 )
 
-                distance, duration = await calculate_osrm_route(pickup_coords,
-                                                                delivery_coords)
-                distance_text = f"{distance} км"
-                duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                distance, duration = await calculate_osrm_route(pickup_coords, delivery_coords)
+
+                if duration is not None:
+                    duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                else:
+                    print("Ошибка: продолжительность маршрута не определена.")
+                    duration_text = "Неизвестно"  # Значение по умолчанию, если продолжительность не найдена
+                if distance is not None:
+                    distance_text = f"{distance} км"
+                else:
+                    print("Ошибка: расстояние маршрута не определено.")
+                    distance_text = "Неизвестно"  # Значение по умолчанию, если расстояние не найдено
+
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
                 price = await get_price(distance, moscow_time)
                 price_text = f"{price}₽"
@@ -1024,14 +1056,22 @@ async def process_message(message: Message, state: FSMContext):
                     f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
                 )
 
-                distance, duration = await calculate_osrm_route(pickup_coords,
-                                                                delivery_coords_1,
-                                                                delivery_coords_2)
-                distance_text = f"{distance} км"
-                duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                distance, duration = await calculate_osrm_route(pickup_coords, delivery_coords_1, delivery_coords_2)
+
+                if duration is not None:
+                    duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
+                else:
+                    print("Ошибка: продолжительность маршрута не определена.")
+                    duration_text = "Неизвестно"  # Значение по умолчанию, если продолжительность не найдена
+                if distance is not None:
+                    distance_text = f"{distance} км"
+                else:
+                    print("Ошибка: расстояние маршрута не определено.")
+                    distance_text = "Неизвестно"  # Значение по умолчанию, если расстояние не найдено
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
                 price = await get_price(distance, moscow_time, over_price=50)
                 price_text = f"{price}₽"
+                print(f"Расстояние: {distance_text}, Продолжительность: {duration_text}, Цена: {price_text}")
 
                 # Структурирование данных заказа
                 structured_data = await process_order_text(recognized_text)
