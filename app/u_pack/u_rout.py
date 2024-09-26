@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
-from app.common.coords_and_price import calculate_osrm_route, get_coordinates, get_price
+from app.common.coords_and_price import calculate_osrm_route, get_coordinates, get_price, calculate_total_distance
 from app.common.fuzzy_city import find_most_compatible_response
 from app.database.models import OrderStatus
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
@@ -199,8 +199,7 @@ async def cmd_order(message: Message, state: FSMContext):
         await state.set_state(UserState.ai_voice_order)
         text = ("◉ Укажите в описании к заказу:\n\n"
                 "Город: *если нужно\n"
-                "Адрес 1: Откуда забрать заказ.\n"
-                "Адрес 2: Куда доставить заказ.\n"
+                "Адреса доставки: *обязательно\n"
                 "Предмет доставки: *обязательно\n"
                 "Имя получателя:\n"
                 "Номер получателя:\n"
@@ -293,8 +292,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.bot)
     text = ("◉ Укажите в описании к заказу:\n\n"
             "Город: *если нужно\n"
-            "Адрес 1: Откуда забрать заказ.\n"
-            "Адрес 2: Куда доставить заказ.\n"
+            "Адреса доставки: *обязательно\n"
             "Предмет доставки: *обязательно\n"
             "Имя получателя:\n"
             "Номер получателя:\n"
@@ -940,22 +938,10 @@ async def process_message(message: Message, state: FSMContext):
                     f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
                 )
 
-                distance, duration = await calculate_osrm_route(pickup_coords, delivery_coords)
-
-                if duration is not None:
-                    duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
-                else:
-                    print("Ошибка: продолжительность маршрута не определена.")
-                    duration_text = "Неизвестно"  # Значение по умолчанию, если продолжительность не найдена
-                if distance is not None:
-                    distance_text = f"{distance} км"
-                else:
-                    print("Ошибка: расстояние маршрута не определено.")
-                    distance_text = "Неизвестно"  # Значение по умолчанию, если расстояние не найдено
+                distance, duration = await calculate_total_distance([pickup_coords, delivery_coords])
 
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
                 price = await get_price(distance, moscow_time)
-                price_text = f"{price}₽"
 
                 # Структурирование данных заказа
                 structured_data = await process_order_text(recognized_text)
@@ -1012,8 +998,8 @@ async def process_message(message: Message, state: FSMContext):
                     f"Имя: {receiver_name_1 if receiver_name_1 else '-'}\n"
                     f"Телефон: {receiver_phone_1 if receiver_phone_1 else '-'}\n\n"
                     f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
-                    f"Расстояние: {distance_text}\n"
-                    f"Стоимость доставки: {price_text}\n\n"
+                    f"Расстояние: {distance} км\n"
+                    f"Стоимость доставки: {price}₽\n\n"
                     f"Комментарии курьеру: {comments if comments else '-'}\n"
                     f"---------------------------------------------\n"
                     f"* Проверьте ваш заказ и если все верно, то разместите.\n"
@@ -1056,22 +1042,12 @@ async def process_message(message: Message, state: FSMContext):
                     f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
                 )
 
-                distance, duration = await calculate_osrm_route(pickup_coords, delivery_coords_1, delivery_coords_2)
+                distance, duration = await calculate_total_distance([pickup_coords,
+                                                                     delivery_coords_1,
+                                                                     delivery_coords_2])
 
-                if duration is not None:
-                    duration_text = f"{(duration - duration % 60) // 60} часов {duration % 60} минут"
-                else:
-                    print("Ошибка: продолжительность маршрута не определена.")
-                    duration_text = "Неизвестно"  # Значение по умолчанию, если продолжительность не найдена
-                if distance is not None:
-                    distance_text = f"{distance} км"
-                else:
-                    print("Ошибка: расстояние маршрута не определено.")
-                    distance_text = "Неизвестно"  # Значение по умолчанию, если расстояние не найдено
                 sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
                 price = await get_price(distance, moscow_time, over_price=50)
-                price_text = f"{price}₽"
-                print(f"Расстояние: {distance_text}, Продолжительность: {duration_text}, Цена: {price_text}")
 
                 # Структурирование данных заказа
                 structured_data = await process_order_text(recognized_text)
@@ -1141,8 +1117,8 @@ async def process_message(message: Message, state: FSMContext):
                     f"Имя: {receiver_name_2 if receiver_name_2 else '-'}\n"
                     f"Телефон: {receiver_phone_2 if receiver_phone_2 else '-'}\n\n"
                     f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
-                    f"Расстояние: {distance_text}\n"
-                    f"Стоимость доставки: {price_text}\n\n"
+                    f"Расстояние: {distance} км\n"
+                    f"Стоимость доставки: {price}₽\n\n"
                     f"Комментарии курьеру: {comments if comments else '-'}\n"
                     f"---------------------------------------------\n"
                     f"* Проверьте ваш заказ и если все верно, то разместите.\n"

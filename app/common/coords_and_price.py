@@ -26,6 +26,37 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return distance
 
 
+def calculate_total_distance(coordinates, adjustment_factor=1.1):
+    """
+    Рассчитывает общее расстояние между набором координат с учётом погрешности.
+    coords - список кортежей вида (широта, долгота)
+    adjustment_factor - коэффициент увеличения (по умолчанию 1.1 для 10% погрешности)
+    """
+    R = 6371  # радиус Земли в километрах
+    total_distance = 0
+    avg_speed = 25.0
+
+    # Проходим по списку координат и считаем расстояние между каждой парой
+    for i in range(len(coordinates) - 1):
+        lat1, lon1 = coordinates[i]
+        lat2, lon2 = coordinates[i + 1]
+
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+        c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        distance = R * c
+        total_distance += distance
+
+    # Применяем коэффициент погрешности
+    total_distance *= adjustment_factor
+    duration = int((total_distance / avg_speed) * 60)
+
+    return total_distance, duration
+
+
 async def get_coordinates(address):
     base_url = "https://geocode-maps.yandex.ru/1.x/"
     params = {
@@ -43,10 +74,6 @@ async def get_coordinates(address):
         return None, None
 
 
-import aiohttp
-import math
-
-
 async def calculate_osrm_route(*coordinates):
     """
     Вычисление маршрута с использованием OSRM для любого количества точек.
@@ -59,7 +86,7 @@ async def calculate_osrm_route(*coordinates):
 
     # Создаем URL для запроса, соединяя все координаты через точку с запятой
     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
-    url = f"http://localhost:5002/route/v1/driving/{coord_str}?overview=false"  # Изменен порт на 5001
+    url = f"http://localhost:5001/route/v1/driving/{coord_str}?overview=false"  # Изменен порт на 5001
 
     try:
         async with aiohttp.ClientSession() as session:
