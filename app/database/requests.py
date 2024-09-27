@@ -3,6 +3,7 @@ from sqlalchemy import select, update, delete, desc, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import async_session_factory, moscow_time, Order, utc_time
 from app.database.models import User, Courier, OrderStatus
+from app.database.models import moscow_time
 from sqlalchemy import select, and_
 from app.common.coords_and_price import calculate_distance
 
@@ -195,7 +196,7 @@ class OrderData:
             if order:
                 order.order_status = new_status
                 if new_status == OrderStatus.COMPLETED:
-                    order.completed_at = utc_time()
+                    order.completed_at_moscow_time = moscow_time
                 await session.commit()
 
     async def assign_courier(self, order_id: int, courier_id: int):
@@ -624,6 +625,15 @@ class OrderData:
                 )
             )
             return result.scalar()
+
+    async def get_order_by_id(self, current_order_id):
+        async with async_session_factory() as session:
+            user_query = await session.execute(
+                select(Order)
+                .where(Order.order_id == current_order_id)
+            )
+            current_order = user_query.scalar()
+            return current_order
 
 
 # async def get_users():

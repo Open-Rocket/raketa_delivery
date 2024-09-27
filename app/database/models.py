@@ -179,7 +179,7 @@ class Order(Base):
     receiver_phone_4: Mapped[stringData]
 
     comments: Mapped[textData]
-    distance_km: Mapped[intData]
+    distance_km: Mapped[floatData]
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
     order_text = Mapped[textData]

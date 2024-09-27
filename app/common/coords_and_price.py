@@ -26,7 +26,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return distance
 
 
-def calculate_total_distance(coordinates, adjustment_factor=1.1):
+async def calculate_total_distance(coordinates, adjustment_factor=1.34):
     """
     Рассчитывает общее расстояние между набором координат с учётом погрешности.
     coords - список кортежей вида (широта, долгота)
@@ -41,7 +41,7 @@ def calculate_total_distance(coordinates, adjustment_factor=1.1):
         lat1, lon1 = coordinates[i]
         lat2, lon2 = coordinates[i + 1]
 
-        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        lat1, lon1, lat2, lon2 = map(radians, map(float, [lat1, lon1, lat2, lon2]))
 
         dlat = lat2 - lat1
         dlon = lon2 - lon1
