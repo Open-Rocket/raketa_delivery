@@ -68,14 +68,12 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
         await user_data.set_user(message.from_user.id)
         await handler.delete_previous_message(message.chat.id)
         photo_title = await get_image_title_user("/start")
-        text = (f"Ракета — это современный сервис доставки, предлагающий минимальные цены и удобство использования.\n\n"
-                f"Почему выбирают Нас?\n\n"
-                f"◉ Самые низкие цены:\n"
-                f"Наши пешие курьеры обнаруживаются в радиусе вашего заказа, "
-                f"что снижает стоимость и ускоряет доставку.\n\n"
-                f"◉ Удобство и простота:\n"
-                f"Оформление заказа с нами — это быстро и легко благодаря технологиям искусственного интеллекта, "
-                f"которые позволяют мгновенно создать заказ и отправить его на выполнение.")
+        text = (f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
+                f"Почему выбирают нас?\n\n"
+                f"◉ Низкие цены:\n"
+                f"Наши пешие курьеры находятся рядом с вами, что снижает стоимость и ускоряет доставку.\n\n"
+                f"◉ Простота и удобство:\n"
+                f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение.")
         reply_kb = await get_user_kb(message)
 
         new_message = await message.answer_photo(photo=photo_title,
@@ -253,28 +251,29 @@ async def cmd_order(message: Message, state: FSMContext):
         photo_title = await get_image_title_user(message.text)
         text = ("◉ Вы можете сделать заказ с помощью текста или голоса, "
                 "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
-                "*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
-                "ассистент создаст заявку для вашего заказа.")
+                "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
+                "ассистент создаст заявку для вашего заказа.</i>")
         reply_kb = await get_user_kb(message)
 
         new_message = await message.answer_photo(photo=photo_title,
                                                  caption=text,
                                                  reply_markup=reply_kb,
-                                                 disable_notification=True)
+                                                 disable_notification=True,
+                                                 parse_mode="HTML")
 
 
     else:
         await state.update_data(read_info=True)
         await state.set_state(UserState.ai_voice_order)
-        text = ("✔︎ Укажите в описании к заказу:\n\n"
-                "Город: *если нужно\n"
-                "Адреса доставки: *обязательно\n"
-                "Предмет доставки: *обязательно\n"
-                "Имя получателя: *желательно\n"
-                "Номер получателя: *желательно\n"
-                "Комментарии курьеру: *если нужно\n\n"
-                "*Вы можете отрпвить как голосовое сообщение так и текстовое, "
-                "заказ будет оформлен в считанные секунды.")
+        text = ("✔︎ <b>Укажите в описании к заказу:</b>\n\n"
+                "<b>Город:</b> <i>*если нужно</i>\n"
+                "<b>Адреса доставки:</b> <i>*обязательно</i>\n"
+                "<b>Предмет доставки:</b> <i>*обязательно</i>\n"
+                "<b>Имя получателя:</b> <i>*желательно</i>\n"
+                "<b>Номер получателя:</b> <i>*желательно</i>\n"
+                "<b>Комментарии курьеру:</b> <i>*если нужно</i>\n\n"
+                "<i>*Вы можете отрпвить как голосовое сообщение так и текстовое, "
+                "заказ будет оформлен в считанные секунды.</i>")
 
         new_message = await message.answer(text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
                                            disable_notification=True,
@@ -293,15 +292,15 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     await state.update_data(read_info=True)
 
     handler = MessageHandler(state, callback_query.bot)
-    text = ("✔︎ Укажите в описании к заказу:\n\n"
-            "Город: *если нужно\n"
-            "Адреса доставки: *обязательно\n"
-            "Предмет доставки: *обязательно\n"
-            "Имя получателя: *желательно\n"
-            "Номер получателя: *желательно\n"
-            "Комментарии курьеру: *если нужно\n\n"
-            "*Вы можете отрпвить как голосовое сообщение так и текстовое, "
-            "заказ будет оформлен в считанные секунды.")
+    text = ("✔︎ <b>Укажите в описании к заказу:</b>\n\n"
+            "<b>Город:</b> <i>*если нужно</i>\n"
+            "<b>Адреса доставки:</b> <i>*обязательно</i>\n"
+            "<b>Предмет доставки:</b> <i>*обязательно</i>\n"
+            "<b>Имя получателя:</b> <i>*желательно</i>\n"
+            "<b>Номер получателя:</b> <i>*желательно</i>\n"
+            "<b>Комментарии курьеру:</b> <i>*если нужно</i>\n\n"
+            "<i>*Вы можете отрпвить как голосовое сообщение так и текстовое, "
+            "заказ будет оформлен в считанные секунды.</i>")
 
     new_message = await callback_query.message.answer(text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
                                                       disable_notification=True,
@@ -509,20 +508,20 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
     def format_address(number, address, name, phone, url):
         return (
-            f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
-            f"Имя: {name if name else '-'}\n"
-            f"Телефон: {phone if phone else '-'}\n\n"
+            f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
+            f"<b>Имя:</b> {name if name else '-'}\n"
+            f"<b>Телефон:</b> {phone if phone else '-'}\n\n"
         )
 
     orders_text = []
     for order in user_orders:
         base_info = (
             f"{user_orders.index(order) + 1}/{len(user_orders)}\n\n"
-            f"Заказ №{order.order_id}\n"
-            f"Дата оформления: {order.created_at_moscow_time}\n"
-            f"Статус заказа: {order.order_status.value}\n"
+            f"<b>Заказ №{order.order_id}</b>\n"
+            f"<b>Дата оформления:</b> {order.created_at_moscow_time}\n"
+            f"<b>Статус заказа:</b> {order.order_status.value}\n"
             f"---------------------------------------------\n"
-            f"Город: {order.order_city}\n\n"
+            f"<b>Город:</b> {order.order_city}\n\n"
             f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
         )
 
@@ -548,11 +547,11 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
                                         order.e_url)
 
         base_info += (
-            f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
-            f"Расстояние: {order.distance_km} км\n"
-            f"Стоимость доставки: {order.price_rub}₽\n"
+            f"<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n\n"
+            f"<b>Расстояние:</b> {order.distance_km} км\n"
+            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n"
             f"---------------------------------------------\n"
-            f"Комментарии: {order.comments if order.comments else '-'}\n\n"
+            f"<b>Комментарии:</b> <i>{'*'}{order.comments if order.comments else '...'}</i>\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
         )
 
@@ -572,7 +571,11 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     current_order_id = user_orders[counter].order_id
     await state.update_data(orders_text=orders_text, counter=counter, current_order_id=current_order_id)
 
-    reply_kb = await get_user_kb(text="one_my_pending" if len(orders_text) == 1 else keyboard_type)
+    if order_type == "pending_orders":
+        reply_kb = await get_user_kb(text="one_my_pending" if len(orders_text) == 1 else keyboard_type)
+    else:
+        reply_kb = await get_user_kb(text="one_my_order" if len(orders_text) == 1 else keyboard_type)
+
     await callback_query.message.edit_text(orders_text[counter], reply_markup=reply_kb,
                                            parse_mode="HTML",
                                            disable_notification=True)
@@ -699,20 +702,14 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 
     await order_data.update_order_status(current_order_id, OrderStatus.CANCELLED)
     text = (f"<b>Заказ №{current_order_id} успешно отменен.</b>\n\n"
-            f"*Вы можете отменить заказ до того как курьер его принял и начал выполнять!\n"
-            f"*Вы можете посмотреть информацию об отмененном заказе в своих заказах в пункте 'Отмененные'.\n\n"
+            # f"<i>*Вы можете отменить заказ до того как курьер его принял и начал выполнять!</i>\n"
+            f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отмененные.</b>\n\n"
             f"▼ <b>Выберите действие ...</b>")
     new_message = await callback_query.message.answer(text,
                                                       disable_notification=True,
                                                       parse_mode="HTML")
 
     await handler.handle_new_message(new_message, callback_query.message)
-
-
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                   ⇣ Delete order ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
-'''some code'''
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -1012,28 +1009,27 @@ async def process_message(message: Message, state: FSMContext):
 
                 # Отправка ответа пользователю
                 order_forma = (
-                    f"Ваш заказ ✍︎\n"
+                    f"<b>Ваш заказ</b> ✍︎\n"
                     f"---------------------------------------------\n"
-                    f"Город: {city}\n\n"
-                    f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                    f"Имя: {sender_name}\n"
-                    f"Телефон: {sender_phone}\n\n"
-                    f"⦿ Адрес 2: <a href='{delivery_point}'>{destination_point_b}</a>\n"
-                    f"Имя: {receiver_name_1 if receiver_name_1 else '-'}\n"
-                    f"Телефон: {receiver_phone_1 if receiver_phone_1 else '-'}\n\n"
-                    f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
-                    f"Расстояние: {distance} км\n"
-                    f"Стоимость доставки: {price}₽\n\n"
-                    f"Комментарии курьеру: {comments if comments else '-'}\n"
+                    f"<b>Город:</b> {city}\n\n"
+                    f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"<b>Имя:</b> {sender_name}\n"
+                    f"<b>Номер:</b> {sender_phone}\n\n"
+                    f"⦿ <b>Адрес 2:</b> <a href='{delivery_point}'>{destination_point_b}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_1 if receiver_name_1 else '...'}\n"
+                    f"<b>Номер:</b> {receiver_phone_1 if receiver_phone_1 else '...'}\n\n"
+                    f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n\n"
+                    f"<b>Расстояние:</b> {distance} км\n"
+                    f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                    f"<b>Комментарии курьеру:</b> <i>{'*'}{comments if comments else '...'}</i>\n"
                     f"---------------------------------------------\n"
-                    f"* Проверьте ваш заказ и если все верно, то разместите.\n"
-                    f"* Курьер может связаться с вами для уточнения деталей!\n"
-                    f"* Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"• Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"• Курьер может связаться с вами для уточнения деталей!\n"
+                    f"• Оплачивайте курьеру наличными или переводом.\n\n"
                     f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
                 )
                 new_message = await message.answer(
-                    text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
-                )
+                    text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML")
 
             else:
                 new_message = await message.answer(
@@ -1128,26 +1124,26 @@ async def process_message(message: Message, state: FSMContext):
 
                 # Отправка ответа пользователю
                 order_forma = (
-                    f"Ваш заказ ✍︎\n"
+                    f"<b>Ваш заказ</b> ✍︎\n"
                     f"---------------------------------------------\n"
-                    f"Город: {city}\n\n"
-                    f"⦿ Адрес 1: <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                    f"Имя: {sender_name}\n"
-                    f"Телефон: {sender_phone}\n\n"
-                    f"⦿ Адрес 2: <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
-                    f"Имя: {receiver_name_1 if receiver_name_1 else '-'}\n"
-                    f"Телефон: {receiver_phone_1 if receiver_phone_1 else '-'}\n\n"
-                    f"⦿ Адрес 3: <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
-                    f"Имя: {receiver_name_2 if receiver_name_2 else '-'}\n"
-                    f"Телефон: {receiver_phone_2 if receiver_phone_2 else '-'}\n\n"
-                    f"Доставляем: {delivery_object if delivery_object else ' -'}\n\n"
-                    f"Расстояние: {distance} км\n"
-                    f"Стоимость доставки: {price}₽\n\n"
-                    f"Комментарии курьеру: {comments if comments else '-'}\n"
+                    f"<b>Город:</b> {city}\n\n"
+                    f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"<b>Имя:</b> {sender_name}\n"
+                    f"<b>Телефон:</b> {sender_phone}\n\n"
+                    f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_1 if receiver_name_1 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_1 if receiver_phone_1 else '...'}\n\n"
+                    f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_2 if receiver_name_2 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_2 if receiver_phone_2 else '...'}\n\n"
+                    f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n\n"
+                    f"<b>Расстояние:</b> {distance} км\n"
+                    f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                    f"<b>Комментарии курьеру:</b> <i>{'*'}{comments if comments else '...'}</i>\n"
                     f"---------------------------------------------\n"
-                    f"* Проверьте ваш заказ и если все верно, то разместите.\n"
-                    f"* Курьер может связаться с вами для уточнения деталей!\n"
-                    f"* Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"• Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"• Курьер может связаться с вами для уточнения деталей!\n"
+                    f"• Оплачивайте курьеру наличными или переводом.\n\n"
                     f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
                 )
                 new_message = await message.answer(
@@ -1168,14 +1164,14 @@ async def process_message(message: Message, state: FSMContext):
                 reply_markup=reply_kb, disable_notification=True
             )
 
-    elif most_compatible_response == "overprice":
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="overprice")
-        new_message = await message.answer(
-            text=("<b>Внимание</b>！ \n\nВаш заказ содержит табачные изделия или алкогольуню продукцию.\n\n"
-                  "<b>Доставка будет стоить немного дороже!</b>"),
-            reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
-        )
+    # elif most_compatible_response == "overprice":
+    #     await state.set_state(UserState.default)
+    #     reply_kb = await get_user_kb(text="overprice")
+    #     new_message = await message.answer(
+    #         text=("<b>Внимание</b>！ \n\nВаш заказ содержит табачные изделия или алкогольуню продукцию.\n\n"
+    #               "<b>Доставка будет стоить немного дороже!</b>"),
+    #         reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+    #     )
     elif most_compatible_response == "inaudible":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
@@ -1238,7 +1234,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
         text = (
             f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
             f"Мы ищем курьера для вашего заказа 🔎\n\n"
-            f"Информацию о заказах можно посмотреть в разделе <b>Мои заказы</b>.\n\n"
+            f"<i>*Информацию о заказах можно посмотреть в разделе</i> <b>Мои заказы</b>.\n\n"
             f"▼ <b>Выберите действие ...</b>"
         )
     except Exception as e:

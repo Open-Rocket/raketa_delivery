@@ -71,8 +71,8 @@ class Role(enum.Enum):
 class OrderStatus(enum.Enum):
     PENDING = "Ожидается курьер"
     IN_PROGRESS = "В пути"
-    COMPLETED = "Доставлено"
-    CANCELLED = "Отменено"
+    COMPLETED = "Доставлен"
+    CANCELLED = "Отменен"
 
 
 # class SubscriptionType(enum.Enum):

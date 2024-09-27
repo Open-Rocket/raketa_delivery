@@ -109,7 +109,7 @@ async def get_my_orders_kb(pending_count: int, active_count: int,
         [InlineKeyboardButton(text=f"Ожидают {pending_count}", callback_data="pending_orders"),
          InlineKeyboardButton(text=f"Активные {active_count}", callback_data="active_orders")],
         [InlineKeyboardButton(text=f"Отмененные {canceled_count}", callback_data="canceled_orders"),
-         InlineKeyboardButton(text=f"Выполненные {completed_count}", callback_data="completed_orders")],
+         InlineKeyboardButton(text=f"Доставленные {completed_count}", callback_data="completed_orders")],
         [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")]
 
     ])
