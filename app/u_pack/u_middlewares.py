@@ -26,7 +26,7 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
         await event.delete()
         return
 
-    if state in (UserState.reg_Name.state, UserState.reg_City.state):
+    if state in (UserState.reg_Name.state, UserState.reg_City.state, UserState.reg_tou.state):
         if message_text in ["/order", "/profile", "/my_orders", "/faq", "/rules", "/become_courier"]:
             await event.delete()
             return

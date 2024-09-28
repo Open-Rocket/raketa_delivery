@@ -56,6 +56,38 @@ async def calculate_total_distance(coordinates, adjustment_factor=1.34):
 
     return total_distance, duration
 
+async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
+    """
+    Рассчитывает манхэттенское расстояние между набором координат с учётом погрешности.
+    coords - список кортежей вида (широта, долгота)
+    adjustment_factor - коэффициент увеличения (по умолчанию 1.34 для учёта сетки дорог)
+    """
+    R = 6371  # радиус Земли в километрах
+    total_distance = 0
+    avg_speed = 25.0
+
+    # Функция для перевода градусов в километры
+    def deg_to_km(deg):
+        return (deg * math.pi / 180) * R
+
+    # Проходим по списку координат и считаем манхэттенское расстояние
+    for i in range(len(coordinates) - 1):
+        lat1, lon1 = coordinates[i]
+        lat2, lon2 = coordinates[i + 1]
+
+        # Рассчитываем абсолютные разницы по широте и долготе
+        delta_lat = abs(lat2 - lat1)
+        delta_lon = abs(lon2 - lon1)
+
+        # Переводим градусы в километры и суммируем манхэттенское расстояние
+        distance = deg_to_km(delta_lat) + deg_to_km(delta_lon)
+        total_distance += distance
+
+    # Применяем коэффициент погрешности для учета реальных дорог
+    total_distance *= adjustment_factor
+    duration = int((total_distance / avg_speed) * 60)
+
+    return total_distance, duration
 
 async def get_coordinates(address):
     base_url = "https://geocode-maps.yandex.ru/1.x/"

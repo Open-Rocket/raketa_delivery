@@ -41,6 +41,13 @@ class UserData:
                 user.user_default_city = city
                 await session.commit()
 
+    async def set_user_accept_tou(self, tg_id: int, accepted: str):
+        async with self.async_session_factory() as session:
+            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
+            if user:
+                user.user_accept_terms_of_use = accepted
+                await session.commit()
+
     async def get_user_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
@@ -198,6 +205,25 @@ class OrderData:
                 if new_status == OrderStatus.COMPLETED:
                     order.completed_at_moscow_time = moscow_time
                 await session.commit()
+
+    async def get_order_courier_info(self, order_id):
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order.courier_id)
+                .where(Order.order_id == order_id)
+            )
+            courier_id = query.scalar()
+            query_2 = await session.execute(
+                select(Courier.courier_name, Courier.courier_phone_number)
+                .where(Courier.courier_id == courier_id)
+            )
+            courier_info = query_2.first()
+
+            if courier_info:
+                courier_name, courier_phone = courier_info
+                return courier_name, courier_phone
+            else:
+                return '...', '...'
 
     async def assign_courier(self, order_id: int, courier_id: int):
         async with self.async_session_factory() as session:

@@ -84,7 +84,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
         await handler.handle_new_message(new_message, message)
 
 
-# registration
+# registration_Name
 @users_router.callback_query(F.data == "reg")
 async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.reg_Name)
@@ -98,9 +98,9 @@ async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# registration_Name
+# registration_Phone
 @users_router.message(filters.StateFilter(UserState.reg_Name))
-async def data_email_user(message: Message, state: FSMContext):
+async def data_name_user(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -122,7 +122,7 @@ async def data_email_user(message: Message, state: FSMContext):
     await handler.handle_new_message(msg, message)
 
 
-# registration_Phone
+# registration_City
 @users_router.message(filters.StateFilter(UserState.reg_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
     await state.set_state(UserState.reg_City)
@@ -142,9 +142,10 @@ async def data_phone_user(message: Message, state: FSMContext):
     await handler.handle_new_message(msg, message)
 
 
+# terms of use
 @users_router.message(filters.StateFilter(UserState.reg_City))
-async def data_phone_user(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+async def data_city_user(message: Message, state: FSMContext):
+    await state.set_state(UserState.reg_tou)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -152,14 +153,36 @@ async def data_phone_user(message: Message, state: FSMContext):
     city = message.text
 
     await user_data.set_user_city(tg_id, city)
+    reply_kb = await get_user_kb(text="accept_tou")
+    text = (f"Начиная использование сервиса, вы соглашаетесь с "
+            f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+            f"Пользовательским соглашением и правилами использования</a>, а также "
+            f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+            f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+            f"отправкой или получением посылок, должны соответствовать законодательству "
+            f"вашего государства и общепринятым этическим нормам.</i>\n\n"
+            )
+    new_message = await message.answer(text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, message)
+
+
+@users_router.callback_query(F.data == "accept_tou")
+async def accept_tou(callback_query: CallbackQuery, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, callback_query.bot)
+
+    tg_id = callback_query.from_user.id
+    accept_tou = "Пользовательское соглашение и правила использования сервиса - Принимаю"
+    await user_data.set_user_accept_tou(tg_id, accept_tou)
     name, phone_number, city = await user_data.get_user_info(tg_id)
-    text = (f"Вы успешно зарегистрировались! 🎉\n\n"
+    text = ("Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {name}\n"
             f"Номер: {phone_number}\n"
             f"Город: {city}\n\n"
-            f"▼ <b>Выберите действие ...</b>")
-    msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
-    await handler.handle_new_message(msg, message)
+            f"▼ <b>Выберите действие ...</b>"
+            )
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -201,9 +224,11 @@ async def cmd_faq(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
-    text = (f"Вопросы и ответы")
+    text = (f"🤔 <b>Вопросы и ответы</b>\n\n"
+            f"Частые вопросы и ответы на них "
+            f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>")
 
-    new_message = await message.answer(text, disable_notification=True)
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
 
 
@@ -213,9 +238,17 @@ async def cmd_rules(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
-    text = (f"Правила сервиса")
+    text = (f"⚖️ <b>Правила сервиса</b>\n\n"
+            f"Начиная использование сервиса, вы соглашаетесь с "
+            f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+            f"Пользовательским соглашением и правилами использования</a>, а также "
+            f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+            f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+            f"отправкой или получением посылок, должны соответствовать законодательству "
+            f"вашего государства и общепринятым этическим нормам.</i>\n\n"
+            )
 
-    new_message = await message.answer(text, disable_notification=True)
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
 
 
@@ -482,24 +515,26 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
     # Основная логика получения заказов
     order_type = callback_query.data
+    user_tg_id = callback_query.from_user.id
+
     if order_type == "pending_orders":
+        user_orders = await order_data.get_pending_orders(user_tg_id)
         await state.set_state(UserState.myOrders_pending)
-        user_orders = await order_data.get_pending_orders(callback_query.from_user.id)
         keyboard_type = "pending_orders"
         status_text = "ожидающих"
     elif order_type == "active_orders":
+        user_orders = await order_data.get_active_orders(user_tg_id)
         await state.set_state(UserState.myOrders_active)
-        user_orders = await order_data.get_active_orders(callback_query.from_user.id)
         keyboard_type = "active_orders"
         status_text = "активных"
     elif order_type == "canceled_orders":
+        user_orders = await order_data.get_canceled_orders(user_tg_id)
         await state.set_state(UserState.myOrders_canceled)
-        user_orders = await order_data.get_canceled_orders(callback_query.from_user.id)
         keyboard_type = "canceled_orders"
         status_text = "отмененных"
     elif order_type == "completed_orders":
+        user_orders = await order_data.get_completed_orders(user_tg_id)
         await state.set_state(UserState.myOrders_completed)
-        user_orders = await order_data.get_completed_orders(callback_query.from_user.id)
         keyboard_type = "completed_orders"
         status_text = "завершенных"
 
@@ -546,10 +581,17 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
                                         order.receiver_phone_4,
                                         order.e_url)
 
+        counter = 0
+        current_order_id = user_orders[counter].order_id
+        courier_name, courier_phone = await order_data.get_order_courier_info(current_order_id)
         base_info += (
             f"<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n\n"
             f"<b>Расстояние:</b> {order.distance_km} км\n"
             f"<b>Стоимость доставки:</b> {order.price_rub}₽\n"
+            f"---------------------------------------------\n"
+            f"✰ <b>Курьер</b>\n"
+            f"Имя: {courier_name}\n"
+            f"Номер: {courier_phone}\n"
             f"---------------------------------------------\n"
             f"<b>Комментарии:</b> <i>{'*'}{order.comments if order.comments else '...'}</i>\n\n"
             f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
@@ -567,8 +609,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
                                                disable_notification=True)
         return
 
-    counter = 0
-    current_order_id = user_orders[counter].order_id
     await state.update_data(orders_text=orders_text, counter=counter, current_order_id=current_order_id)
 
     if order_type == "pending_orders":

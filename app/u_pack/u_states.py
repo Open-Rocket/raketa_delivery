@@ -8,6 +8,7 @@ class UserState(StatesGroup):
     reg_Name = State()
     reg_Phone = State()
     reg_City = State()
+    reg_tou = State()
 
     waiting_Courier = State()
     ai_voice_order = State()

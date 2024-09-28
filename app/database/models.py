@@ -92,6 +92,7 @@ class User(Base):
     user_name: Mapped[stringData]
     user_phone_number: Mapped[stringData]
     user_default_city: Mapped[stringData]
+    user_accept_terms_of_use: Mapped[stringData]
     user_registration_date: Mapped[datetimeData]
 
     orders = relationship("Order", back_populates="user")

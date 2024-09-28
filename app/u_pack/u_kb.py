@@ -83,6 +83,9 @@ async def get_user_kb(message: Optional[Message] = None, callback_data: Optional
             [InlineKeyboardButton(text="Перезаписать ゞ", callback_data="ai_order")],
 
         ]),
+        "accept_tou": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Принять", callback_data="accept_tou")]
+        ]),
     }
 
     if message:

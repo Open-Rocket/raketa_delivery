@@ -1,9 +1,10 @@
-from app.common.coords_and_price import calculate_osrm_route, calculate_total_distance
+import itertools
+
+from app.common.coords_and_price import calculate_osrm_route, calculate_total_distance, calculate_manhattan_distance
 import asyncio
 
 
 async def osrm():
-
     # Владикавказ
     coords1 = [(43.0220, 44.6750), (43.0215, 44.6980)]
 
@@ -16,12 +17,15 @@ async def osrm():
         [(55.769149, 37.643131), (55.850500, 37.617600)]  # Лужники и Шелепиха
     ]
 
-    distance, duration = await calculate_osrm_route(*coords_list[4])
+    string_coordinates = [(str(lat), str(lon)) for lat, lon in coords_list[3]]
 
-    distance_m, duration_m = calculate_total_distance(coords_list[4], adjustment_factor=1.33)
+    distance, duration = await calculate_osrm_route(*string_coordinates)
+    distance_m, duration_m = await calculate_total_distance(coords_list[3], adjustment_factor=1.32)
+    distance_m2, duration_m2 = await calculate_manhattan_distance(coords_list[3], adjustment_factor=1.1)
 
     print(f"test osrm - Общая дистанция: {distance:.2f} км, Общее время: {duration} минут")
-    print(f"test math - Общая дистанция: {distance_m:.2f} км, Общее время: {duration_m} минут")
+    print(f"test adjustment - Общая дистанция: {distance_m:.2f} км, Общее время: {duration_m} минут")
+    print(f"test manhattan - Общая дистанция: {distance_m2:.2f} км, Общее время: {duration_m2} минут")
 
 
 asyncio.run(osrm())
