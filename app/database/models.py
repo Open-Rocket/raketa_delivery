@@ -19,6 +19,7 @@ sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
 engine = create_async_engine(url=settings.DB_URL_asyncpg, echo=False)  # pool_size=5, max_overflow=10
 async_session_factory = async_sessionmaker(engine)
 
+
 moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
 utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0)
 
