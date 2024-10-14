@@ -14,7 +14,7 @@ from app.common.fuzzy_city import find_most_compatible_response
 from app.database.models import OrderStatus
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
-from app.u_pack.u_kb import get_user_kb, get_my_orders_kb
+from app.u_pack.u_kb import get_user_kb, get_my_orders_kb, get_switch
 from app.u_pack.u_ai_assistant import assistant_censure, process_order_text, get_parsed_addresses
 
 from app.common.message_handler import MessageHandler
@@ -1582,4 +1582,15 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
 
+
 # ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
+
+
+@users_router.message(F.text == "/share")
+async def switch_button(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    reply_kb = await get_switch()
+    new_message = await message.answer("Нажмите на кнопку", reply_markup=reply_kb)
+    await handler.handle_new_message(new_message, message)

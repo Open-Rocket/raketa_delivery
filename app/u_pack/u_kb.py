@@ -1,4 +1,4 @@
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, KeyboardButtonPollType
 from typing import Union, Optional
 from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton, InputFile,
                            InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery)
@@ -118,3 +118,17 @@ async def get_my_orders_kb(pending_count: int, active_count: int,
     ])
 
     return my_orders_kb
+
+
+async def get_poll():
+    poll_button = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="Создать опрос", request_poll=KeyboardButtonPollType())]
+    ], resize_keyboard=True)
+    return poll_button
+
+
+async def get_switch():
+    switch_button = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Поделиться", switch_inline_query='👈 Лучший сервис пешей доставки!')]
+    ])
+    return switch_button

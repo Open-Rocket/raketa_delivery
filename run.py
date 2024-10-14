@@ -2,6 +2,8 @@ import os
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.enums.menu_button_type import MenuButtonType
+from aiogram.types import MenuButtonDefault, MenuButtonCommands
 from dotenv import load_dotenv
 
 from app.u_pack.u_rout import users_router

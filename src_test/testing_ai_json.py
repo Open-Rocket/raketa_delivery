@@ -11,9 +11,7 @@ templates_orders = {
 
 
 async def get_ai_json(text: str):
-    ai_json = await process_order_text(text)
-    print(ai_json)
-    return ai_json
+    await process_order_text(text)
 
 
 asyncio.run(get_ai_json(templates_orders["order_1"]))
