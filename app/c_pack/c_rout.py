@@ -8,7 +8,7 @@ from aiogram.enums import ContentType
 from aiogram import filters
 
 from app.c_pack.c_middlewares import OuterMiddleware, InnerMiddleware
-from app.c_pack.c_states import CourierState
+from app.c_pack.c_states import CourierState, CourierRegistration
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_courier
 from app.common.titles import get_image_title_courier
@@ -26,99 +26,145 @@ couriers_router.callback_query.outer_middleware(OuterMiddleware())
 couriers_router.message.middleware(InnerMiddleware())
 couriers_router.callback_query.middleware(InnerMiddleware())
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                              ⇣ Registration steps ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+text = (
+    "Добро пожаловать в Ракету — платформу, которая делает каждого курьера независимым и успешным!\n"
+    "Стань частью сообщества, где ты сам управляешь своими доходами и работаешь на своих условиях.\n\n"
+    "Почему Ракета?\n\n"
+    "◉ **Зарабатывай больше**: \n"
+    "Забудь про комиссии и скрытые платежи. Ты оплачиваешь только подписку и получаешь 100% прибыли "
+    "с каждого заказа. "
+    "Чем больше работаешь, тем больше зарабатываешь. Всё честно и прозрачно.\n\n"
+    "◉ **Свобода выбора**: \n"
+    "Твоя работа — на твоих условиях. Бери заказы в любое время и работай так, как удобно тебе. "
+    "Управляй своим временем и доходами самостоятельно.\n\n"
+    "◉ **Прозрачность**: \n"
+    "Каждый заработанный рубль — твой. Никаких посредников, штрафов и скрытых условий. "
+    "Ты строишь свой бизнес, а мы поддерживаем тебя.\n\n"
+    "Присоединяйся к Ракете и начинай зарабатывать больше уже сегодня! Независимость и возможности ждут тебя."
+)
+
 
 # start
-
 @couriers_router.message(CommandStart())
 async def cmd_start_courier(message: Message, state: FSMContext) -> None:
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    photo_title = await get_image_title_courier("/start")
-    text = (
-        "Ракета — это новый, современный сервис доставки, созданный для того, "
-        "чтобы курьеры могли работать свободно и зарабатывать больше. "
-        "С нами вы сами управляете своими доходами без скрытых комиссий и сложных условий.\n\n"
-        "Почему стоит выбрать Нас?\n\n"
-        "◉ Подписка:\n"
-        "Забудьте про комиссии! Оплачивая подписку, вы получаете полную свободу: выбирайте заказы, "
-        "определяйте рабочие часы и сами управляйте своим заработком. "
-        "Здесь каждый заказ — это чистая прибыль для вас. Хотите заработать больше? Работайте больше! Всё просто.\n\n"
-        "◉ Полная прозрачность:\n"
-        "Все заработанные вами деньги — только ваши. Нет ни посредников, ни комиссий, ни штрафов. "
-        "Это ваш бизнес, а Ракета помогает вам развивать его так, как вы хотите.\n\n"
-        "Ракета — это платформа, где независимость и возможности идут вместе с технологиями. "
-        "Работайте на своих условиях и зарабатывайте столько, сколько хотите!")
-    reply_kb = await get_courier_kb(message)
+    """
+        Обрабатывает команду /start для курьеров.
 
-    new_message = await message.answer_photo(photo=photo_title,
-                                             caption=text,
-                                             reply_markup=reply_kb,
-                                             disable_notification=True)
-    await handler.handle_new_message(new_message, message)
-    await courier_data.set_courier(message.from_user.id)
+        Эта функция активируется, когда курьер отправляет команду /start.
+        - Назначает курьеру начальное состояние регистрации (`CourierState.reg_state`).
+        - Отправляет приветственное сообщение, в котором кратко описывается сервис.
+        - Предлагает курьеру пройти процесс регистрации.
+
+        Args:
+            message (Message): Объект сообщения от пользователя, содержащий команду /start.
+            state (FSMContext): Контекст состояния конечного автомата, используемый для управления состояниями пользователя.
+
+        Returns:
+            None: Функция не возвращает значение, только отправляет сообщение и устанавливает состояние.
+    """
 
 
-# registration
+@couriers_router.callback_query(F.data == "reg")
+async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext) -> None:
+    """
+        Обрабатывает нажатие на кнопку регистрации курьера.
 
-@couriers_router.callback_query(F.data == "next")
-async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
-    handler = MessageHandler(state, callback_query.bot)
-    await state.set_state(CourierState.state_Name)
-    text = "Пройдите небольшую регистрацию, это не займет много времени.\n\nКак вас зовут?"
-    new_message = await callback_query.message.answer(text, disable_notification=True)
-    await handler.handle_new_message(new_message, callback_query.message)
+        После нажатия на кнопку с идентификатором "reg":
+        - Переводит пользователя в состояние регистрации (`CourierRegistration.name`).
+        - Отправляет сообщение с просьбой ввести имя курьера.
 
+        Args:
+            callback_query (CallbackQuery): Объект, содержащий информацию о нажатии на кнопку.
+            state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
 
-@couriers_router.message(filters.StateFilter(CourierState.state_Name))
-async def data_name_user(message: Message, state: FSMContext):
-    await state.set_state(CourierState.state_email)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    tg_id = message.from_user.id
-    name = message.text
-    await courier_data.set_courier_name(tg_id, name)
-    text = f"Спасибо {name}\nТеперь введите ваш email:"
-    new_message = await message.answer(text, disable_notification=True)
-    await handler.handle_new_message(new_message, message)
+        Returns:
+            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
 
 
-@couriers_router.message(filters.StateFilter(CourierState.state_email))
-async def data_email_user(message: Message, state: FSMContext):
-    await state.set_state(CourierState.state_Phone)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+@couriers_router.message(filters.StateFilter(CourierRegistration.name))
+async def data_name_courier(message: Message, state: FSMContext) -> None:
+    """
+       Обрабатывает состояние курьера после отправки его имени.
 
-    tg_id = message.from_user.id
-    email = message.text
+       После отправки курьером своего имени:
+       - Переводит пользователя в состояние регистрации (`CourierRegistration.phone_number`).
+       - Сохраняет в состояние имя курьера (await state.update_data(name=message.text))
+       - Отправляет сообщение с просьбой указать номер телефона с помощью KeyboardButton и никак иначе.
 
-    # Сохраняем email пользователя в БД
-    await courier_data.set_courier_email(tg_id, email)
-    reply_kb = await get_courier_kb(text="phone_number")
-    text = ("Последний шаг!\n\n"
-            "Ваш номер телефона:")
-    msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
-    await handler.handle_new_message(msg, message)
+       Args:
+           message (Message): Объект сообщения от пользователя, содержащий его имя.
+           state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
+
+       Returns:
+           None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
 
 
-@couriers_router.message(filters.StateFilter(CourierState.state_Phone))
-async def data_phone_user(message: Message, state: FSMContext):
-    await state.set_state(CourierState.zero)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+@couriers_router.message(filters.StateFilter(CourierRegistration.phone_number))
+async def data_phone_courier(message: Message, state: FSMContext) -> None:
+    """
+        Обрабатывает состояние курьера после отправки его номера.
 
-    tg_id = message.from_user.id
-    phone = message.contact.phone_number
+        После отправки курьером своего номера:
+        - Переводит пользователя в состояние регистрации (`CourierRegistration.city`).
+        - Сохраняет в состояние номер курьера (await state.update_data(phone_number=message.contact.phone_number))
+        - Отправляет сообщение с просьбой указать свой город работы.
 
-    # Сохраняем email пользователя в БД
-    await courier_data.set_courier_phone(tg_id, phone)
-    name, email, phone_number = await courier_data.get_courier_info(tg_id)
-    text = (f"Вы успешно зарегистрировались!\n\n"
-            f"Имя: {name}\n"
-            f"Почта: {email}\n"
-            f"Номер: {phone_number}\n\n▼ Выберите действие в меню")
-    msg = await message.answer(text, disable_notification=True)
-    await handler.handle_new_message(msg, message)
+        Args:
+            message (Message): Объект сообщения от пользователя, содержащий его номер телефона.
+            state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
 
+        Returns:
+            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
+
+
+@couriers_router.message(filters.StateFilter(CourierRegistration.city))
+async def data_city_courier(message: Message, state: FSMContext) -> None:
+    """
+        Обрабатывает состояние курьера после отправки его города.
+
+        После отправки курьером своего города:
+        - Переводит пользователя в состояние регистрации (`CourierRegistration.accept_tou`).
+        - Сохраняет в состояние город курьера (await state.update_data(city=message.text))
+        - Отправляет сообщение с предложением ознакомиться и принять пользовательское соглашение.
+
+        Args:
+            message (Message): Объект сообщения от пользователя, содержащий его город.
+            state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
+
+        Returns:
+            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
+
+
+@couriers_router.callback_query(F.data == "accept_tou")
+async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -> None:
+    """
+        Обрабатывает принятия курьером пользовательского соглашения.
+
+        После принятия курьером пользовательского соглашения:
+        - Извлекает из состояния CourierRegistration данные name, phone_number, city, accept_tou.
+        - Отправляет запрос в БД для записи.
+        - Переводит пользователя в состояние регистрации (`CourierState.default`).
+        - Отправляет сообщение с успешной регистрацией и предложением выбрать дальнейшее действие в пункте меню.
+
+        Args:
+            callback_query (CallbackQuery): Объект, содержащий информацию о нажатии на кнопку.
+            state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
+
+        Returns:
+            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ Bot functions ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 
 # commands
 

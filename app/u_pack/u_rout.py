@@ -1,6 +1,5 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
 
-# import asyncio
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -86,7 +85,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 
 # registration_Name
 @users_router.callback_query(F.data == "reg")
-async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
+async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.reg_Name)
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
@@ -167,7 +166,7 @@ async def data_city_user(message: Message, state: FSMContext):
 
 
 @users_router.callback_query(F.data == "accept_tou")
-async def accept_tou(callback_query: CallbackQuery, state: FSMContext):
+async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.default)
     handler = MessageHandler(state, callback_query.bot)
 

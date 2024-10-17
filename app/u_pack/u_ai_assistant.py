@@ -16,7 +16,7 @@ client = AsyncOpenAI(api_key=apy_key,
                      http_client=httpx.AsyncClient(proxies=proxy,
                                                    transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0")))
 
-
+# Протестировать на ожидание ответа
 async def get_gpt_text(req, model="gpt-4o-mini"):
     completion = await client.chat.completions.create(
         messages=[{"role": "user", "content": req}],
