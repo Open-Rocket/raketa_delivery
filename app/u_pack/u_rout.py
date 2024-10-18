@@ -1,6 +1,5 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
 
-# import asyncio
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -14,7 +13,7 @@ from app.common.fuzzy_city import find_most_compatible_response
 from app.database.models import OrderStatus
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
-from app.u_pack.u_kb import get_user_kb, get_my_orders_kb
+from app.u_pack.u_kb import get_user_kb, get_my_orders_kb, get_switch
 from app.u_pack.u_ai_assistant import assistant_censure, process_order_text, get_parsed_addresses
 
 from app.common.message_handler import MessageHandler
@@ -86,7 +85,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 
 # registration_Name
 @users_router.callback_query(F.data == "reg")
-async def data_next_user(callback_query: CallbackQuery, state: FSMContext):
+async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.reg_Name)
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
@@ -116,6 +115,7 @@ async def data_name_user(message: Message, state: FSMContext):
         reply_kb = await get_user_kb(text="phone_number")
         text = (f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
                 f"в случае необходимости, пожалуйста, укажите ваш номер телефона.\n\n"
+                f"<i>*При регистрации с компьютера нажмите на значек команд рядом с полем ввода.</i>\n\n"
                 f"<b>Ваш номер:</b>")
 
         msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML")
@@ -167,7 +167,7 @@ async def data_city_user(message: Message, state: FSMContext):
 
 
 @users_router.callback_query(F.data == "accept_tou")
-async def accept_tou(callback_query: CallbackQuery, state: FSMContext):
+async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(UserState.default)
     handler = MessageHandler(state, callback_query.bot)
 
@@ -1189,12 +1189,303 @@ async def process_message(message: Message, state: FSMContext):
                 new_message = await message.answer(
                     text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
                 )
+        elif len(addresses) == 4:
+            pickup_address, delivery_address_1, delivery_address_2, delivery_address_3 = addresses
+            pickup_coords = await get_coordinates(pickup_address)
+            delivery_coords_1 = await get_coordinates(delivery_address_1)
+            delivery_coords_2 = await get_coordinates(delivery_address_2)
+            delivery_coords_3 = await get_coordinates(delivery_address_3)
+            all_coordinates = [pickup_coords, delivery_coords_1, delivery_coords_2, delivery_coords_3]
+
+            if all(pickup_coords) and all(delivery_coords_1) and all(delivery_coords_2) and all(delivery_coords_3):
+                # Формирование ссылки для маршрута на Яндекс.Картах
+                yandex_maps_url = (
+                    f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
+                    f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
+                    f"~{delivery_coords_2[0]},{delivery_coords_2[1]}"
+                    f"~{delivery_coords_3[0]},{delivery_coords_3[1]}&rtt=auto"
+                )
+
+                # Ссылки на точки на карте
+                pickup_point = (
+                    f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+                    f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+                )
+                delivery_point_1 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
+                    f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
+                )
+                delivery_point_2 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
+                    f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
+                )
+                delivery_point_3 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_3[1]},{delivery_coords_3[0]}"
+                    f"&pt={delivery_coords_3[1]},{delivery_coords_3[0]}&z=14"
+                )
+
+                # Рассчет дистанции и продолжительности
+                distance, duration = await calculate_total_distance(all_coordinates)
+                distance = round(distance, 2)
+
+                # Получение информации о пользователе
+                sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
+                price = await get_price(distance, moscow_time, over_price=50)
+
+                # Структурирование данных заказа
+                structured_data = await process_order_text(recognized_text)
+                city = structured_data.get('City', user_city)
+                starting_point_a = structured_data.get('Starting point A')
+                destination_point_b = structured_data.get('Destination point B')
+                destination_point_c = structured_data.get('Destination point C')
+                destination_point_d = structured_data.get('Destination point D')
+                delivery_object = structured_data.get('Delivery object')
+                receiver_name_1 = structured_data.get('Receiver name 1')
+                receiver_phone_1 = structured_data.get('Receiver phone 1')
+                receiver_name_2 = structured_data.get('Receiver name 2')
+                receiver_phone_2 = structured_data.get('Receiver phone 2')
+                receiver_name_3 = structured_data.get('Receiver name 3')
+                receiver_phone_3 = structured_data.get('Receiver phone 3')
+                order_details = structured_data.get('Order details', None)
+                comments = structured_data.get('Comments', None)
+
+                # Сохранение данных в состоянии
+                await state.update_data(
+                    city=city,
+                    starting_point_a=starting_point_a,
+                    a_latitude=float(pickup_coords[0]),
+                    a_longitude=float(pickup_coords[1]),
+                    a_coordinates=pickup_coords,
+                    a_url=pickup_point,
+                    destination_point_b=destination_point_b,
+                    b_latitude=float(delivery_coords_1[0]),
+                    b_longitude=float(delivery_coords_1[1]),
+                    b_coordinates=delivery_coords_1,
+                    b_url=delivery_point_1,
+                    destination_point_c=destination_point_c,
+                    c_latitude=float(delivery_coords_2[0]),
+                    c_longitude=float(delivery_coords_2[1]),
+                    c_coordinates=delivery_coords_2,
+                    c_url=delivery_point_2,
+                    destination_point_d=destination_point_d,
+                    d_latitude=float(delivery_coords_3[0]),
+                    d_longitude=float(delivery_coords_3[1]),
+                    d_coordinates=delivery_coords_3,
+                    d_url=delivery_point_3,
+                    delivery_object=delivery_object,
+                    sender_name=sender_name,
+                    sender_phone=sender_phone,
+                    receiver_name_1=receiver_name_1,
+                    receiver_phone_1=receiver_phone_1,
+                    receiver_name_2=receiver_name_2,
+                    receiver_phone_2=receiver_phone_2,
+                    receiver_name_3=receiver_name_3,
+                    receiver_phone_3=receiver_phone_3,
+                    order_details=order_details,
+                    comments=comments,
+                    distance_km=distance,
+                    duration_min=duration,
+                    price_rub=price,
+                    order_text=recognized_text,
+                    order_time=moscow_time,
+                    yandex_maps_url=yandex_maps_url,
+                    pickup_point=pickup_point,
+                    delivery_point=delivery_point_1,
+                )
+
+                # Формирование ответа пользователю
+                order_forma = (
+                    f"<b>Ваш заказ</b> ✍︎\n"
+                    f"---------------------------------------------\n"
+                    f"<b>Город:</b> {city}\n\n"
+                    f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"<b>Имя:</b> {sender_name}\n"
+                    f"<b>Телефон:</b> {sender_phone}\n\n"
+                    f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_1 if receiver_name_1 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_1 if receiver_phone_1 else '...'}\n\n"
+                    f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_2 if receiver_name_2 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_2 if receiver_phone_2 else '...'}\n\n"
+                    f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_3 if receiver_name_3 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_3 if receiver_phone_3 else '...'}\n\n"
+                    f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n\n"
+                    f"<b>Расстояние:</b> {distance} км\n"
+                    f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                    f"<b>Комментарии курьеру:</b> <i>{'*'}{comments if comments else '...'}</i>\n"
+                    f"---------------------------------------------\n"
+                    f"• Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"• Курьер может связаться с вами для уточнения деталей!\n"
+                    f"• Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+                )
+                new_message = await message.answer(
+                    text=order_forma, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+                )
+        elif len(addresses) == 5:
+            pickup_address, delivery_address_1, delivery_address_2, delivery_address_3, delivery_address_4 = addresses
+            pickup_coords = await get_coordinates(pickup_address)
+            delivery_coords_1 = await get_coordinates(delivery_address_1)
+            delivery_coords_2 = await get_coordinates(delivery_address_2)
+            delivery_coords_3 = await get_coordinates(delivery_address_3)
+            delivery_coords_4 = await get_coordinates(delivery_address_4)
+            all_coordinates = [pickup_coords, delivery_coords_1, delivery_coords_2, delivery_coords_3,
+                               delivery_coords_4]
+
+            if all(pickup_coords) and all(delivery_coords_1) and all(delivery_coords_2) and all(
+                    delivery_coords_3) and all(delivery_coords_4):
+                # Формирование ссылки для маршрута на Яндекс.Картах
+                yandex_maps_url = (
+                    f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
+                    f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
+                    f"~{delivery_coords_2[0]},{delivery_coords_2[1]}"
+                    f"~{delivery_coords_3[0]},{delivery_coords_3[1]}"
+                    f"~{delivery_coords_4[0]},{delivery_coords_4[1]}&rtt=auto"
+                )
+
+                # Ссылки на точки на карте
+                pickup_point = (
+                    f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+                    f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+                )
+                delivery_point_1 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
+                    f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
+                )
+                delivery_point_2 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
+                    f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
+                )
+                delivery_point_3 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_3[1]},{delivery_coords_3[0]}"
+                    f"&pt={delivery_coords_3[1]},{delivery_coords_3[0]}&z=14"
+                )
+                delivery_point_4 = (
+                    f"https://yandex.ru/maps/?ll={delivery_coords_4[1]},{delivery_coords_4[0]}"
+                    f"&pt={delivery_coords_4[1]},{delivery_coords_4[0]}&z=14"
+                )
+
+                # Рассчет дистанции и продолжительности
+                distance, duration = await calculate_total_distance(all_coordinates)
+                distance = round(distance, 2)
+
+                # Получение информации о пользователе
+                sender_name, sender_phone = await user_data.get_username_userphone(tg_id)
+                price = await get_price(distance, moscow_time, over_price=50)
+
+                # Структурирование данных заказа
+                structured_data = await process_order_text(recognized_text)
+                city = structured_data.get('City', user_city)
+                starting_point_a = structured_data.get('Starting point A')
+                destination_point_b = structured_data.get('Destination point B')
+                destination_point_c = structured_data.get('Destination point C')
+                destination_point_d = structured_data.get('Destination point D')
+                destination_point_e = structured_data.get('Destination point E')
+                delivery_object = structured_data.get('Delivery object')
+                receiver_name_1 = structured_data.get('Receiver name 1')
+                receiver_phone_1 = structured_data.get('Receiver phone 1')
+                receiver_name_2 = structured_data.get('Receiver name 2')
+                receiver_phone_2 = structured_data.get('Receiver phone 2')
+                receiver_name_3 = structured_data.get('Receiver name 3')
+                receiver_phone_3 = structured_data.get('Receiver phone 3')
+                receiver_name_4 = structured_data.get('Receiver name 4')
+                receiver_phone_4 = structured_data.get('Receiver phone 4')
+                order_details = structured_data.get('Order details', None)
+                comments = structured_data.get('Comments', None)
+
+                # Сохранение данных в состоянии
+                await state.update_data(
+                    city=city,
+                    starting_point_a=starting_point_a,
+                    a_latitude=float(pickup_coords[0]),
+                    a_longitude=float(pickup_coords[1]),
+                    a_coordinates=pickup_coords,
+                    a_url=pickup_point,
+                    destination_point_b=destination_point_b,
+                    b_latitude=float(delivery_coords_1[0]),
+                    b_longitude=float(delivery_coords_1[1]),
+                    b_coordinates=delivery_coords_1,
+                    b_url=delivery_point_1,
+                    destination_point_c=destination_point_c,
+                    c_latitude=float(delivery_coords_2[0]),
+                    c_longitude=float(delivery_coords_2[1]),
+                    c_coordinates=delivery_coords_2,
+                    c_url=delivery_point_2,
+                    destination_point_d=destination_point_d,
+                    d_latitude=float(delivery_coords_3[0]),
+                    d_longitude=float(delivery_coords_3[1]),
+                    d_coordinates=delivery_coords_3,
+                    d_url=delivery_point_3,
+                    destination_point_e=destination_point_e,
+                    e_latitude=float(delivery_coords_4[0]),
+                    e_longitude=float(delivery_coords_4[1]),
+                    e_coordinates=delivery_coords_4,
+                    e_url=delivery_point_4,
+                    delivery_object=delivery_object,
+                    sender_name=sender_name,
+                    sender_phone=sender_phone,
+                    receiver_name_1=receiver_name_1,
+                    receiver_phone_1=receiver_phone_1,
+                    receiver_name_2=receiver_name_2,
+                    receiver_phone_2=receiver_phone_2,
+                    receiver_name_3=receiver_name_3,
+                    receiver_phone_3=receiver_phone_3,
+                    receiver_name_4=receiver_name_4,
+                    receiver_phone_4=receiver_phone_4,
+                    order_details=order_details,
+                    comments=comments,
+                    distance_km=distance,
+                    duration_min=duration,
+                    price_rub=price,
+                    order_text=recognized_text,
+                    order_time=moscow_time,
+                    yandex_maps_url=yandex_maps_url,
+                    pickup_point=pickup_point,
+                    delivery_point=delivery_point_1,
+                )
+
+                # Формирование ответа пользователю
+                order_forma = (
+                    f"<b>Ваш заказ</b> ✍︎\n"
+                    f"---------------------------------------------\n"
+                    f"<b>Город:</b> {city}\n\n"
+                    f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
+                    f"<b>Имя:</b> {sender_name}\n"
+                    f"<b>Телефон:</b> {sender_phone}\n\n"
+                    f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_1 if receiver_name_1 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_1 if receiver_phone_1 else '...'}\n\n"
+                    f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_2 if receiver_name_2 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_2 if receiver_phone_2 else '...'}\n\n"
+                    f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_3 if receiver_name_3 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_3 if receiver_phone_3 else '...'}\n\n"
+                    f"⦿ <b>Адрес 5:</b> <a href='{delivery_point_4}'>{destination_point_e}</a>\n"
+                    f"<b>Имя:</b> {receiver_name_4 if receiver_name_4 else '...'}\n"
+                    f"<b>Телефон:</b> {receiver_phone_4 if receiver_phone_4 else '...'}\n\n"
+                    f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n\n"
+                    f"<b>Расстояние:</b> {distance} км\n"
+                    f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                    f"<b>Комментарии курьеру:</b> <i>{'*'}{comments if comments else '...'}</i>\n"
+                    f"---------------------------------------------\n"
+                    f"• Проверьте ваш заказ и если все верно, то разместите.\n"
+                    f"• Курьер может связаться с вами для уточнения деталей!\n"
+                    f"• Оплачивайте курьеру наличными или переводом.\n\n"
+                    f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+                )
+
+                new_message = await message.answer(text=order_forma,
+                                                   reply_markup=reply_kb,
+                                                   disable_notification=True,
+                                                   parse_mode="HTML")
+
         elif len(addresses) > 5:
             new_message = await message.answer(
                 text=f"<b>Слишком много пунктов</b> 𐒀 \n\nМы не оформляем доставки с более чем 5 адресами, "
                      "так как курьер может запутаться и не выполнить ваш заказ!",
-                reply_markup=reply_kb, disable_notification=True
-            )
+                reply_markup=reply_kb, disable_notification=True, parse_mode="HTML")
 
 
 
@@ -1291,4 +1582,15 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
 
+
 # ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
+
+
+@users_router.message(F.text == "/share")
+async def switch_button(message: Message, state: FSMContext):
+    await state.set_state(UserState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    reply_kb = await get_switch()
+    new_message = await message.answer("Нажмите на кнопку", reply_markup=reply_kb)
+    await handler.handle_new_message(new_message, message)

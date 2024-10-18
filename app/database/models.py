@@ -106,7 +106,11 @@ class Courier(Base):
     courier_tg_id: Mapped[int] = mapped_column(BigInteger)
     courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
     courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
-    courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
+    courier_default_city: Mapped[stringData]
+    courier_accept_terms_of_use: Mapped[stringData]
+    courier_registration_date: Mapped[datetimeData]
+
+    # courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
 
     courier_lat: Mapped[floatData]
     courier_lon: Mapped[floatData]

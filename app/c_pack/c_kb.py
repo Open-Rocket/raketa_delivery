@@ -23,7 +23,7 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
             [InlineKeyboardButton(text="Отзывы и предложения", callback_data="reviews")]
         ]),
         "next_kb": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Дальше", callback_data="next")]
+            [InlineKeyboardButton(text="Регистрация", callback_data="reg", )],
         ]),
         "success_payment": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Полетели! ⇢ К заказам", callback_data="lets_go")]

@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
+class SettingsDB(BaseSettings):
     DB_HOST: str
     DB_PORT: int
     DB_USER: str
@@ -17,4 +17,4 @@ class Settings(BaseSettings):
 
 
 # Создание экземпляра настроек
-settings = Settings()
+settings = SettingsDB()

@@ -78,7 +78,12 @@ class CourierData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def set_courier(self, tg_id: int):
+    async def set_courier(self, tg_id: int,
+                          name: str,
+                          phone_number: str,
+                          default_city: str,
+                          accept_terms_tou: str,
+                          registration_date: str):
         async with self.async_session_factory() as session:
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
             if not courier:

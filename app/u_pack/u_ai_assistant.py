@@ -6,7 +6,7 @@ import json
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("./info/.env")
 proxy = os.getenv("PROXY")
 apy_key = os.getenv("OPENAI_API")
 assistant_id = os.getenv("AI_ASSISTANT_ID")
@@ -16,7 +16,7 @@ client = AsyncOpenAI(api_key=apy_key,
                      http_client=httpx.AsyncClient(proxies=proxy,
                                                    transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0")))
 
-
+# Протестировать на ожидание ответа
 async def get_gpt_text(req, model="gpt-4o-mini"):
     completion = await client.chat.completions.create(
         messages=[{"role": "user", "content": req}],
@@ -129,7 +129,9 @@ async def process_order_text(order_text: str) -> dict | str | None:
     )
 
     response = await get_gpt_text(prompt)
+    print(f"JSON={response}")
     structured_data = await parse_response(response)
+    print(f"structured_data={response}")
 
     return structured_data
 
@@ -151,14 +153,18 @@ async def get_parsed_addresses(order_text, city=None):
                   f"Если не указывается второй город то значит оба адреса из одного города!")
 
     response = await get_gpt_text(prompt)
+    # print(response)
 
     # Регулярное выражение для поиска адресов по указанному формату
     address_pattern = re.compile(r'\((.*?)\)')
+    # print(address_pattern)
     matches = address_pattern.findall(response)
+    # print(matches)
 
     addresses = []
     for match in matches:
         if ',' in match:
             addresses.append(match.strip())
 
+    # print(addresses)
     return addresses

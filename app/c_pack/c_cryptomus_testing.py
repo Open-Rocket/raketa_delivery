@@ -5,8 +5,12 @@ import json
 import uuid
 
 import aiohttp
+import dp
 from aiogram.filters import CommandStart
 from aiogram.types import Message
+
+from app.c_pack.c_rout import couriers_router
+from app.database.config_db import settings
 
 
 async def make_request(url: str, invoice_data: dict):
@@ -43,7 +47,7 @@ async def check_invoice_paid(id: str, message):
         await asyncio.sleep(10)
 
 
-@dp.message(CommandStart())
+@couriers_router.message(CommandStart())
 async def buy_handler(message: Message):
     invoice_data = await make_request(
         url="https://api.cryptomus.com/v1/payment",
