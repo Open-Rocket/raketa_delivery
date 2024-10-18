@@ -3,6 +3,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 class CourierState(StatesGroup):
     default = State()
+    location = State()
 
 
 class CourierRegistration(StatesGroup):
