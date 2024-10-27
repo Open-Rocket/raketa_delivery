@@ -1,6 +1,5 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
 
-
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
@@ -34,11 +33,11 @@ from app.u_pack.u_voice_to_text import process_audio_data
 
 users_router = Router()
 
-# middleware_Outer
+# middlewares_Outer
 users_router.message.outer_middleware(OuterMiddleware())
 users_router.callback_query.outer_middleware(OuterMiddleware())
 
-# middleware_Inner
+# middlewares_Inner
 users_router.message.middleware(InnerMiddleware())
 users_router.callback_query.middleware(InnerMiddleware())
 
@@ -217,7 +216,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# commands_Profile
+# faq
 @users_router.message(F.text == "/faq")
 async def cmd_faq(message: Message, state: FSMContext):
     await state.set_state(UserState.default)
@@ -231,7 +230,7 @@ async def cmd_faq(message: Message, state: FSMContext):
     new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
 
-
+# rules
 @users_router.message(F.text == "/rules")
 async def cmd_rules(message: Message, state: FSMContext):
     await state.set_state(UserState.default)

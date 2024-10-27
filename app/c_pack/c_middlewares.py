@@ -2,112 +2,130 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
 
-
 import os
 from dotenv import load_dotenv
+
+from app.c_pack.c_states import CourierRegistration, CourierState
+from app.u_pack.u_states import UserState
 
 load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
 
 
-class OuterMiddleware(BaseMiddleware):
+async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
+                                         data: Dict[str, Any]) -> Any:
+    message_text = event.text
 
+    # Обработка команды /start для курьера
+    if message_text == "/start":
+        return await handler(event, data)
+
+    # Обработка состояния регистрации курьера
+    if state in (CourierRegistration.name.state,
+                 CourierRegistration.phone_number.state,
+                 CourierRegistration.city.state,
+                 CourierRegistration.accept_tou.state):
+        if message_text in ["/my_orders", "/location", "/start"]:
+            await event.delete()
+            return
+
+    # Если курьер пытается выполнить команду не в `default` состоянии
+    if state in {CourierState.location.state, CourierState.myOrders.state}:
+        if message_text not in ["/my_orders", "/location", "/start"]:
+            await event.delete()
+            return
+
+    # Состояние при отсутствии регистрации (инициализация)
+    if state == CourierState.start_reg.state:
+        await event.delete()
+        return
+
+    # Если состояние регистрации курьера и сообщение не содержит номер телефона
+    if state == CourierRegistration.phone_number.state and not event.contact:
+        await event.delete()
+        return
+
+    # Обработка остальных состояний по умолчанию
+    return await handler(event, data)
+
+
+class OuterMiddleware(BaseMiddleware):
     async def __call__(self,
                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]) -> Any:
-        fsm_context = data.get("state")
-        if fsm_context:
-            state = await fsm_context.get_state()
-        else:
-            state = "No state"
 
-        # Обработка обычного сообщения
+        # Проверка состояния до вызова хендлера
+        fsm_context = data.get("state")
+        state = await fsm_context.get_state() if fsm_context else "No state"
+
         if isinstance(event, Message):
             user_id = event.from_user.id
             message_text = event.text
 
             print("--------------------")
-            print("Couriers - 🏃")
+            print("Couriers - 🚴")
             print("Outer_mw")
-            print(f"User message: {message_text}")
-            print(f"User ID: {user_id}")
-            print(f"User state previous: {state}")
+            print(f"Courier message: {message_text}")
+            print(f"Courier ID: {user_id}")
+            print(f"Courier state previous: {state}")
 
-        # Обработка callback-запроса
+            # Передаем данные дальше в цепочку
+            result = await check_state_and_handle_message(state, event, handler, data)
+            return result
+
         elif isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             callback_data = event.data
 
             print("--------------------")
-            print("Couriers - 🏃")
+            print("Couriers - 🚴")
             print("Outer_mw")
             print(f"Callback data: {callback_data}")
-            print(f"User ID: {user_id}")
-            print(f"User state previous: {state}")
+            print(f"Courier ID: {user_id}")
+            print(f"Courier state previous: {state}")
 
-        result = await handler(event, data)
-        return result
+            return await handler(event, data)
 
 
 class InnerMiddleware(BaseMiddleware):
-
     async def __call__(self,
                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]) -> Any:
 
-        # Обработка обычного сообщения
+        fsm_context = data.get("state")
+        state = await fsm_context.get_state() if fsm_context else "No state"
+
         if isinstance(event, Message):
             user_id = event.from_user.id
             message_text = event.text
 
             print("--------------------")
-            print("Couriers - 🏃")
+            print("Couriers - 🚴")
             print("Inner_mw")
-            print(f"User message: {message_text}")
-            print(f"User ID: {user_id}")
+            print(f"Courier message: {message_text}")
+            print(f"Courier ID: {user_id}")
+            print(f"Courier state previous: {state}")
 
-        # Обработка callback-запроса
         elif isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             callback_data = event.data
 
             print("--------------------")
-            print("Couriers - 🏃")
+            print("Couriers - 🚴")
             print("Inner_mw")
             print(f"Callback data: {callback_data}")
-            print(f"User ID: {user_id}")
+            print(f"Courier ID: {user_id}")
 
-        # Вызов хендлера
+        # Вызов хендлера и вывод обновленного состояния
         result = await handler(event, data)
 
-        # Проверка состояния после вызова хендлера
-        fsm_context = data.get("state")
         if fsm_context:
-            state = await fsm_context.get_state()
+            updated_state = await fsm_context.get_state()
         else:
-            state = "No state"
+            updated_state = "No state"
 
-        # Вывод обновленного состояния
-        print(f"User state now: {state}")
+        print(f"Courier state now: {updated_state}")
 
         return result
-
-
-class AdminPasswordAcception(BaseMiddleware):
-
-    async def __call__(self,
-                       handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject,
-                       data: Dict[str, Any]) -> Any:
-        print("--------------------")
-        print(f"Processing message: {event.text}")
-        result = await handler(event, data)
-        print("Попытка входа в админ панель")
-        if event.text == password:
-            print(f"Доступ разрешен!")
-            return result
-        else:
-            print(f"Доступ откланен!")
-            return result

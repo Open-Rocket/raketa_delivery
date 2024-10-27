@@ -25,3 +25,4 @@ class TestCalculator:
     def test_add(self, x, y, res, expectation):
         with expectation:
             assert Calculator().add(x, y) == res
+

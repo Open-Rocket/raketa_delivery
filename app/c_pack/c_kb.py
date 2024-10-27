@@ -11,9 +11,6 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
             [KeyboardButton(text="Отправить локацию 🧭", request_location=True)],
         ],
             resize_keyboard=True, one_time_keyboard=False),
-        "phone_number": ReplyKeyboardMarkup(keyboard=[
-            [KeyboardButton(text="Поделиться номером", request_contact=True)],
-        ], resize_keyboard=True, one_time_keyboard=False),
         "/subs": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", callback_data="pay_sub")]
         ]),
@@ -33,6 +30,12 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
             [InlineKeyboardButton(text="Телефон", callback_data="set_my_phone")],
             [InlineKeyboardButton(text="Почта", callback_data="set_my_email")],
             [InlineKeyboardButton(text="Мои заказы", callback_data="my_orders")]
+        ]),
+        "phone_number": ReplyKeyboardMarkup(keyboard=[
+            [KeyboardButton(text="Поделиться номером", request_contact=True)],
+        ], resize_keyboard=True, one_time_keyboard=False, input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎"),
+        "accept_tou": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Принять", callback_data="accept_tou")]
         ]),
 
     }

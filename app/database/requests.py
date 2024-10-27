@@ -78,48 +78,56 @@ class CourierData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def set_courier(self, tg_id: int,
-                          name: str,
-                          phone_number: str,
-                          default_city: str,
-                          accept_terms_tou: str,
-                          registration_date: str):
+    async def set_courier_info(self, tg_id: int, name: str, phone_number: str,
+                               default_city: str, accept_terms_tou: str,
+                               registration_date: str):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
-            if not courier:
-                new_courier = Courier(courier_tg_id=tg_id)
-                session.add(new_courier)
-                await session.commit()
-
-    async def set_courier_name(self, tg_id: int, name: str):
-        async with self.async_session_factory() as session:
+            # Пытаемся найти существующего курьера
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
             if courier:
+                # Если курьер найден, обновляем его данные
                 courier.courier_name = name
-                await session.commit()
+                courier.courier_phone_number = phone_number
+                courier.courier_default_city = default_city
+                courier.courier_accept_terms_of_use = accept_terms_tou
+                courier.registration_date = registration_date
+            else:
+                # Если курьер не найден, создаем нового курьера
+                new_courier = Courier(
+                    courier_tg_id=tg_id,
+                    courier_name=name,
+                    courier_phone_number=phone_number,
+                    courier_default_city=default_city,
+                    courier_accept_terms_of_use=accept_terms_tou,
+                    courier_registration_date=registration_date
+                )
+                session.add(new_courier)
 
-    async def set_courier_email(self, tg_id: int, email: str):
-        async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
-            if courier:
-                courier.courier_email = email
-                await session.commit()
-
-    async def set_courier_phone(self, tg_id: int, phone: str):
-        async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
-            if courier:
-                courier.courier_phone_number = phone
-                await session.commit()
-
+            # Сохраняем изменения в базе данных
+            await session.commit()
     async def get_courier_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
             if courier:
                 return (
-                    courier.courier_name or "...", courier.courier_email or "...",
-                    courier.courier_phone_number or "...")
-            return ("...", "...", "...")
+                    courier.courier_name or "...",
+                    courier.courier_phone_number or "...",
+                )
+            return (None, None)
+
+    async def get_courier_phone(self, tg_id: int):
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            if courier:
+                return courier.courier_phone_number
+            return None
+
+    async def get_courier_city(self, tg_id: int):
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            if courier:
+                return courier.courier_default_city
+            return None
 
 
 class OrderData:

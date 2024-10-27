@@ -4,6 +4,9 @@ from aiogram.fsm.state import StatesGroup, State
 class CourierState(StatesGroup):
     default = State()
     location = State()
+    myOrders = State()
+    start_reg = State()
+
 
 
 class CourierRegistration(StatesGroup):

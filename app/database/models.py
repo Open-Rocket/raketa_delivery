@@ -108,12 +108,12 @@ class Courier(Base):
     courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
     courier_default_city: Mapped[stringData]
     courier_accept_terms_of_use: Mapped[stringData]
-    courier_registration_date: Mapped[datetimeData]
+    courier_registration_date: Mapped[stringData]
 
     # courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
 
-    courier_lat: Mapped[floatData]
-    courier_lon: Mapped[floatData]
+    # courier_lat: Mapped[floatData]
+    # courier_lon: Mapped[floatData]
 
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
