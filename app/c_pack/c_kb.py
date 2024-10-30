@@ -37,6 +37,14 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
         "accept_tou": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅ Принять", callback_data="accept_tou")]
         ]),
+        "one_order": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
+        ]),
+        "available_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right")],
+            [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
+        ]),
 
     }
 

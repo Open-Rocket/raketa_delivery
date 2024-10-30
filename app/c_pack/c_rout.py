@@ -1,7 +1,7 @@
 import asyncio
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
@@ -14,7 +14,7 @@ from app.common.titles import get_image_title_courier
 from app.common.titles import get_image_title_courier
 from app.c_pack.c_kb import get_courier_kb
 
-from app.database.requests import courier_data
+from app.database.requests import courier_data, order_data
 
 from datetime import datetime
 
@@ -297,9 +297,18 @@ async def cmd_run(message: Message, state: FSMContext) -> None:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
 
+    # handler = MessageHandler(state, message.bot)
+    await state.set_state(CourierState.location)
+    reply_kb = await get_courier_kb(text="/run")
+
+    await message.answer(
+        "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.",
+        reply_markup=reply_kb)
+    # await handler.handle_new_message(new_message, message)
+
 
 # Location
-@couriers_router.message(F.content_type == ContentType.LOCATION)
+@couriers_router.message(F.content_type == ContentType.LOCATION, filters.StateFilter(CourierState.location))
 async def get_location(message: Message, state: FSMContext) -> None:
     """
         Обрабатывает сообщение с отправкой локации курьера.
@@ -314,6 +323,106 @@ async def get_location(message: Message, state: FSMContext) -> None:
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
+
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    courier_tg_id = message.from_user.id
+    my_lon = message.location.longitude
+    my_lat = message.location.latitude
+    radius_km = 5
+
+    available_orders = await order_data.get_available_orders(courier_tg_id, my_lat, my_lon, radius_km=radius_km)
+
+    def format_address(number, address, name, phone, url):
+        return (
+            f"⦿ Адрес {number}: <a href='{url}'>{address}</a>\n"
+            f"Имя: {name if name else '-'}\n"
+            f"Телефон: {phone if phone else '-'}\n\n"
+        )
+
+    orders = []
+    for order in available_orders:
+        base_info = (
+            f"Заказов рядом: {len(available_orders)}\n\n"
+            f"Заказ №{order.order_id}\n"
+            f"Дата оформления: {order.created_at_moscow_time}\n"
+            f"Статус заказа: {order.order_status.value}\n"
+            f"---------------------------------------------\n"
+            f"Город: {order.order_city}\n\n"
+            f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
+        )
+
+        # Динамическое добавление адресов до 5-ти
+        if order.destination_point_b:
+            base_info += format_address(2, order.destination_point_b, order.receiver_name_1, order.receiver_phone_1,
+                                        order.b_url)
+        if order.destination_point_c:
+            base_info += format_address(3, order.destination_point_c, order.receiver_name_2, order.receiver_phone_2,
+                                        order.c_url)
+        if order.destination_point_d:
+            base_info += format_address(4, order.destination_point_d, order.receiver_name_3, order.receiver_phone_3,
+                                        order.d_url)
+        if order.destination_point_e:
+            base_info += format_address(5, order.destination_point_e, order.receiver_name_4, order.receiver_phone_4,
+                                        order.e_url)
+
+        base_info += (
+            f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
+            f"Расстояние: {order.distance_km} км\n"
+            f"Оплата: {order.price_rub}₽\n"
+            f"* Принимайте оплату наличными или переводом.\n"
+            f"---------------------------------------------\n"
+            f"Комментарии: {order.comments if order.comments else '-'}\n\n"
+            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
+        )
+
+        orders.append(base_info)
+
+    if not orders:
+        await message.answer("Спасибо! Локация получена.", reply_markup=ReplyKeyboardRemove())
+        await asyncio.sleep(1)
+        new_message = await message.answer("Нет доступных заказов в вашем радиусе.",
+                                           disable_notification=True)
+        return
+
+    counter = 0
+    await state.update_data(orders=orders, counter=counter)
+
+    reply_kb = await get_courier_kb(text="one_order" if len(orders) == 1 else "available_orders")
+    await message.answer("Спасибо! Локация получена.",
+                         disable_notification=True,
+                         reply_markup=ReplyKeyboardRemove())
+    await asyncio.sleep(1)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb,
+                                       parse_mode="HTML",
+                                       disable_notification=True)
+
+    await handler.handle_new_message(new_message, message)
+
+
+@couriers_router.callback_query(F.data == "next_right", filters.StateFilter(CourierState.location))
+async def on_button_next(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    orders = data.get("orders")
+    counter = data.get("counter", 0)
+
+    counter = (counter + 1) % len(orders)
+    await state.update_data(counter=counter)
+    await callback_query.message.edit_text(orders[counter], reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
+
+
+@couriers_router.callback_query(F.data == "back_left", filters.StateFilter(CourierState.location))
+async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    orders = data.get("orders")
+    counter = data.get("counter", 0)
+
+    counter = (counter - 1) % len(orders)
+    await state.update_data(counter=counter)
+    await callback_query.message.edit_text(orders[counter], reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
 
 
 @couriers_router.message(F.text == "/my_orders")

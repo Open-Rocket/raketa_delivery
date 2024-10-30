@@ -892,6 +892,8 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+
+
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                 ⇣ Assistant test ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -966,11 +968,11 @@ async def process_message(message: Message, state: FSMContext):
 
     # Проверка текста через ассистента на цензуру
     censore_response = await assistant_censure(recognized_text)
-    print(censore_response)
+    # print(censore_response)
 
     # Определение наибольшей совместимости ответа с возможными сценариями
     most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
-    print(most_compatible_response)
+    # print(most_compatible_response)
 
     # Обработка результата цензуры по наибольшему соответствию
     if most_compatible_response == "clear":

@@ -16,6 +16,9 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
                                          data: Dict[str, Any]) -> Any:
     message_text = event.text
 
+    if state == CourierState.location.state:
+        return await handler(event, data)
+
     # Обработка команды /start для курьера
     if message_text == "/start":
         return await handler(event, data)
