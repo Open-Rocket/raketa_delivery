@@ -13,6 +13,7 @@ from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_courier
 from app.common.titles import get_image_title_courier
 from app.c_pack.c_kb import get_courier_kb
+from app.database.models import OrderStatus
 
 from app.database.requests import courier_data, order_data
 
@@ -276,7 +277,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Bot functions ⇣
+#                                                    ⇣ Get orders ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # run
@@ -298,35 +299,19 @@ async def cmd_run(message: Message, state: FSMContext) -> None:
     """
 
     # handler = MessageHandler(state, message.bot)
+    # await handler.delete_previous_message(message.chat.id)
     await state.set_state(CourierState.location)
     reply_kb = await get_courier_kb(text="/run")
 
-    await message.answer(
+    new_message = await message.answer(
         "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.",
-        reply_markup=reply_kb)
+        reply_markup=reply_kb, disable_notification=True)
     # await handler.handle_new_message(new_message, message)
 
 
 # Location
 @couriers_router.message(F.content_type == ContentType.LOCATION, filters.StateFilter(CourierState.location))
 async def get_location(message: Message, state: FSMContext) -> None:
-    """
-        Обрабатывает сообщение с отправкой локации курьера.
-
-        После отправки команды локации:
-        - Отправляет сообщение с заказами в радиусе 2км от курьера.
-
-        Args:
-            message (Message): Объект, содержащий информацию о текущем местомоложении(location=message.location).
-            state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-        Returns:
-            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
     courier_tg_id = message.from_user.id
     my_lon = message.location.longitude
     my_lat = message.location.latitude
@@ -342,7 +327,11 @@ async def get_location(message: Message, state: FSMContext) -> None:
         )
 
     orders = []
+    order_ids = []  # Список для хранения order_id
+
     for order in available_orders:
+        order_ids.append(order.order_id)  # Сохраняем order_id текущего заказа
+
         base_info = (
             f"Заказов рядом: {len(available_orders)}\n\n"
             f"Заказ №{order.order_id}\n"
@@ -352,20 +341,14 @@ async def get_location(message: Message, state: FSMContext) -> None:
             f"Город: {order.order_city}\n\n"
             f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
         )
-
-        # Динамическое добавление адресов до 5-ти
+        # Добавление адресов
         if order.destination_point_b:
             base_info += format_address(2, order.destination_point_b, order.receiver_name_1, order.receiver_phone_1,
                                         order.b_url)
         if order.destination_point_c:
             base_info += format_address(3, order.destination_point_c, order.receiver_name_2, order.receiver_phone_2,
                                         order.c_url)
-        if order.destination_point_d:
-            base_info += format_address(4, order.destination_point_d, order.receiver_name_3, order.receiver_phone_3,
-                                        order.d_url)
-        if order.destination_point_e:
-            base_info += format_address(5, order.destination_point_e, order.receiver_name_4, order.receiver_phone_4,
-                                        order.e_url)
+        # И так далее...
 
         base_info += (
             f"Доставляем: {order.delivery_object if order.delivery_object else '-'}\n\n"
@@ -382,22 +365,22 @@ async def get_location(message: Message, state: FSMContext) -> None:
     if not orders:
         await message.answer("Спасибо! Локация получена.", reply_markup=ReplyKeyboardRemove())
         await asyncio.sleep(1)
-        new_message = await message.answer("Нет доступных заказов в вашем радиусе.",
-                                           disable_notification=True)
+        await message.answer("Нет доступных заказов в вашем радиусе.", disable_notification=True)
         return
 
+    # Сохраняем заказы и идентификаторы заказов
     counter = 0
-    await state.update_data(orders=orders, counter=counter)
+    await state.update_data(orders=orders, order_ids=order_ids, counter=counter)
 
+    # Отправляем первый заказ
     reply_kb = await get_courier_kb(text="one_order" if len(orders) == 1 else "available_orders")
     await message.answer("Спасибо! Локация получена.",
                          disable_notification=True,
                          reply_markup=ReplyKeyboardRemove())
     await asyncio.sleep(1)
-    new_message = await message.answer(orders[counter], reply_markup=reply_kb,
-                                       parse_mode="HTML",
+    handler = MessageHandler(state, message.bot)
+    new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML",
                                        disable_notification=True)
-
     await handler.handle_new_message(new_message, message)
 
 
@@ -425,6 +408,43 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
                                            parse_mode="HTML")
 
 
+@couriers_router.callback_query(F.data == "accept_order")
+async def accept_order(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    order_ids = data.get("order_ids", [])
+    counter = data.get("counter", 0)  # Текущий индекс заказа
+    courier_tg_id = callback_query.from_user.id
+
+    # handler = MessageHandler(state, callback_query.message.bot)
+    # await handler.delete_previous_message(callback_query.message.chat.id)
+    if not order_ids:
+        await callback_query.answer("Ошибка: заказы не найдены.", show_alert=True)
+        return
+
+    order_id = order_ids[counter]  # `order_id` текущего заказа
+
+    try:
+        # Назначаем курьера к заказу
+        await order_data.assign_courier_to_order(order_id=order_id, courier_tg_id=courier_tg_id)
+
+        # Обновляем статус заказа на "В работе" (или другой необходимый статус)
+        await order_data.update_order_status(order_id=order_id, new_status=OrderStatus.IN_PROGRESS)
+
+        await callback_query.message.answer("Заказ успешно принят!")
+
+        # Обновляем интерфейс
+        await callback_query.message.answer("Заказ принят. Вы закреплены за этим заказом.", parse_mode="HTML",
+                                            show_alert=True)
+    except ValueError as e:
+        await callback_query.answer(str(e), show_alert=True)
+    except Exception as e:
+        await callback_query.answer("Ошибка при принятии заказа.", show_alert=True)
+        print(f"Ошибка при принятии заказа: {e}")
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ Get orders ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 @couriers_router.message(F.text == "/my_orders")
 @couriers_router.callback_query(F.data == "back_myOrders")
 async def cmd_my_orders(event, state: FSMContext) -> None:
