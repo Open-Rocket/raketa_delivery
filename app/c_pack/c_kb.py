@@ -10,7 +10,7 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
         "/run": ReplyKeyboardMarkup(keyboard=[
             [KeyboardButton(text="Отправить локацию 🧭", request_location=True)],
         ],
-            resize_keyboard=True, one_time_keyboard=False),
+            resize_keyboard=True, one_time_keyboard=True),
         "/subs": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", callback_data="pay_sub")]
         ]),
@@ -23,7 +23,7 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
             [InlineKeyboardButton(text="Регистрация", callback_data="reg", )],
         ]),
         "success_payment": InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Полетели! ⇢ К заказам", callback_data="lets_go")]
+            [InlineKeyboardButton(text="Перейти к заказам!", callback_data="lets_go")]
         ]),
         "/profile": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],

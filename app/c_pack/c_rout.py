@@ -1,11 +1,13 @@
+import os
 import asyncio
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, LabeledPrice, PreCheckoutQuery
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
+from aiogram import Bot
 
 from app.c_pack.c_middlewares import OuterMiddleware, InnerMiddleware
 from app.c_pack.c_states import CourierState, CourierRegistration
@@ -15,9 +17,12 @@ from app.common.titles import get_image_title_courier
 from app.c_pack.c_kb import get_courier_kb
 from app.database.models import OrderStatus
 
-from app.database.requests import courier_data, order_data
+from app.database.requests import courier_data, order_data, user_data
 
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 couriers_router = Router()
 
@@ -26,6 +31,8 @@ couriers_router.callback_query.outer_middleware(OuterMiddleware())
 
 couriers_router.message.middleware(InnerMiddleware())
 couriers_router.callback_query.middleware(InnerMiddleware())
+
+notification_bot = Bot(token=os.getenv("U_TOKEN"))
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -281,37 +288,53 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # run
-@couriers_router.message(F.text == "/run")
-async def cmd_run(message: Message, state: FSMContext) -> None:
-    """
-        Обрабатывает команду доставить заказ /run.
 
-        После отправки команды /run:
+
+@couriers_router.message(F.text == "/run")
+@couriers_router.callback_query(F.data == "lets_go")
+async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
+    """
+        Обрабатывает команду доставить заказ /run или нажатие кнопки lets_go.
+
         - Переводит пользователя в состояние (`CourierState.location`).
         - Отправляет сообщение c просьбой поделиться локацией и KeyboardButton(send location).
 
         Args:
-            message (Message): Объект, содержащий информацию о нажатии на кнопку.
+            event (Message | CallbackQuery): Объект, содержащий информацию о событии.
             state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
 
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
 
-    # handler = MessageHandler(state, message.bot)
-    # await handler.delete_previous_message(message.chat.id)
+    handler = MessageHandler(state, event.bot)
+    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+
+    # Удаление предыдущего сообщения, если это сообщение
+    if isinstance(event, Message):
+        await handler.delete_previous_message(chat_id)
+
     await state.set_state(CourierState.location)
     reply_kb = await get_courier_kb(text="/run")
 
-    new_message = await message.answer(
-        "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.",
-        reply_markup=reply_kb, disable_notification=True)
-    # await handler.handle_new_message(new_message, message)
+    # Отправляем новое сообщение с просьбой отправить локацию
+    new_message = await event.bot.send_message(
+        chat_id=chat_id,
+        text="Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.",
+        reply_markup=reply_kb,
+        disable_notification=True
+    )
+
+    # Обрабатываем новое сообщение с помощью MessageHandler
+    await handler.handle_new_message(new_message, event if isinstance(event, Message) else event.message)
 
 
 # Location
 @couriers_router.message(F.content_type == ContentType.LOCATION, filters.StateFilter(CourierState.location))
 async def get_location(message: Message, state: FSMContext) -> None:
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
     courier_tg_id = message.from_user.id
     my_lon = message.location.longitude
     my_lat = message.location.latitude
@@ -363,9 +386,10 @@ async def get_location(message: Message, state: FSMContext) -> None:
         orders.append(base_info)
 
     if not orders:
-        await message.answer("Спасибо! Локация получена.", reply_markup=ReplyKeyboardRemove())
+        # await message.answer("Спасибо! Локация получена.", reply_markup=ReplyKeyboardRemove())
         await asyncio.sleep(1)
-        await message.answer("Нет доступных заказов в вашем радиусе.", disable_notification=True)
+        new_message = await message.answer("Нет доступных заказов в вашем радиусе.", disable_notification=True)
+        await handler.handle_new_message(new_message, message)
         return
 
     # Сохраняем заказы и идентификаторы заказов
@@ -374,9 +398,9 @@ async def get_location(message: Message, state: FSMContext) -> None:
 
     # Отправляем первый заказ
     reply_kb = await get_courier_kb(text="one_order" if len(orders) == 1 else "available_orders")
-    await message.answer("Спасибо! Локация получена.",
-                         disable_notification=True,
-                         reply_markup=ReplyKeyboardRemove())
+    # await message.answer("Спасибо! Локация получена.",
+    #                      disable_notification=True,
+    #                      reply_markup=ReplyKeyboardRemove())
     await asyncio.sleep(1)
     handler = MessageHandler(state, message.bot)
     new_message = await message.answer(orders[counter], reply_markup=reply_kb, parse_mode="HTML",
@@ -412,29 +436,57 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
 async def accept_order(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     order_ids = data.get("order_ids", [])
-    counter = data.get("counter", 0)  # Текущий индекс заказа
+    counter = data.get("counter", 0)
     courier_tg_id = callback_query.from_user.id
 
-    # handler = MessageHandler(state, callback_query.message.bot)
-    # await handler.delete_previous_message(callback_query.message.chat.id)
     if not order_ids:
         await callback_query.answer("Ошибка: заказы не найдены.", show_alert=True)
         return
 
-    order_id = order_ids[counter]  # `order_id` текущего заказа
+    order_id = order_ids[counter]
 
     try:
         # Назначаем курьера к заказу
         await order_data.assign_courier_to_order(order_id=order_id, courier_tg_id=courier_tg_id)
 
-        # Обновляем статус заказа на "В работе" (или другой необходимый статус)
+        # Обновляем статус заказа на "В работе"
         await order_data.update_order_status(order_id=order_id, new_status=OrderStatus.IN_PROGRESS)
 
-        await callback_query.message.answer("Заказ успешно принят!")
+        # Получаем номер телефона заказчика
+        customer_phone = await order_data.get_order_customer_phone(order_id)
 
-        # Обновляем интерфейс
-        await callback_query.message.answer("Заказ принят. Вы закреплены за этим заказом.", parse_mode="HTML",
-                                            show_alert=True)
+        # Получаем tg_id по номеру телефона
+        customer_tg_id = await user_data.get_user_tg_id_by_phone(customer_phone)
+
+        # Отправляем уведомление заказчику
+        notification_text = (f"Ваш заказ №{order_id} был принят курьером!\n"
+                             f"Подробности смотрите в Моих заказах\n\n"
+                             f"<i>*Сообщение удалится через 15 минут</i>")
+        notification_message = await notification_bot.send_message(
+            chat_id=customer_tg_id,
+            text=notification_text,
+            parse_mode="HTML"
+        )
+
+        handler = MessageHandler(state, callback_query.message.bot)
+        await handler.delete_previous_message(callback_query.message.chat.id)
+
+        # Уведомляем курьера о принятии заказа
+        new_message = await callback_query.message.answer("Заказ принят. Вы закреплены за этим заказом.",
+                                            parse_mode="HTML",
+                                            disable_notification=False)
+
+        await handler.handle_new_message(new_message, callback_query.message)
+
+        # Удаляем уведомление спустя 1 час
+        await asyncio.sleep(900)  # Ожидаем 1 час
+        try:
+            await notification_bot.delete_message(chat_id=customer_tg_id, message_id=notification_message.message_id)
+        except Exception as e:
+            print(f"Ошибка при удалении сообщения: {e}")
+
+
+
     except ValueError as e:
         await callback_query.answer(str(e), show_alert=True)
     except Exception as e:
@@ -442,9 +494,6 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         print(f"Ошибка при принятии заказа: {e}")
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Get orders ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
 @couriers_router.message(F.text == "/my_orders")
 @couriers_router.callback_query(F.data == "back_myOrders")
 async def cmd_my_orders(event, state: FSMContext) -> None:
@@ -464,6 +513,105 @@ async def cmd_my_orders(event, state: FSMContext) -> None:
     """
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ Payment ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
+
+@couriers_router.message(F.text == "/subs")
+@couriers_router.callback_query(F.data == "pay_sub")
+async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
+    """
+            Обрабатывает команду доставить заказ /subs.
+
+            После отправки команды /subs:
+            - Переводит пользователя в состояние (`CourierState.default`).
+            - Отправляет сообщение c предложением преобрести или продлить подписку с InlineButton для перехода на инвойс.
+
+            Args:
+                message (Message): Объект, содержащий информацию о нажатии на кнопку.
+                state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
+
+            Returns:
+                None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+        """
+    await state.set_state(CourierState.pay)
+    handler = MessageHandler(state, event.bot)
+    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+
+    if isinstance(event, Message):
+        await handler.delete_previous_message(chat_id)
+
+    prices = [
+        LabeledPrice(
+            label="Месячная подписка",
+            amount=99000  # Сумма указана в копейках (990 рублей)
+        ),
+    ]
+
+    provider_token = os.getenv("UKASSA_TEST")
+    if not provider_token:
+        print("Ошибка: provider_token не найден. Проверьте переменные окружения.")
+        return
+
+    # Отправка инвойса пользователю
+    new_message = await event.bot.send_invoice(
+        chat_id=chat_id,
+        title="Подписка Raketa",
+        description="Оформите подписку на сервис доставки...",
+        payload="Payment through a bot",
+        provider_token=provider_token,
+        currency="RUB",
+        prices=prices,
+        max_tip_amount=50000,
+        start_parameter="",
+        photo_url="https://i.ibb.co/NpQzZyY/subs.jpg",
+        photo_width=1200,
+        photo_height=720,
+        need_name=True,
+        need_phone_number=True,
+        need_email=True,
+        reply_markup=None,
+        disable_notification=True
+
+    )
+
+    await handler.handle_new_message(new_message, event if isinstance(event, Message) else event.message)
+
+
+# Обработка подтверждения платежа
+@couriers_router.pre_checkout_query()
+async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
+    try:
+        if pre_checkout_query.currency == 'RUB' and pre_checkout_query.total_amount == 99000:
+            await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+        else:
+            await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=False,
+                                                                   error_message='Неверная сумма или валюта')
+    except Exception as e:
+        await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=False,
+                                                               error_message=f'Ошибка: {str(e)}')
+
+
+# Сообщение об успешной оплате
+@couriers_router.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
+async def succesful_payment(message: Message, state: FSMContext):
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+    photo_title = await get_image_title_courier("success_payment")
+    text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
+    reply_kb = await get_courier_kb(text="success_payment")
+    new_message = await message.answer_photo(photo=photo_title,
+                                             caption=text,
+                                             reply_markup=reply_kb,
+                                             disable_notification=True)
+    await handler.handle_new_message(new_message, message)
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ Profile ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 @couriers_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext) -> None:
     """
@@ -472,24 +620,6 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
         После отправки команды /profile:
         - Переводит пользователя в состояние (`CourierState.default`).
         - Отправляет сообщение c информацией о курьере (имя, номер телефона, город, статус подписки и ее срок).
-
-        Args:
-            message (Message): Объект, содержащий информацию о нажатии на кнопку.
-            state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-        Returns:
-            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-
-
-@couriers_router.message(F.text == "/subs")
-async def cmd_subs(message: Message, state: FSMContext) -> None:
-    """
-        Обрабатывает команду доставить заказ /subs.
-
-        После отправки команды /subs:
-        - Переводит пользователя в состояние (`CourierState.default`).
-        - Отправляет сообщение c предложением преобрести или продлить подписку с InlineButton для перехода на инвойс.
 
         Args:
             message (Message): Объект, содержащий информацию о нажатии на кнопку.

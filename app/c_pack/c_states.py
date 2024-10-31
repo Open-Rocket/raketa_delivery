@@ -6,6 +6,7 @@ class CourierState(StatesGroup):
     location = State()
     myOrders = State()
     start_reg = State()
+    pay = State()
 
 
 

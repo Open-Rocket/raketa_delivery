@@ -19,12 +19,15 @@ async def main():
 
     users_bot = Bot(token=os.getenv('U_TOKEN'))
     couriers_bot = Bot(token=os.getenv('C_TOKEN'))
+    info_bot = Bot(token=os.getenv("INFO_BOT"))
 
     u_dp = Dispatcher()
     c_dp = Dispatcher()
+    info_dp = Dispatcher()
 
     u_dp.include_routers(users_router, u_fallback_router)
     c_dp.include_routers(couriers_router, test_payment_router, c_fallback_router)
+    # info_dp.include_routers()
 
     u_dp.startup.register(on_startup)
     # await u_dp.start_polling(users_bot, skip_updates=True)

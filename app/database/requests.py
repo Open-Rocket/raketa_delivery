@@ -12,6 +12,14 @@ class UserData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
+    async def get_user_tg_id_by_phone(self, phone_number: str) -> int:
+        async with self.async_session_factory() as session:
+            user = await session.scalar(select(User).where(User.user_phone_number == phone_number))
+            if user:
+                return user.user_tg_id
+            else:
+                raise ValueError("Пользователь не найден")
+
     async def set_user(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
@@ -105,6 +113,7 @@ class CourierData:
 
             # Сохраняем изменения в базе данных
             await session.commit()
+
     async def get_courier_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
@@ -133,6 +142,27 @@ class CourierData:
 class OrderData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
+
+    async def get_order_customer_phone(self, order_id: int) -> str:
+        async with self.async_session_factory() as session:
+            # Предполагается, что есть таблица Order и связанная таблица User
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            if order:
+                return order.sender_phone
+            else:
+                raise ValueError("Заказ не найден")
+
+    async def get_order_customer_tg_id(self, order_id: int) -> int:
+        async with self.async_session_factory() as session:
+            # Ищем заказ по его ID
+            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+
+            if not order:
+                raise ValueError(f"Заказ с ID {order_id} не найден")
+
+            # Получаем tg_id клиента
+            customer_tg_id = order.customer_tg_id  # предполагаем, что у объекта `order` есть поле `customer_tg_id`
+            return customer_tg_id
 
     async def create_order(self, user_tg_id: int, data: dict):
         async with self.async_session_factory() as session:  # Открываем асинхронный сеанс
