@@ -129,9 +129,9 @@ async def process_order_text(order_text: str) -> dict | str | None:
     )
 
     response = await get_gpt_text(prompt)
-    print(f"JSON={response}")
+    # print(f"JSON={response}")
     structured_data = await parse_response(response)
-    print(f"structured_data={response}")
+    # print(f"structured_data={response}")
 
     return structured_data
 

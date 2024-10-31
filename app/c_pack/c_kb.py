@@ -45,14 +45,17 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
              InlineKeyboardButton(text="⇥", callback_data="next_right")],
             [InlineKeyboardButton(text="Принять заказ", callback_data="accept_order")]
         ]),
+        "/make_order": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Go", url="https://t.me/raketadelivery_bot")]
+        ]),
 
     }
 
     if message:
         if message.text == "/start":
             return kb["next_kb"]
-    if message and message.text in kb:
-        return kb[message.text]
+        if message and message.text in kb:
+            return kb[message.text]
 
     if callback_data: pass
 

@@ -1,17 +1,18 @@
-import asyncio
-
+import logging
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
-
 import os
 from dotenv import load_dotenv
-
 from app.u_pack.u_states import UserState
 
+# Загрузка переменных окружения
 load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
 
+# Настройка логгера для одного сообщения на логический блок
+logging.basicConfig(level=logging.INFO, format='--------------------\n%(message)s\n--------------------')
+logger = logging.getLogger(__name__)
 
 async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
                                          data: Dict[str, Any]) -> Any:
@@ -31,10 +32,6 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
             await event.delete()
             return
 
-    # if state == UserState.ai_voice_order.state:
-    #     if message_text in ["/order", "/profile", "/my_orders", "/faq", "/rules", "/become_courier", "/test"]:
-    #         return "setdefault"
-
     if state == UserState.reg_Phone.state or state == UserState.change_Phone.state:
         if event.content_type == "contact":  # Если тип контента - контакт
             return await handler(event, data)
@@ -49,156 +46,57 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
     # Обработка сообщения в случае, если ни одно состояние не совпало
     return await handler(event, data)
 
-
-# async def check_state_and_handle_message(state: str, event: Message, handler: Callable, data: Dict[str, Any]) -> Any:
-#     message_text = event.text
-#
-#     if state == UserState.regstate.state:
-#         if message_text == "/start":
-#             return await handler(event, data)
-#         else:
-#             await event.delete()
-#             return
-#
-#     if state == UserState.set_Name.state:
-#         if message_text == "/start":
-#             return await handler(event, data)
-#         if message_text in ["/order", "/profile", "/ai", "/rules", "/help", "/become_courier"]:
-#             await event.delete()
-#             return
-#
-#     if state == UserState.set_Phone.state:
-#         if message_text == "/start":
-#             return await handler(event, data)
-#         if event.content_type == "contact":
-#             return await handler(event, data)
-#         elif event.text:
-#             await event.delete()
-#             return
-#         else:
-#             await event.delete()
-#             return
-#
-#     if state == UserState.waiting_Courier.state:
-#         if message_text == "/start":
-#             return await handler(event, data)
-#         elif event.text:
-#             await event.delete()
-#             return
-#         else:
-#             await event.delete()
-#             return
-#
-#     return await handler(event, data)
-
-
 class OuterMiddleware(BaseMiddleware):
+    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+                       event: TelegramObject, data: Dict[str, Any]) -> Any:
 
-    async def __call__(self,
-                       handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject,
-                       data: Dict[str, Any]) -> Any:
-
-        # Обработка состояния до вызова хендлера
         fsm_context = data.get("state")
-        if fsm_context:
-            state = await fsm_context.get_state()
-        else:
-            state = "No state"
+        state = await fsm_context.get_state() if fsm_context else "No state"
 
         if isinstance(event, Message):
             user_id = event.from_user.id
             message_text = event.text
 
-            print("--------------------")
-            print("Users - 🧍")
-            print("Outer_mw")
-            print(f"User message: {message_text}")
-            print(f"User ID: {user_id}")
-            print(f"User state previous: {state}")
+            # Формируем лог-сообщение для OuterMiddleware
+            log_message = f"Users - 🧍\nOuter_mw\nUser message: {message_text}\nUser ID: {user_id}\nUser state previous: {state}"
+            logger.info(log_message)
 
-            # Передаем данные дальше в цепочку
             result = await check_state_and_handle_message(state, event, handler, data)
             return result
 
-        # Обработка callback-запроса
         elif isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             callback_data = event.data
 
-            print("--------------------")
-            print("Users - 🧍")
-            print("Outer_mw")
-            print(f"Callback data: {callback_data}")
-            print(f"User ID: {user_id}")
-            print(f"User state previous: {state}")
+            log_message = f"Users - 🧍\nOuter_mw\nCallback data: {callback_data}\nUser ID: {user_id}\nUser state previous: {state}"
+            logger.info(log_message)
 
-            # Вызываем хендлер для callback'ов
             return await handler(event, data)
 
-
 class InnerMiddleware(BaseMiddleware):
+    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+                       event: TelegramObject, data: Dict[str, Any]) -> Any:
 
-    async def __call__(self,
-                       handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject,
-                       data: Dict[str, Any]) -> Any:
-
-        # Обработка состояния до вызова хендлера
         fsm_context = data.get("state")
-        if fsm_context:
-            state = await fsm_context.get_state()
-        else:
-            state = "No state"
+        state = await fsm_context.get_state() if fsm_context else "No state"
 
+        log_message = ""
         if isinstance(event, Message):
             user_id = event.from_user.id
             message_text = event.text
 
-            print("--------------------")
-            print("Users - 🧍")
-            print("Inner_mw")
-            print(f"User message: {message_text}")
-            print(f"User ID: {user_id}")
-            print(f"User state previous: {state}")
+            log_message += f"Users - 🧍\nInner_mw\nUser message: {message_text}\nUser ID: {user_id}\nUser state previous: {state}"
 
-        # Обработка callback-запроса
         elif isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             callback_data = event.data
 
-            print("--------------------")
-            print("Users - 🧍")
-            print("Inner_mw")
-            print(f"Callback data: {callback_data}")
-            print(f"User ID: {user_id}")
+            log_message += f"Users - 🧍\nInner_mw\nCallback data: {callback_data}\nUser ID: {user_id}"
 
-        # Вызываем хендлер после обработки
         result = await handler(event, data)
 
-        # Вывод обновленного состояния после вызова хендлера
-        if fsm_context:
-            updated_state = await fsm_context.get_state()
-        else:
-            updated_state = "No state"
+        updated_state = await fsm_context.get_state() if fsm_context else "No state"
+        log_message += f"\nUser state now: {updated_state}"
 
-        print(f"User state now: {updated_state}")
-
+        logger.info(log_message)
         return result
-
-# class AdminPasswordAcception(BaseMiddleware):
-#
-#     async def __call__(self,
-#                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-#                        event: TelegramObject,
-#                        data: Dict[str, Any]) -> Any:
-#         print("--------------------")
-#         print(f"Processing message: {event.text}")
-#         result = await handler(event, data)
-#         print("Попытка входа в админ панель")
-#         if event.text == password:
-#             print(f"Доступ разрешен!")
-#             return result
-#         else:
-#             print(f"Доступ откланен!")
-#             return result

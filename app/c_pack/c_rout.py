@@ -1,5 +1,6 @@
 import os
 import asyncio
+import logging
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, LabeledPrice, PreCheckoutQuery
@@ -33,6 +34,7 @@ couriers_router.message.middleware(InnerMiddleware())
 couriers_router.callback_query.middleware(InnerMiddleware())
 
 notification_bot = Bot(token=os.getenv("U_TOKEN"))
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -440,7 +442,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
     courier_tg_id = callback_query.from_user.id
 
     if not order_ids:
-        await callback_query.answer("Ошибка: заказы не найдены.", show_alert=True)
+        await callback_query.answer("Заказы не найдены.", show_alert=True)
         return
 
     order_id = order_ids[counter]
@@ -468,14 +470,13 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             parse_mode="HTML"
         )
 
-        handler = MessageHandler(state, callback_query.message.bot)
-        await handler.delete_previous_message(callback_query.message.chat.id)
-
         # Уведомляем курьера о принятии заказа
         new_message = await callback_query.message.answer("Заказ принят. Вы закреплены за этим заказом.",
-                                            parse_mode="HTML",
-                                            disable_notification=False)
+                                                          parse_mode="HTML",
+                                                          disable_notification=False)
+        await state.set_state(CourierState.default)
 
+        handler = MessageHandler(state, callback_query.message.bot)
         await handler.handle_new_message(new_message, callback_query.message)
 
         # Удаляем уведомление спустя 1 час
@@ -483,7 +484,8 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         try:
             await notification_bot.delete_message(chat_id=customer_tg_id, message_id=notification_message.message_id)
         except Exception as e:
-            print(f"Ошибка при удалении сообщения: {e}")
+            logger.error(f"Ошибка при удалении сообщения: {e}")
+
 
 
 
@@ -491,7 +493,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.answer(str(e), show_alert=True)
     except Exception as e:
         await callback_query.answer("Ошибка при принятии заказа.", show_alert=True)
-        print(f"Ошибка при принятии заказа: {e}")
+        logger.error(f"Ошибка: {e}")
 
 
 @couriers_router.message(F.text == "/my_orders")
@@ -633,7 +635,7 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
 @couriers_router.message(F.text == "/faq")
 async def cmd_faq(message: Message, state: FSMContext) -> None:
     """
-        Обрабатывает команду доставить заказ /faq.
+        Обрабатывает команду /faq.
 
         После отправки команды /faq:
         - Переводит пользователя в состояние (`CourierState.default`).
@@ -646,16 +648,31 @@ async def cmd_faq(message: Message, state: FSMContext) -> None:
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+
+    # Логируем попытку удаления предыдущего сообщения
+    try:
+        await handler.delete_previous_message(message.chat.id)
+    except Exception as e:
+        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+
+    text = (f"🤔 <b>Вопросы и ответы</b>\n\n"
+            f"Частые вопросы и ответы на них "
+            f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>")
+
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, message)
 
 
 @couriers_router.message(F.text == "/rules")
 async def cmd_rules(message: Message, state: FSMContext) -> None:
     """
-        Обрабатывает команду доставить заказ /rules.
+        Обрабатывает команду /rules.
 
         После отправки команды /rules:
         - Переводит пользователя в состояние (`CourierState.default`).
-        - Отправляет сообщение c ссылкой на документ с вопросами и правилами сервиса.
+        - Отправляет сообщение c ссылкой на документ с правилами сервиса.
 
         Args:
             message (Message): Объект, содержащий информацию о нажатии на кнопку.
@@ -664,6 +681,27 @@ async def cmd_rules(message: Message, state: FSMContext) -> None:
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+
+    # Логируем попытку удаления предыдущего сообщения
+    try:
+        await handler.delete_previous_message(message.chat.id)
+    except Exception as e:
+        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+
+    text = (f"⚖️ <b>Правила сервиса</b>\n\n"
+            f"Начиная использование сервиса, вы соглашаетесь с "
+            f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+            f"Пользовательским соглашением и правилами использования</a>, а также "
+            f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+            f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+            f"отправкой или получением посылок, должны соответствовать законодательству "
+            f"вашего государства и общепринятым этическим нормам.</i>\n\n"
+            )
+
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, message)
 
 
 @couriers_router.message(F.text == "/ai_support_couriers")
@@ -687,7 +725,7 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
 @couriers_router.message(F.text == "/make_order")
 async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     """
-        Обрабатывает команду доставить заказ /make_order.
+        Обрабатывает команду /make_order.
 
         После отправки команды /make_order:
         - Переводит пользователя в состояние (`CourierState.default`).
@@ -700,3 +738,20 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+
+    # Логируем попытку удаления предыдущего сообщения
+    try:
+        await handler.delete_previous_message(message.chat.id)
+    except Exception as e:
+        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+
+    reply_kb = await get_courier_kb(text="/make_order")
+    # Формируем текст сообщения
+    text = "📦 Для оформления заказа, пожалуйста, перейдите в клиентский бот."
+
+    # Отправляем сообщение с кнопкой для перехода на клиентский бот
+    new_message = await message.answer(text, disable_notification=True, reply_markup=reply_kb)
+
+    await handler.handle_new_message(new_message, message)
