@@ -28,7 +28,7 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
         "/profile": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
             [InlineKeyboardButton(text="Телефон", callback_data="set_my_phone")],
-            [InlineKeyboardButton(text="Почта", callback_data="set_my_email")],
+            # [InlineKeyboardButton(text="Почта", callback_data="set_my_email")],
             [InlineKeyboardButton(text="Мои заказы", callback_data="my_orders")]
         ]),
         "phone_number": ReplyKeyboardMarkup(keyboard=[

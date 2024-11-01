@@ -630,6 +630,64 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
         Returns:
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    name, phone_number, city, subscription_status, subscription_expiry = await courier_data.get_courier_info(tg_id)
+
+    text = (f"👤 <b>Профиль курьера</b>\n\n"
+            f"Посмотрите или измените данные о себе.\n\n"
+            f"<b>Имя:</b> {name}\n"
+            f"<b>Номер:</b> {phone_number}\n"
+            f"<b>Город:</b> {city}\n"
+            f"<b>Статус подписки:</b> {subscription_status}\n"
+            f"<b>Срок подписки:</b> {subscription_expiry}")
+
+    reply_kb = await get_courier_kb(text="/profile")
+
+    new_message = await message.answer(text,
+                                       reply_markup=reply_kb,
+                                       disable_notification=True,
+                                       parse_mode="HTML")
+    await handler.handle_new_message(new_message, message)
+
+@couriers_router.callback_query(F.data == "set_my_name")
+async def set_name(callback_query: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(CourierState.change_Name)
+    handler = MessageHandler(state, callback_query.bot)
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваше имя:</b>")
+    new_message = await callback_query.message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+@couriers_router.callback_query(F.data == "set_my_phone")
+async def set_phone(callback_query: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(CourierState.change_Phone)
+    handler = MessageHandler(state, callback_query.bot)
+    reply_kb = await get_courier_kb(text="phone_number")
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваш Телефон:</b>")
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      reply_markup=reply_kb,
+                                                      parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
+
+@couriers_router.callback_query(F.data == "set_my_city")
+async def set_city(callback_query: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(CourierState.change_City)
+    handler = MessageHandler(state, callback_query.bot)
+    text = (f"Изменить данные профиля.\n\n"
+            f"<b>Ваш город:</b>")
+    new_message = await callback_query.message.answer(text,
+                                                      disable_notification=True,
+                                                      parse_mode="HTML")
+    await handler.handle_new_message(new_message, callback_query.message)
+
 
 
 @couriers_router.message(F.text == "/faq")

@@ -196,7 +196,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
-    photo_title = await get_image_title_user(message.text)
+    await get_image_title_user(message.text)
     name, phone_number, city = await user_data.get_user_info(tg_id)
 
     text = (f"👥 <b>Профиль</b>\n\n"
