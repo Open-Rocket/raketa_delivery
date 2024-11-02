@@ -1,6 +1,8 @@
 import json
 from sqlalchemy import select, update, delete, desc, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.database.models import async_session_factory, moscow_time, Order, utc_time
 from app.database.models import User, Courier, OrderStatus
 from app.database.models import moscow_time
@@ -114,6 +116,27 @@ class CourierData:
             # Сохраняем изменения в базе данных
             await session.commit()
 
+    async def set_courier_name(self, tg_id: int, name: str):
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            if courier:
+                courier.courier_name = name
+                await session.commit()
+
+    async def set_courier_phone(self, tg_id: int, phone: str):
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            if courier:
+                courier.courier_phone_number = phone
+                await session.commit()
+
+    async def set_courier_city(self, tg_id: int, city: str):
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            if courier:
+                courier.courier_default_city = city
+                await session.commit()
+
     async def get_courier_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
@@ -123,6 +146,22 @@ class CourierData:
                     courier.courier_phone_number or "...",
                 )
             return (None, None)
+
+    async def get_courier_full_info(self, tg_id: int):
+        async with self.async_session_factory() as session:
+            # Используем join для извлечения связанных данных о подписке
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id).options(selectinload(Courier.subscription))
+            )
+            if courier:
+                subscription_status = courier.subscription.status if courier.subscription else "Нет подписки"
+                return (
+                    courier.courier_name or "...",
+                    courier.courier_phone_number or "...",
+                    courier.courier_default_city or "...",  # убедитесь, что поле существует в модели
+                    subscription_status
+                )
+            return (None, None, None, "Нет подписки")  # добавлено "Нет подписки" для более полного результата
 
     async def get_courier_phone(self, tg_id: int):
         async with self.async_session_factory() as session:

@@ -322,7 +322,8 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
     # Отправляем новое сообщение с просьбой отправить локацию
     new_message = await event.bot.send_message(
         chat_id=chat_id,
-        text="Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.",
+        text="Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
+             "<i>*Доступно только с мобильных устройств</i>",
         reply_markup=reply_kb,
         disable_notification=True
     )
@@ -635,15 +636,15 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
     await handler.delete_previous_message(message.chat.id)
 
     tg_id = message.from_user.id
-    name, phone_number, city, subscription_status, subscription_expiry = await courier_data.get_courier_info(tg_id)
+    courier_name, courier_phone_number, courier_default_city, subscription_status = await courier_data.get_courier_full_info(
+        tg_id)
 
     text = (f"👤 <b>Профиль курьера</b>\n\n"
             f"Посмотрите или измените данные о себе.\n\n"
-            f"<b>Имя:</b> {name}\n"
-            f"<b>Номер:</b> {phone_number}\n"
-            f"<b>Город:</b> {city}\n"
-            f"<b>Статус подписки:</b> {subscription_status}\n"
-            f"<b>Срок подписки:</b> {subscription_expiry}")
+            f"<b>Имя:</b> {courier_name}\n"
+            f"<b>Номер:</b> {courier_phone_number}\n"
+            f"<b>Город:</b> {courier_default_city}\n"
+            f"<b>Статус подписки:</b> {subscription_status}\n")
 
     reply_kb = await get_courier_kb(text="/profile")
 
@@ -652,6 +653,7 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
                                        disable_notification=True,
                                        parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
+
 
 @couriers_router.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext) -> None:
@@ -688,6 +690,56 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext) -> None:
                                                       parse_mode="HTML")
     await handler.handle_new_message(new_message, callback_query.message)
 
+
+@couriers_router.message(filters.StateFilter(CourierState.change_Name))
+async def change_name(message: Message, state: FSMContext):
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    name = message.text
+
+    await courier_data.set_courier_name(tg_id, name)  # Метод для обновления имени курьера
+    text = (f"Имя курьера было изменено на {name} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+
+    await handler.handle_new_message(new_message, message)
+
+
+@couriers_router.message(filters.StateFilter(CourierState.change_Phone))
+async def change_phone(message: Message, state: FSMContext):
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    phone = message.contact.phone_number
+
+    await courier_data.set_courier_phone(tg_id, phone)  # Метод для обновления телефона курьера
+    text = (f"Номер курьера был изменен на {phone} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+
+    await handler.handle_new_message(new_message, message)
+
+
+@couriers_router.message(filters.StateFilter(CourierState.change_City))
+async def change_city(message: Message, state: FSMContext):
+    await state.set_state(CourierState.default)
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    tg_id = message.from_user.id
+    city = message.text
+
+    await courier_data.set_courier_city(tg_id, city)  # Метод для обновления города курьера
+    text = (f"Город курьера был изменен на {city} 🎉\n\n"
+            f"▼ <b>Выберите действие ...</b>")
+    new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
+
+    await handler.handle_new_message(new_message, message)
 
 
 @couriers_router.message(F.text == "/faq")

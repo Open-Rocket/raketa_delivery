@@ -29,7 +29,9 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
         return await handler(event, data)
 
     if state in (CourierRegistration.name.state, CourierRegistration.phone_number.state,
-                 CourierRegistration.city.state, CourierRegistration.accept_tou.state):
+                 CourierRegistration.city.state, CourierRegistration.accept_tou.state,
+                 CourierState.change_Name.state, CourierState.change_Phone.state,
+                 CourierState.change_City.state):
         if message_text in ["/my_orders", "/location", "/start"]:
             await event.delete()
             return
