@@ -15,7 +15,7 @@ from app.c_pack.c_states import CourierState, CourierRegistration
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_courier
 from app.common.titles import get_image_title_courier
-from app.c_pack.c_kb import get_courier_kb
+from app.c_pack.c_kb import get_courier_kb, get_my_orders_kb
 from app.database.models import OrderStatus
 
 from app.database.requests import courier_data, order_data, user_data
@@ -290,8 +290,6 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -
 # ------------------------------------------------------------------------------------------------------------------- #
 
 # run
-
-
 @couriers_router.message(F.text == "/run")
 @couriers_router.callback_query(F.data == "lets_go")
 async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
@@ -325,7 +323,8 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
         text="Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
              "<i>*Доступно только с мобильных устройств</i>",
         reply_markup=reply_kb,
-        disable_notification=True
+        disable_notification=True,
+        parse_mode="HTML"
     )
 
     # Обрабатываем новое сообщение с помощью MessageHandler
@@ -497,23 +496,252 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         logger.error(f"Ошибка: {e}")
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ My orders ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 @couriers_router.message(F.text == "/my_orders")
 @couriers_router.callback_query(F.data == "back_myOrders")
-async def cmd_my_orders(event, state: FSMContext) -> None:
-    """
-        Обрабатывает команду отображения заказов курьера /my_orders , back_myOrders.
+async def cmd_my_orders(event, state: FSMContext):
+    is_callback = isinstance(event, CallbackQuery)
+    courier_tg_id = event.from_user.id
+    chat_id = event.message.chat.id if is_callback else event.chat.id
+    bot = event.message.bot if is_callback else event.bot
 
-        После отправки команды /my_orders или back_myOrders:
-        - Переводит пользователя в состояние (`CourierState.myOrders`).
-        - Отправляет курьеру сообщение меню со всеми его заказами и статистикой их выполнения
+    # Удаление предыдущего сообщения, если это не callback
+    if not is_callback:
+        handler = MessageHandler(state, bot)
+        await handler.delete_previous_message(chat_id)
 
-        Args:
-            event: Объект, содержащий информацию о нажатии на кнопку.
-            state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
+    await state.set_state(CourierState.myOrders)
 
-        Returns:
-            None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
+    # Получение количества заказов курьера
+    active_count = len(await order_data.get_active_orders(courier_tg_id))
+    completed_count = len(await order_data.get_completed_orders(courier_tg_id))
+
+    # Клавиатура и текст сообщения
+    reply_kb = await get_my_orders_kb(active_count, completed_count)
+    text = (f"✎ <b>Мои заказы</b>\n\n"
+            f"Здесь вы можете посмотреть статус ваших заказов, "
+            f"а также статистику их выполнения.\n\n"
+            f"<b>Статус ваших заказов:</b>")
+
+    if is_callback:
+        new_message = await event.message.edit_text(text,
+                                                    reply_markup=reply_kb,
+                                                    disable_notification=True,
+                                                    parse_mode="HTML")
+    else:
+        new_message = await event.answer(text,
+                                         reply_markup=reply_kb,
+                                         disable_notification=True,
+                                         parse_mode="HTML")
+
+    # Если это сообщение, обрабатываем новое сообщение
+    if not is_callback:
+        handler = MessageHandler(state, bot)
+        await handler.handle_new_message(new_message, event)
+    else:
+        await event.answer()
+
+
+@couriers_router.callback_query(F.data.in_({"active_orders", "completed_orders", "next_order", "prev_order"}))
+async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    # Если курьер листает заказы (вперёд или назад)
+    if callback_query.data in {"next_order", "prev_order"}:
+        counter = data.get("counter", 0)
+        orders_text = data.get("orders_text", [])
+
+        # Переключение по заказам (вперёд или назад) с циклическим зацикливанием
+        if orders_text:
+            total_orders = len(orders_text)
+            if callback_query.data == "next_order":
+                counter = (counter + 1) % total_orders
+            elif callback_query.data == "prev_order":
+                counter = (counter - 1) % total_orders
+
+            await state.update_data(counter=counter)
+            reply_kb = await get_courier_kb(text="one_my_order")
+            await callback_query.message.edit_text(
+                orders_text[counter],
+                reply_markup=reply_kb,
+                parse_mode="HTML",
+                disable_notification=True
+            )
+        return
+
+    # Основная логика получения заказов
+    order_type = callback_query.data
+    courier_tg_id = callback_query.from_user.id
+
+    if order_type == "active_orders":
+        courier_orders = await order_data.get_active_orders(courier_tg_id)
+        await state.set_state(CourierState.myOrders_active)
+        status_text = "активных"
+    elif order_type == "completed_orders":
+        courier_orders = await order_data.get_completed_orders(courier_tg_id)
+        await state.set_state(CourierState.myOrders_completed)
+        status_text = "завершенных"
+
+    # Проверяем наличие заказов и настраиваем клавиатуру соответственно
+    num_orders = len(courier_orders)
+    if num_orders == 0:
+        text = f"У вас нет {status_text} заказов."
+        reply_kb = await get_courier_kb(text="empty_orders")
+        await callback_query.message.edit_text(text, reply_markup=reply_kb, disable_notification=True)
+        return
+    elif num_orders == 1:
+        keyboard_type = "active_one" if order_type == "active_orders" else "complete_one"
+    else:
+        keyboard_type = "active_orders" if order_type == "active_orders" else "complete_orders"
+
+    # Формируем текст для каждого заказа
+    def format_address(number, address, name, phone, url):
+        return (
+            f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
+            f"<b>Имя:</b> {name if name else '-'}\n"
+            f"<b>Телефон:</b> {phone if phone else '-'}\n\n"
+        )
+
+    # Сохраняем текст каждого заказа и сам `orders` как словарь
+    orders_text = []
+    orders_dict = {}  # Храним заказы в виде словаря с ID в качестве ключей
+    for order in courier_orders:
+        base_info = (
+            f"{courier_orders.index(order) + 1}/{len(courier_orders)}\n\n"
+            f"<b>Заказ №{order.order_id}</b>\n"
+            f"<b>Дата оформления:</b> {order.created_at_moscow_time}\n"
+            f"<b>Статус заказа:</b> {order.order_status.value}\n"
+            f"---------------------------------------------\n"
+            f"<b>Город:</b> {order.order_city}\n\n"
+            f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
+        )
+
+        if order.destination_point_b:
+            base_info += format_address(2, order.destination_point_b, order.receiver_name_1, order.receiver_phone_1,
+                                        order.b_url)
+        if order.destination_point_c:
+            base_info += format_address(3, order.destination_point_c, order.receiver_name_2, order.receiver_phone_2,
+                                        order.c_url)
+        if order.destination_point_d:
+            base_info += format_address(4, order.destination_point_d, order.receiver_name_3, order.receiver_phone_3,
+                                        order.d_url)
+        if order.destination_point_e:
+            base_info += format_address(5, order.destination_point_e, order.receiver_name_4, order.receiver_phone_4,
+                                        order.e_url)
+
+        base_info += (
+            f"<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n\n"
+            f"<b>Расстояние:</b> {order.distance_km} км\n"
+            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n"
+            f"---------------------------------------------\n"
+            f"<b>Комментарии:</b> <i>{'*'}{order.comments if order.comments else '...'}</i>\n\n"
+            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
+        )
+
+        orders_text.append(base_info)
+        orders_dict[order.order_id] = order  # Сохраняем каждый заказ по его ID
+
+    # Устанавливаем данные для состояния
+    counter = 0
+    current_order_id = courier_orders[counter].order_id
+    await state.update_data(orders_text=orders_text, orders=orders_dict, counter=counter,
+                            current_order_id=current_order_id)
+
+    # Устанавливаем соответствующую клавиатуру
+    reply_kb = await get_courier_kb(text=keyboard_type)
+    await callback_query.message.edit_text(
+        orders_text[counter],
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+        disable_notification=True
+    )
+
+
+@couriers_router.callback_query(F.data == "my_statistic")
+async def get_courier_statistic(callback_query: CallbackQuery, state: FSMContext):
+    courier_tg_id = callback_query.from_user.id
+
+    # Получение статистики курьера из одного вызова
+    stats = await order_data.get_order_statistics(courier_tg_id)
+
+    # Вычисление процента успешных доставок
+    total_orders = stats["total_orders"]
+    completed_orders = stats["completed_orders"]
+    success_rate = (completed_orders / total_orders) * 100 if total_orders > 0 else 0
+
+    # Формирование текста сообщения
+    text = (
+        f"☈ <b>Статистика доставок</b>\n\n"
+        f"Всего доставок: {total_orders}\n"
+        f"Завершенные доставки: {completed_orders}\n\n"
+        f"Самая низкая скорость: {stats['slowest_order_speed']:.2f} км/ч\n"
+        f"Самая высокая скорость: {stats['fastest_order_speed']:.2f} км/ч\n"
+        f"Средняя скорость: {stats['avg_order_speed']:.2f} км/ч\n\n"
+        f"Самая долгая доставка: {stats['longest_order_time']:.2f} мин\n"
+        f"Самая быстрая доставка: {stats['fastest_order_time']:.2f} мин\n"
+        f"Среднее время доставки: {stats['avg_order_time']:.2f} мин\n\n"
+        f"Самое короткое расстояние: {stats['shortest_order_distance']:.2f} км\n"
+        f"Самое длинное расстояние: {stats['longest_order_distance']:.2f} км\n"
+        f"Среднее расстояние: {stats['avg_order_distance']:.2f} км\n\n"
+        f"Минимальная стоимость: {stats['min_price']:.2f} руб.\n"
+        f"Максимальная стоимость: {stats['max_price']:.2f} руб.\n"
+        f"Средняя стоимость: {stats['avg_price']:.2f} руб.\n\n"
+        f"Всего заработано: {stats['total_earn']:.2f} руб.\n\n"
+        f"Процент успешных доставок: {success_rate:.2f}%\n"
+    )
+
+    reply_kb = await get_courier_kb(text="one_my_order")
+
+    # Отправка сообщения курьеру
+    await callback_query.message.edit_text(
+        text,
+        reply_markup=reply_kb,
+        parse_mode="HTML"
+    )
+
+
+@couriers_router.callback_query(F.data == "next_right_mo")
+async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    orders_text = data.get("orders_text", [])  # Список текста для каждого заказа
+    orders = data.get("orders", {})  # Словарь с полными данными заказов
+    counter = data.get("counter", 0)
+
+    # Увеличиваем счетчик и зацикливаем его
+    counter = (counter + 1) % len(orders_text) if orders_text else 0
+
+    # Обновляем состояние с новым значением счетчика и ID текущего заказа
+    current_order_id = list(orders.keys())[counter]  # Получаем ID нового активного заказа
+    await state.update_data(counter=counter, current_order_id=current_order_id)
+
+    # Обновляем сообщение с новым заказом
+    new_order_info = orders_text[counter] if orders_text else "Нет заказов"
+    await callback_query.message.edit_text(new_order_info,
+                                           reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
+
+
+@couriers_router.callback_query(F.data == "back_left_mo")
+async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    orders_text = data.get("orders_text", [])
+    orders = data.get("orders", {})
+    counter = data.get("counter", 0)
+
+    # Уменьшаем счетчик и зацикливаем его
+    counter = (counter - 1) % len(orders_text) if orders_text else 0
+
+    # Обновляем состояние с новым значением счетчика
+    current_order_id = list(orders.keys())[counter]
+    await state.update_data(counter=counter, current_order_id=current_order_id)
+
+    # Обновляем сообщение с новым заказом
+    new_order_info = orders_text[counter] if orders_text else "Нет заказов"
+    await callback_query.message.edit_text(new_order_info,
+                                           reply_markup=callback_query.message.reply_markup,
+                                           parse_mode="HTML")
 
 
 # ------------------------------------------------------------------------------------------------------------------- #

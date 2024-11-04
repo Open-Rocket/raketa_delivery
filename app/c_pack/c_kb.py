@@ -48,6 +48,28 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
         "/make_order": InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Go", url="https://t.me/raketadelivery_bot")]
         ]),
+        "active_one": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Доставил ✅", callback_data="completed_orders")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+        ]),
+        "active_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Доставил ✅", callback_data="completed_orders")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+
+        ]),
+        "complete_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+             InlineKeyboardButton(text="⇥", callback_data="next_right_mo")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+        ]),
+        "one_complete": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+        ]),
+        "empty_orders": InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+        ]),
 
     }
 
@@ -64,3 +86,13 @@ async def get_courier_kb(message: Optional[Message] = None, callback_data: Optio
             return kb[text]
 
     return kb["ok_kb"]
+
+
+async def get_my_orders_kb(active_count: int, completed_count: int) -> InlineKeyboardMarkup:
+    my_orders_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Завершеные {completed_count}", callback_data="completed_orders"),
+         InlineKeyboardButton(text=f"Активные {active_count}", callback_data="active_orders")],
+        [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")]
+    ])
+
+    return my_orders_kb

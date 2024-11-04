@@ -1,5 +1,5 @@
 import json
-from sqlalchemy import select, update, delete, desc, func, extract
+from sqlalchemy import select, update, delete, desc, func, extract, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -743,12 +743,76 @@ class OrderData:
             current_order = user_query.scalar()
             return current_order
 
+    async def _get_user_id(self, tg_id: int) -> int:
+        async with self.async_session_factory() as session:
+            user_query = await session.scalar(select(Courier.courier_id).where(Courier.courier_tg_id == tg_id))
+            if not user_query:
+                raise ValueError("Пользователь не найден")
+            return user_query
 
-# async def get_users():
-#     async with async_session_factory() as session:  # Используйте свой async_session
-#         result = await session.execute(select(User))
-#         users = result.scalars().all()  # Получение всех пользователей
-#         print(users)
+    async def get_order_statistics(self, tg_id: int):
+        user_id = await self._get_user_id(tg_id)
+
+        async with self.async_session_factory() as session:
+            # Используем агрегации в одном запросе
+            result = await session.execute(
+                select(
+                    func.count(Order.order_id).label("total_orders"),
+                    func.count(case((Order.order_status == OrderStatus.COMPLETED, 1))).label("completed_orders"),
+                    func.count(case((Order.order_status == OrderStatus.CANCELLED, 1))).label("canceled_orders"),
+                    func.avg(case((Order.order_status == OrderStatus.COMPLETED,
+                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
+                        "avg_order_speed"),
+                    func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
+                        "avg_order_distance"),
+                    func.min(case((Order.order_status == OrderStatus.COMPLETED,
+                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
+                        "slowest_order_speed"),
+                    func.max(case((Order.order_status == OrderStatus.COMPLETED,
+                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
+                        "fastest_order_speed"),
+                    func.avg(case(
+                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
+                        "avg_order_time"),
+                    func.min(case(
+                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
+                        "fastest_order_time"),
+                    func.max(case(
+                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
+                        "longest_order_time"),
+                    func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
+                        "shortest_order_distance"),
+                    func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
+                        "longest_order_distance"),
+                    # Новые агрегаты для стоимости заказов
+                    func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("min_price"),
+                    func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("max_price"),
+                    func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("avg_price"),
+                    func.sum(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("total_earn")
+                ).where(Order.user_id == user_id)
+            )
+
+            # Достаем результаты
+            stats = result.fetchone()
+            return {
+                "total_orders": stats.total_orders or 0,
+                "completed_orders": stats.completed_orders or 0,
+                "canceled_orders": stats.canceled_orders or 0,
+                "avg_order_speed": stats.avg_order_speed or 0,
+                "avg_order_distance": stats.avg_order_distance or 0,
+                "slowest_order_speed": stats.slowest_order_speed or 0,
+                "fastest_order_speed": stats.fastest_order_speed or 0,
+                "avg_order_time": (stats.avg_order_time / 60) if stats.avg_order_time else 0,
+                "fastest_order_time": (stats.fastest_order_time / 60) if stats.fastest_order_time else 0,
+                "longest_order_time": (stats.longest_order_time / 60) if stats.longest_order_time else 0,
+                "shortest_order_distance": stats.shortest_order_distance or 0,
+                "longest_order_distance": stats.longest_order_distance or 0,
+                "min_price": stats.min_price or 0,
+                "max_price": stats.max_price or 0,
+                "avg_price": stats.avg_price or 0,
+                "total_earn": stats.total_earn or 0,
+
+            }
 
 
 user_data = UserData(async_session_factory)

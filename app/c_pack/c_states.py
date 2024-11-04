@@ -5,6 +5,8 @@ class CourierState(StatesGroup):
     default = State()
     location = State()
     myOrders = State()
+    myOrders_active = State()
+    myOrders_completed = State()
     start_reg = State()
     pay = State()
     change_Name = State()

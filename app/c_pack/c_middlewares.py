@@ -15,11 +15,16 @@ password = os.getenv("ADMIN_PASSWORD")
 logging.basicConfig(level=logging.INFO, format='--------------------\n%(message)s\n--------------------')
 logger = logging.getLogger(__name__)
 
+
 async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
                                          data: Dict[str, Any]) -> Any:
     message_text = event.text
 
     if state == CourierState.location.state:
+        return await handler(event, data)
+
+    if state in (CourierState.myOrders.state, CourierState.myOrders_completed.state,
+                 CourierState.myOrders_active.state):
         return await handler(event, data)
 
     if message_text == "/start":
@@ -51,6 +56,7 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
 
     return await handler(event, data)
 
+
 class OuterMiddleware(BaseMiddleware):
     async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject, data: Dict[str, Any]) -> Any:
@@ -77,6 +83,7 @@ class OuterMiddleware(BaseMiddleware):
             logger.info(log_message)
 
             return await handler(event, data)
+
 
 class InnerMiddleware(BaseMiddleware):
     async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
