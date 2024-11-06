@@ -94,7 +94,7 @@ async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
     return total_distance, duration
 
 
-async def get_coordinates_yandex(address):
+async def get_coordinates(address):
     base_url = "https://geocode-maps.yandex.ru/1.x/"
     params = {
         "apikey": YANDEX_API_KEY,
@@ -111,7 +111,7 @@ async def get_coordinates_yandex(address):
         return None, None
 
 
-async def get_coordinates(address):
+async def get_coordinates_nominatim(address):
     base_url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": address,

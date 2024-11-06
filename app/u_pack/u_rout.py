@@ -974,39 +974,14 @@ async def process_message(message: Message, state: FSMContext):
     most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
     # print(most_compatible_response)
 
-    # Обработка результата цензуры по наибольшему соответствию
     if most_compatible_response == "clear":
-        # Получаем адреса в нужном формате для геокодирования
+        # Обработка для разрешенных заказов (обычные товары)
         addresses = await get_parsed_addresses(recognized_text, user_city)
-        print(f"Адреса: {addresses}")
-
-        # Проверка, если адресов два
         if len(addresses) == 2:
             pickup_address, delivery_address = addresses
-            print(f"pickup_address: {pickup_address}")
-            print(f"delivery_address: {delivery_address}\n")
-
-            # Используем адреса напрямую для геокодирования
-            try:
-                pickup_coords = await get_coordinates(pickup_address)
-                if not pickup_coords:
-                    print(f"Не удалось найти координаты для pickup_address: {pickup_address}")
-
-                await asyncio.sleep(1.2)  # Пауза для предотвращения превышения лимита запросов
-
-                delivery_coords = await get_coordinates(delivery_address)
-                if not delivery_coords:
-                    print(f"Не удалось найти координаты для delivery_address: {delivery_address}")
-
-                # Если обе координаты найдены, выводим их
-                if pickup_coords and delivery_coords:
-                    all_coordinates = [pickup_coords, delivery_coords]
-                    print(f"all_coordinates: {all_coordinates}")
-                else:
-                    print("Не удалось получить координаты для обоих адресов.")
-
-            except Exception as e:
-                print(f"Произошла ошибка при получении координат: {e}")
+            pickup_coords = await get_coordinates(pickup_address)
+            delivery_coords = await get_coordinates(delivery_address)
+            all_coordinates = [pickup_coords, delivery_coords]
 
             if all(pickup_coords) and all(delivery_coords):
                 # Продолжение обработки заказа
@@ -1042,22 +1017,18 @@ async def process_message(message: Message, state: FSMContext):
                 order_details = structured_data.get('Order details', None)
                 comments = structured_data.get('Comments', None)
 
-                # Преобразуем координаты в строки перед сохранением
-                pickup_coords_str = [str(coord) for coord in pickup_coords]
-                delivery_coords_str = [str(coord) for coord in delivery_coords]
-
                 # Сохранение данных в состоянии
                 await state.update_data(
                     city=city,
                     starting_point_a=starting_point_a,
                     a_latitude=float(pickup_coords[0]),
                     a_longitude=float(pickup_coords[1]),
-                    a_coordinates=pickup_coords_str,  # Используем строки
+                    a_coordinates=pickup_coords,
                     a_url=pickup_point,
                     destination_point_b=destination_point_b,
                     b_latitude=float(delivery_coords[0]),
                     b_longitude=float(delivery_coords[1]),
-                    b_coordinates=delivery_coords_str,  # Используем строки
+                    b_coordinates=delivery_coords,
                     b_url=delivery_point,
                     delivery_object=delivery_object,
                     sender_name=sender_name,
