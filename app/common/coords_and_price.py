@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 import aiohttp
 import os
@@ -8,8 +7,6 @@ import math
 import urllib3
 from math import cos, radians, sin, sqrt, atan2
 from dotenv import load_dotenv
-
-from app.u_pack.u_middlewares import logger
 
 load_dotenv()
 
@@ -59,7 +56,6 @@ async def calculate_total_distance(coordinates, adjustment_factor=1.34):
 
     return total_distance, duration
 
-
 async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
     """
     Рассчитывает манхэттенское расстояние между набором координат с учётом погрешности.
@@ -93,7 +89,6 @@ async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
 
     return total_distance, duration
 
-
 async def get_coordinates(address):
     base_url = "https://geocode-maps.yandex.ru/1.x/"
     params = {
@@ -102,44 +97,12 @@ async def get_coordinates(address):
         "format": "json"
     }
     response = requests.get(base_url, params=params)
-    print(response)
     if response.status_code == 200:
         json_data = response.json()
         pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
         longitude, latitude = pos.split()
         return latitude, longitude
     else:
-        return None, None
-
-
-async def get_coordinates_nominatim(address):
-    base_url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": address,
-        "format": "json",
-        "addressdetails": 1,
-        "limit": 1
-    }
-    headers = {
-        "User-Agent": "RaketaDelivery"
-    }
-
-    try:
-        response = requests.get(base_url, params=params, headers=headers)
-        response.raise_for_status()  # выбрасывает исключение при ошибке запроса
-
-        json_data = response.json()
-        # print(json_data)
-        if json_data:
-            latitude = float(json_data[0]["lat"])  # Преобразуем строку в число
-            longitude = float(json_data[0]["lon"])  # Преобразуем строку в число
-            return latitude, longitude
-        else:
-            logger.warning(f"Адрес '{address}' не найден. Проверьте корректность ввода.")
-            return None, None
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка запроса к API Nominatim для адреса '{address}': {e}")
         return None, None
 
 
