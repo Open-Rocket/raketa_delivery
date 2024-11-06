@@ -109,6 +109,9 @@ class Courier(Base):
     courier_default_city: Mapped[stringData]
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[stringData]
+    order_low_speed: Mapped[floatData]
+    order_max_speed: Mapped[floatData]
+    order_avg_speed: Mapped[floatData]
 
     # courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
 

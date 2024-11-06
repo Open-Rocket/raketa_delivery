@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+
 from sqlalchemy import select, update, delete, desc, func, extract, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -754,46 +756,66 @@ class OrderData:
         user_id = await self._get_user_id(tg_id)
 
         async with self.async_session_factory() as session:
-            # Используем агрегации в одном запросе
             result = await session.execute(
                 select(
                     func.count(Order.order_id).label("total_orders"),
                     func.count(case((Order.order_status == OrderStatus.COMPLETED, 1))).label("completed_orders"),
                     func.count(case((Order.order_status == OrderStatus.CANCELLED, 1))).label("canceled_orders"),
-                    func.avg(case((Order.order_status == OrderStatus.COMPLETED,
-                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
-                        "avg_order_speed"),
+
+                    # Средняя скорость: средний показатель execution_speed
+                    func.avg(case(
+                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
+                    )).label("avg_order_speed"),
+
+                    # Среднее расстояние
                     func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
                         "avg_order_distance"),
-                    func.min(case((Order.order_status == OrderStatus.COMPLETED,
-                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
-                        "slowest_order_speed"),
-                    func.max(case((Order.order_status == OrderStatus.COMPLETED,
-                                   Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))).label(
-                        "fastest_order_speed"),
-                    func.avg(case(
-                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
-                        "avg_order_time"),
+
+                    # Самая низкая и самая высокая скорость
                     func.min(case(
-                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
-                        "fastest_order_time"),
+                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
+                    )).label("slowest_order_speed"),
+
                     func.max(case(
-                        (Order.order_status == OrderStatus.COMPLETED, extract('epoch', Order.execution_time)))).label(
-                        "longest_order_time"),
+                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
+                    )).label("fastest_order_speed"),
+
+                    # Среднее, минимальное и максимальное время доставки (в минутах)
+                    func.avg(case(
+                        (Order.order_status == OrderStatus.COMPLETED,
+                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
+                    )).label("avg_order_time"),
+
+                    func.min(case(
+                        (Order.order_status == OrderStatus.COMPLETED,
+                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
+                    )).label("fastest_order_time"),
+
+                    func.max(case(
+                        (Order.order_status == OrderStatus.COMPLETED,
+                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
+                    )).label("longest_order_time"),
+
+                    # Самое короткое и самое длинное расстояние
                     func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
                         "shortest_order_distance"),
                     func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
                         "longest_order_distance"),
-                    # Новые агрегаты для стоимости заказов
+
+                    # Минимальная, максимальная и средняя стоимость заказов
                     func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("min_price"),
                     func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("max_price"),
                     func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("avg_price"),
+
+                    # Общая выручка
                     func.sum(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("total_earn")
                 ).where(Order.user_id == user_id)
             )
 
             # Достаем результаты
             stats = result.fetchone()
+
+            # Оформление статистики
             return {
                 "total_orders": stats.total_orders or 0,
                 "completed_orders": stats.completed_orders or 0,
@@ -802,17 +824,33 @@ class OrderData:
                 "avg_order_distance": stats.avg_order_distance or 0,
                 "slowest_order_speed": stats.slowest_order_speed or 0,
                 "fastest_order_speed": stats.fastest_order_speed or 0,
-                "avg_order_time": (stats.avg_order_time / 60) if stats.avg_order_time else 0,
-                "fastest_order_time": (stats.fastest_order_time / 60) if stats.fastest_order_time else 0,
-                "longest_order_time": (stats.longest_order_time / 60) if stats.longest_order_time else 0,
+                "avg_order_time": stats.avg_order_time if stats.avg_order_time is not None else 0,
+                "fastest_order_time": stats.fastest_order_time if stats.fastest_order_time is not None else 0,
+                "longest_order_time": stats.longest_order_time if stats.longest_order_time is not None else 0,
                 "shortest_order_distance": stats.shortest_order_distance or 0,
                 "longest_order_distance": stats.longest_order_distance or 0,
                 "min_price": stats.min_price or 0,
                 "max_price": stats.max_price or 0,
                 "avg_price": stats.avg_price or 0,
                 "total_earn": stats.total_earn or 0,
-
             }
+
+    async def update_order_status_and_time(self, order_id: int, new_status: OrderStatus, completed_time: datetime):
+        async with self.async_session_factory() as session:
+            async with session.begin():
+                # Получаем заказ по ID
+                order = await session.execute(select(Order).where(Order.order_id == order_id))
+                order = order.scalars().first()
+
+                if not order:
+                    raise ValueError("Заказ не найден")
+
+                # Обновляем статус и время завершения
+                order.order_status = new_status
+                order.completed_at_moscow_time = completed_time
+
+                # Сохраняем изменения
+                await session.commit()
 
 
 user_data = UserData(async_session_factory)

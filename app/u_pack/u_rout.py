@@ -1,5 +1,5 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
-
+import asyncio
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters
 
+from app.c_pack.c_middlewares import logger
 from app.common.coords_and_price import calculate_osrm_route, get_coordinates, get_price, calculate_total_distance
 from app.common.fuzzy_city import find_most_compatible_response
 from app.database.models import OrderStatus
@@ -229,6 +230,7 @@ async def cmd_faq(message: Message, state: FSMContext):
 
     new_message = await message.answer(text, disable_notification=True, parse_mode="HTML")
     await handler.handle_new_message(new_message, message)
+
 
 # rules
 @users_router.message(F.text == "/rules")
@@ -892,8 +894,6 @@ async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-
-
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                 ⇣ Assistant test ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -976,13 +976,63 @@ async def process_message(message: Message, state: FSMContext):
 
     # Обработка результата цензуры по наибольшему соответствию
     if most_compatible_response == "clear":
-        # Обработка для разрешенных заказов (обычные товары)
+        def clean_address(address, city_name):
+            # Убираем кавычки и лишние пробелы
+            address = address.replace('"', '').strip()
+            address_parts = address.split(" ")
+
+            # Преобразуем список в set для удаления дублирующихся слов
+            # Сначала добавляем все части адреса в set, затем восстанавливаем обратно строку
+            # Если город повторяется в конце, удалим его
+            if address_parts[-len(city_name.split()):] == city_name.split():
+                address_parts = address_parts[:-len(city_name.split())]
+
+            # Воссоздаем строку
+            cleaned_address = " ".join(address_parts)
+            return cleaned_address
+
+        # Основной код
         addresses = await get_parsed_addresses(recognized_text, user_city)
+        print(f"Адреса: {addresses}")
+
+        # Если адресов два
         if len(addresses) == 2:
             pickup_address, delivery_address = addresses
-            pickup_coords = await get_coordinates(pickup_address)
-            delivery_coords = await get_coordinates(delivery_address)
-            all_coordinates = [pickup_coords, delivery_coords]
+            print(f"pickup_address: {pickup_address}")
+            print(f"delivery_address: {delivery_address}\n")
+
+            # Применяем очистку к каждому адресу
+            pickup_address = clean_address(pickup_address)
+            delivery_address = clean_address(delivery_address)
+
+            print(f"pickup_address after clean: {pickup_address}")
+            print(f"delivery_address after clean: {delivery_address}")
+
+            # Преобразуем адреса в строку, как в тесте
+            address_1 = " ".join(pickup_address.split())  # Преобразуем в строку, разделяя по пробелам
+            address_2 = " ".join(delivery_address.split())  # То же для второго адреса
+            print(f"Formatted address_1: {address_1}")
+            print(f"Formatted address_2: {address_2}")
+
+            # Получаем координаты по очищенным адресам
+            try:
+                pickup_coords = await get_coordinates(address_1)
+                if not pickup_coords:
+                    print(f"Не удалось найти координаты для pickup_address: {address_1}")
+                await asyncio.sleep(1.2)
+                delivery_coords = await get_coordinates(address_2)
+                if not delivery_coords:
+                    print(f"Не удалось найти координаты для delivery_address: {address_2}")
+
+                # Если координаты найдены, выводим их
+                if pickup_coords and delivery_coords:
+                    all_coordinates = [pickup_coords, delivery_coords]
+                    print(f"all_coordinates: {all_coordinates}")
+                else:
+                    print("Не удалось получить координаты для обоих адресов.")
+
+            except Exception as e:
+                print(f"Произошла ошибка при получении координат: {e}")
 
             if all(pickup_coords) and all(delivery_coords):
                 # Продолжение обработки заказа

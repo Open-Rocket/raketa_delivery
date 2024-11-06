@@ -674,8 +674,8 @@ async def get_courier_statistic(callback_query: CallbackQuery, state: FSMContext
     # Формирование текста сообщения
     text = (
         f"☈ <b>Статистика доставок</b>\n\n"
-        f"Всего доставок: {total_orders}\n"
-        f"Завершенные доставки: {completed_orders}\n\n"
+        f"Всего заказов: {total_orders}\n"
+        f"Завершенные заказы: {completed_orders}\n\n"
         f"Самая низкая скорость: {stats['slowest_order_speed']:.2f} км/ч\n"
         f"Самая высокая скорость: {stats['fastest_order_speed']:.2f} км/ч\n"
         f"Средняя скорость: {stats['avg_order_speed']:.2f} км/ч\n\n"
@@ -692,7 +692,7 @@ async def get_courier_statistic(callback_query: CallbackQuery, state: FSMContext
         f"Процент успешных доставок: {success_rate:.2f}%\n"
     )
 
-    reply_kb = await get_courier_kb(text="one_my_order")
+    reply_kb = await get_courier_kb(text="go_back")
 
     # Отправка сообщения курьеру
     await callback_query.message.edit_text(
@@ -742,6 +742,75 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
     await callback_query.message.edit_text(new_order_info,
                                            reply_markup=callback_query.message.reply_markup,
                                            parse_mode="HTML")
+
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ order_delivered ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+@couriers_router.callback_query(F.data == "order_delivered")
+async def complete_order(callback_query: CallbackQuery, state: FSMContext):
+    handler = MessageHandler(state, callback_query.message.bot)
+    data = await state.get_data()
+    current_order_id = data.get("current_order_id")  # Получаем ID текущего заказа
+
+    if not current_order_id:
+        await callback_query.message.answer("Не удалось найти активный заказ для завершения.")
+        return
+
+    try:
+        # Проверяем текущий статус заказа
+        order = await order_data.get_order_by_id(current_order_id)
+        if order.order_status != OrderStatus.IN_PROGRESS:
+            await callback_query.message.answer(
+                f"Заказ №{current_order_id} нельзя завершить, так как он не в статусе выполнения."
+            )
+            return
+
+        # Обновляем статус заказа на "Завершен" и устанавливаем время завершения в базе данных
+        completed_time = datetime.now()  # Текущее время завершения
+        await order_data.update_order_status_and_time(
+            order_id=current_order_id,
+            new_status=OrderStatus.COMPLETED,
+            completed_time=completed_time
+        )
+
+        # Получаем данные заказчика для отправки уведомления
+        customer_phone = await order_data.get_order_customer_phone(current_order_id)
+        customer_tg_id = await user_data.get_user_tg_id_by_phone(customer_phone)
+
+        # Отправляем уведомление заказчику
+        notification_text = (f"Ваш заказ №{current_order_id} был успешно доставлен курьером!\n"
+                             f"Спасибо, что воспользовались нашим сервисом.\n\n"
+                             f"<i>*Сообщение удалится через 15 минут</i>")
+        notification_message = await notification_bot.send_message(
+            chat_id=customer_tg_id,
+            text=notification_text,
+            parse_mode="HTML"
+        )
+
+        # Уведомляем курьера о завершении заказа
+        await callback_query.message.answer("Статус заказа обновлен на 'Завершен'. Заказчик уведомлен.",
+                                            parse_mode="HTML",
+                                            disable_notification=False)
+
+        # Удаляем предыдущее сообщение курьера перед отправкой нового
+        await handler.delete_previous_message(callback_query.message.chat.id)
+
+        # Устанавливаем состояние курьера в начальное состояние
+        await state.set_state(CourierState.default)
+
+        # Удаляем уведомление заказчику через 15 минут
+        await asyncio.sleep(900)
+        try:
+            await notification_bot.delete_message(chat_id=customer_tg_id, message_id=notification_message.message_id)
+        except Exception as e:
+            logger.error(f"Ошибка при удалении сообщения заказчику: {e}")
+
+    except ValueError as e:
+        await callback_query.answer(str(e), show_alert=True)
+    except Exception as e:
+        await callback_query.answer("Ошибка при завершении заказа.", show_alert=True)
+        logger.error(f"Ошибка при завершении заказа: {e}")
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -843,6 +912,7 @@ async def succesful_payment(message: Message, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                    ⇣ Profile ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
+
 @couriers_router.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext) -> None:
     """
@@ -970,6 +1040,10 @@ async def change_city(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ fqs ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
+
 @couriers_router.message(F.text == "/faq")
 async def cmd_faq(message: Message, state: FSMContext) -> None:
     """
@@ -1042,6 +1116,9 @@ async def cmd_rules(message: Message, state: FSMContext) -> None:
     await handler.handle_new_message(new_message, message)
 
 
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ ai ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 @couriers_router.message(F.text == "/ai_support_couriers")
 async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     """
@@ -1059,6 +1136,10 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
             None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
     """
 
+
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                    ⇣ make order ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 
 @couriers_router.message(F.text == "/make_order")
 async def cmd_ai_support_couriers(message: Message, state: FSMContext):
