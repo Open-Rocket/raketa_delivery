@@ -102,6 +102,7 @@ async def get_coordinates(address):
         "format": "json"
     }
     response = requests.get(base_url, params=params)
+    print(response)
     if response.status_code == 200:
         json_data = response.json()
         pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]

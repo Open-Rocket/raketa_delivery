@@ -1495,14 +1495,7 @@ async def process_message(message: Message, state: FSMContext):
                 reply_markup=reply_kb, disable_notification=True
             )
 
-    # elif most_compatible_response == "overprice":
-    #     await state.set_state(UserState.default)
-    #     reply_kb = await get_user_kb(text="overprice")
-    #     new_message = await message.answer(
-    #         text=("<b>Внимание</b>！ \n\nВаш заказ содержит табачные изделия или алкогольуню продукцию.\n\n"
-    #               "<b>Доставка будет стоить немного дороже!</b>"),
-    #         reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
-    #     )
+
     elif most_compatible_response == "inaudible":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
