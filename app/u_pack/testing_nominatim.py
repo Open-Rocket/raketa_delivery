@@ -3,13 +3,14 @@ from app.common.coords_and_price import get_coordinates
 
 address_1 = "Москва проспект Вернадского 76/2"
 address_2 = "Москва улица Академика Анохина 20/3"
+address_3 = "Москва улица Юных Ленинцев 25"
 address_x1 = "Москва", "улица", "проспект Вернадского", "76, корпус 2", "Москва"
 address_x2 = "Москва", "улица", "Академика Анохина", "20", "Москва"
 async def show_coords(add_1, add_2):
     coord_1 = await get_coordinates(add_1)
     print(coord_1)
     coord_2 = await get_coordinates(add_2)
-    print(coord_1)
+    print(coord_2)
 
     yandex_maps_url = (
         f"https://yandex.ru/maps/?rtext={coord_1[0]},{coord_1[1]}"
@@ -28,4 +29,4 @@ async def show_coords(add_1, add_2):
     print(pickup_point_2)
 
 
-asyncio.run(show_coords(address_1, address_2))
+asyncio.run(show_coords(address_1, address_3))
