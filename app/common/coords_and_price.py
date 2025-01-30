@@ -106,6 +106,50 @@ async def get_coordinates(address):
         return None, None
 
 
+async def get_price(distance, order_time, city=None, over_price=0) -> int:
+    city = city
+
+    # Базовая цена за километр
+    if 0 < distance <= 2:
+        base_price_per_km = 101
+    else:
+        base_price_per_km = 38
+
+    # Устанавливаем универсальный коэффициент для всех городов
+    city_coefficient = 1.0
+
+    # Коэффициент на основе времени заказа
+    if 0 <= order_time.hour < 6:
+        time_coefficient = 1.1  # Ночью наибольший
+    elif 6 <= order_time.hour < 12:
+        time_coefficient = 1  # Утро стандартное
+    elif 12 <= order_time.hour < 18:
+        time_coefficient = 1  # Днем стандартное
+    else:
+        time_coefficient = 1.05  # Вечером выше
+
+    # Коэффициент на основе дистанции
+    if distance <= 5:
+        distance_coefficient = 1
+    elif 5 < distance <= 10:
+        distance_coefficient = 0.8
+    elif 10 < distance <= 20:
+        distance_coefficient = 0.7
+    else:
+        distance_coefficient = 0.6
+
+    # Общий коэффициент
+    total_coefficient = city_coefficient * time_coefficient * distance_coefficient
+
+    # Итоговая цена
+    total_price = base_price_per_km * distance * total_coefficient
+
+    return int(total_price + over_price)
+
+
+
+
+# OSRM 
 async def calculate_osrm_route(*coordinates):
     """
     Вычисление маршрута с использованием OSRM для любого количества точек.
@@ -253,44 +297,3 @@ async def calculate_osrm_route(*coordinates):
 #     else:
 #         print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
 #         return None, None
-
-
-async def get_price(distance, order_time, city=None, over_price=0) -> int:
-    city = city
-
-    # Базовая цена за километр
-    if 0 < distance <= 2:
-        base_price_per_km = 101
-    else:
-        base_price_per_km = 38
-
-    # Устанавливаем универсальный коэффициент для всех городов
-    city_coefficient = 1.0
-
-    # Коэффициент на основе времени заказа
-    if 0 <= order_time.hour < 6:
-        time_coefficient = 1.1  # Ночью наибольший
-    elif 6 <= order_time.hour < 12:
-        time_coefficient = 1  # Утро стандартное
-    elif 12 <= order_time.hour < 18:
-        time_coefficient = 1  # Днем стандартное
-    else:
-        time_coefficient = 1.05  # Вечером выше
-
-    # Коэффициент на основе дистанции
-    if distance <= 5:
-        distance_coefficient = 1
-    elif 5 < distance <= 10:
-        distance_coefficient = 0.8
-    elif 10 < distance <= 20:
-        distance_coefficient = 0.7
-    else:
-        distance_coefficient = 0.6
-
-    # Общий коэффициент
-    total_coefficient = city_coefficient * time_coefficient * distance_coefficient
-
-    # Итоговая цена
-    total_price = base_price_per_km * distance * total_coefficient
-
-    return int(total_price + over_price)

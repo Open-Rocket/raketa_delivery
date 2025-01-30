@@ -114,8 +114,9 @@ async def data_name_user(message: Message, state: FSMContext):
         await user_data.set_user_name(tg_id, name)
         reply_kb = await get_user_kb(text="phone_number")
         text = (f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
-                f"в случае необходимости, пожалуйста, укажите ваш номер телефона.\n\n"
+                f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
                 f"<i>*При регистрации с компьютера нажмите на значек команд рядом с полем ввода.</i>\n\n"
+                f"<i>*Отправка номера возможно только по клику на кнопку!</i>\n\n"
                 f"<b>Ваш номер:</b>")
 
         msg = await message.answer(text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML")
@@ -1507,7 +1508,8 @@ async def process_message(message: Message, state: FSMContext):
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
         new_message = await message.answer(
-            text="<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.",
+            text="<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.\n"
+            "Заказ нужно оформить заново!",
             reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
     elif most_compatible_response == "not_order":
