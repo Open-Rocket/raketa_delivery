@@ -106,7 +106,7 @@ async def process_order_text(order_text: str) -> dict | str | None:
         f"то узазывай точку возврата, полным его адресом (как в тексте), как следующую. "
         f"Обрати внимание на тот факт если пользователь просит вернуться обратно, то есть ABA - маршрут, "
         f"но ты заполняй как ABC\n"
-        f"Заказ: {order_text}\n"
+        f"Заказ: \n{order_text}\n\n"
         f"Строго в формате JSON:\n"
         f"{{\n"
         f'  "City": ,\n'
@@ -115,14 +115,6 @@ async def process_order_text(order_text: str) -> dict | str | None:
         f'  "Destination point C": "Третий пункт доставки",\n'
         f'  "Destination point D": "Четвертый пункт доставки",\n'
         f'  "Destination point E": "Пятый пункт доставки",\n'
-        f'  "Receiver name 1": "Имя получателя пункта B",\n'
-        f'  "Receiver phone 1": "Телефон получателя пункта B",\n'
-        f'  "Receiver name 2": "Имя получателя пункта C",\n'
-        f'  "Receiver phone 2": "Телефон получателя пункта C",\n'
-        f'  "Receiver name 3": "Имя получателя пункта D",\n'
-        f'  "Receiver phone 3": "Телефон получателя пункта D",\n'
-        f'  "Receiver name 4": "Имя получателя пункта E ",\n'
-        f'  "Receiver phone 4": "Телефон получателя пункта E",\n'
         f'  "Delivery object": "Объект доставки",\n'
         f'  "Comments": "Комментарии (если указываются)"\n'
         f"}}"

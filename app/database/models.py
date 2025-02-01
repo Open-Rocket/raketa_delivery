@@ -171,20 +171,8 @@ class Order(Base):
 
     delivery_object: Mapped[stringData]
 
-    sender_name: Mapped[stringData]
-    sender_phone: Mapped[stringData]
-
-    receiver_name_1: Mapped[stringData]
-    receiver_phone_1: Mapped[stringData]
-
-    receiver_name_2: Mapped[stringData]
-    receiver_phone_2: Mapped[stringData]
-
-    receiver_name_3: Mapped[stringData]
-    receiver_phone_3: Mapped[stringData]
-
-    receiver_name_4: Mapped[stringData]
-    receiver_phone_4: Mapped[stringData]
+    customer_name: Mapped[stringData]
+    customer_phone: Mapped[stringData]
 
     comments: Mapped[textData]
     distance_km: Mapped[floatData]
