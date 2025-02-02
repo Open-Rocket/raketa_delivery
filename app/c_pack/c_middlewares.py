@@ -12,19 +12,25 @@ load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
 
 # Настройка логгера для одного сообщения на логический блок
-logging.basicConfig(level=logging.INFO, format='--------------------\n%(message)s\n--------------------')
+logging.basicConfig(
+    level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
+)
 logger = logging.getLogger(__name__)
 
 
-async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
-                                         data: Dict[str, Any]) -> Any:
+async def check_state_and_handle_message(
+    state: str, event: Message, handler: Callable, data: Dict[str, Any]
+) -> Any:
     message_text = event.text
 
     if state == CourierState.location.state:
         return await handler(event, data)
 
-    if state in (CourierState.myOrders.state, CourierState.myOrders_completed.state,
-                 CourierState.myOrders_active.state):
+    if state in (
+        CourierState.myOrders.state,
+        CourierState.myOrders_completed.state,
+        CourierState.myOrders_active.state,
+    ):
         return await handler(event, data)
 
     if message_text == "/start":
@@ -33,10 +39,15 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
     if message_text == "/subs":
         return await handler(event, data)
 
-    if state in (CourierRegistration.name.state, CourierRegistration.phone_number.state,
-                 CourierRegistration.city.state, CourierRegistration.accept_tou.state,
-                 CourierState.change_Name.state, CourierState.change_Phone.state,
-                 CourierState.change_City.state):
+    if state in (
+        CourierRegistration.name.state,
+        CourierRegistration.phone_number.state,
+        CourierRegistration.city.state,
+        CourierRegistration.accept_tou.state,
+        CourierState.change_Name.state,
+        CourierState.change_Phone.state,
+        CourierState.change_City.state,
+    ):
         if message_text in ["/my_orders", "/location", "/start"]:
             await event.delete()
             return
@@ -58,8 +69,12 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
 
 
 class OuterMiddleware(BaseMiddleware):
-    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject, data: Dict[str, Any]) -> Any:
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
 
         fsm_context = data.get("state")
         state = await fsm_context.get_state() if fsm_context else "No state"
@@ -86,8 +101,12 @@ class OuterMiddleware(BaseMiddleware):
 
 
 class InnerMiddleware(BaseMiddleware):
-    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject, data: Dict[str, Any]) -> Any:
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
 
         fsm_context = data.get("state")
         state = await fsm_context.get_state() if fsm_context else "No state"

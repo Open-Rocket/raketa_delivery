@@ -17,8 +17,8 @@ from app.database.models import async_main
 async def main():
     load_dotenv()
 
-    users_bot = Bot(token=os.getenv('U_TOKEN'))
-    couriers_bot = Bot(token=os.getenv('C_TOKEN'))
+    users_bot = Bot(token=os.getenv("U_TOKEN"))
+    couriers_bot = Bot(token=os.getenv("C_TOKEN"))
     info_bot = Bot(token=os.getenv("INFO_BOT"))
 
     u_dp = Dispatcher()
@@ -34,7 +34,7 @@ async def main():
 
     await asyncio.gather(
         u_dp.start_polling(users_bot, skip_updates=True),
-        c_dp.start_polling(couriers_bot, skip_updates=True)
+        c_dp.start_polling(couriers_bot, skip_updates=True),
     )
 
 
@@ -42,9 +42,9 @@ async def on_startup(dispatcher):
     await async_main()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print('Exit')
+        print("Exit")

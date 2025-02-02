@@ -1,10 +1,31 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional, Annotated, List
-from sqlalchemy import (ForeignKey, String, BigInteger, Enum, Boolean, DateTime,
-                        Text, Float, Date, func, MetaData, text, Table, JSON, Interval)
+from sqlalchemy import (
+    ForeignKey,
+    String,
+    BigInteger,
+    Enum,
+    Boolean,
+    DateTime,
+    Text,
+    Float,
+    Date,
+    func,
+    MetaData,
+    text,
+    Table,
+    JSON,
+    Interval,
+)
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, MappedColumn
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    DeclarativeBase,
+    relationship,
+    MappedColumn,
+)
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy import Column, Integer
 from dotenv import load_dotenv
@@ -16,10 +37,14 @@ from app.database.config_db import settings
 load_dotenv()
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
-engine = create_async_engine(url=settings.DB_URL_asyncpg, echo=False)  # pool_size=5, max_overflow=10
+engine = create_async_engine(
+    url=settings.DB_URL_asyncpg, echo=False
+)  # pool_size=5, max_overflow=10
 async_session_factory = async_sessionmaker(engine)
 
-moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
+moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
+    tzinfo=None, microsecond=0
+)
 utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0)
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
@@ -33,6 +58,7 @@ datetimeData = Annotated[datetime, mapped_column(DateTime, default=utc_time)]
 
 
 # Enums
+
 
 class Base(AsyncAttrs, DeclarativeBase):
     repr_cols_num = 3
@@ -49,16 +75,18 @@ class Base(AsyncAttrs, DeclarativeBase):
 class AssociateTables:
     # Ассоциативная таблица для связывания заказов и курьеров
     order_courier_association = Table(
-        'order_courier_association', Base.metadata,
-        Column('order_id', Integer, ForeignKey('orders.order_id')),
-        Column('courier_id', Integer, ForeignKey('users.user_id'))
+        "order_courier_association",
+        Base.metadata,
+        Column("order_id", Integer, ForeignKey("orders.order_id")),
+        Column("courier_id", Integer, ForeignKey("users.user_id")),
     )
 
     # Ассоциативная таблица для связывания заказов и клиентов
     order_customer_association = Table(
-        'order_customer_association', Base.metadata,
-        Column('order_id', Integer, ForeignKey('orders.order_id')),
-        Column('customer_id', Integer, ForeignKey('users.user_id'))
+        "order_customer_association",
+        Base.metadata,
+        Column("order_id", Integer, ForeignKey("orders.order_id")),
+        Column("customer_id", Integer, ForeignKey("users.user_id")),
     )
 
 
@@ -82,6 +110,7 @@ class OrderStatus(enum.Enum):
 
 
 # Tables
+
 
 class User(Base):
     __tablename__ = "users"
@@ -127,13 +156,15 @@ class Order(Base):
 
     order_id: Mapped[intPK]
 
-    order_status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer,
-                                                   ForeignKey("users.user_id", ondelete="CASCADE"),
-                                                   nullable=True)
-    courier_id: Mapped[Optional[int]] = mapped_column(Integer,
-                                                      ForeignKey("couriers.courier_id", ondelete="CASCADE"),
-                                                      nullable=True)
+    order_status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=True
+    )
+    courier_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"), nullable=True
+    )
 
     order_city: Mapped[stringData]
 
@@ -179,7 +210,9 @@ class Order(Base):
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
     order_text = Mapped[textData]
-    created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=True)
+    created_at_moscow_time: Mapped[datetime] = mapped_column(
+        DateTime, default=moscow_time, nullable=True
+    )
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
     execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
@@ -195,10 +228,14 @@ class Subscription(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     subscription_cost: Mapped[float] = mapped_column(Float, nullable=False)
-    start_date: Mapped[datetime] = mapped_column(DateTime, default=moscow_time, nullable=False)
+    start_date: Mapped[datetime] = mapped_column(
+        DateTime, default=moscow_time, nullable=False
+    )
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
-    courier_id: Mapped[int] = mapped_column(Integer, ForeignKey("couriers.courier_id"), nullable=False)
+    courier_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("couriers.courier_id"), nullable=False
+    )
 
     couriers = relationship("Courier", back_populates="subscription")
 
@@ -209,23 +246,31 @@ class DailyEvent(Base):
     # Основные поля
     daily_event_id: Mapped[intPK]
 
-    event_date: Mapped[Date] = mapped_column(Date, primary_key=True, default=func.current_date(), nullable=False)
+    event_date: Mapped[Date] = mapped_column(
+        Date, primary_key=True, default=func.current_date(), nullable=False
+    )
     total_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     canceled_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_users: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_couriers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     new_subscriptions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    total_order_revenue: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    fastest_order_time: Mapped[float] = mapped_column(Float, nullable=True)  # В секундах или минутах
+    total_order_revenue: Mapped[float] = mapped_column(
+        Float, default=0.0, nullable=False
+    )
+    fastest_order_time: Mapped[float] = mapped_column(
+        Float, nullable=True
+    )  # В секундах или минутах
     total_reviews: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     support_requests: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
     def __repr__(self):
-        return (f"DailyEvent(date={self.event_date}, total_orders={self.total_orders}, "
-                f"completed_orders={self.completed_orders}, total_revenue={self.total_order_revenue})")
+        return (
+            f"DailyEvent(date={self.event_date}, total_orders={self.total_orders}, "
+            f"completed_orders={self.completed_orders}, total_revenue={self.total_order_revenue})"
+        )
 
 
 # Функция

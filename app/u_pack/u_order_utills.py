@@ -6,7 +6,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.common.coords_and_price import get_coordinates, calculate_osrm_route, get_price
-from app.u_pack.u_ai_assistant import process_order_text, get_parsed_addresses, assistant_censure
+from app.u_pack.u_ai_assistant import (
+    process_order_text,
+    get_parsed_addresses,
+    assistant_censure,
+)
 from app.u_pack.u_states import UserState
 from app.u_pack.u_voice_to_text import process_audio_data
 from app.database.requests import user_data
@@ -47,21 +51,27 @@ async def get_order_data(recognized_text, user_city, moscow_time, message, state
                 f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
             )
 
-            distance, duration = await calculate_osrm_route(*pickup_coords, *delivery_coords)
+            distance, duration = await calculate_osrm_route(
+                *pickup_coords, *delivery_coords
+            )
             price = await get_price(distance, moscow_time)
             structured_data = await process_order_text(recognized_text)
 
-            sender_name, sender_phone = await user_data.get_username_userphone(message.from_user.id)
-            structured_data.update({
-                'distance_km': distance,
-                'duration_min': duration,
-                'price_rub': price,
-                'sender_name': sender_name,
-                'sender_phone': sender_phone,
-                'a_url': pickup_point,
-                'b_url': delivery_point,
-                'yandex_maps_url': yandex_maps_url,
-            })
+            sender_name, sender_phone = await user_data.get_username_userphone(
+                message.from_user.id
+            )
+            structured_data.update(
+                {
+                    "distance_km": distance,
+                    "duration_min": duration,
+                    "price_rub": price,
+                    "sender_name": sender_name,
+                    "sender_phone": sender_phone,
+                    "a_url": pickup_point,
+                    "b_url": delivery_point,
+                    "yandex_maps_url": yandex_maps_url,
+                }
+            )
 
             await state.update_data(structured_data)
             return structured_data
@@ -70,8 +80,8 @@ async def get_order_data(recognized_text, user_city, moscow_time, message, state
 
 
 async def send_order_confirmation(message, structured_data, reply_kb):
-    pickup_point = structured_data['a_url']
-    delivery_point = structured_data['b_url']
+    pickup_point = structured_data["a_url"]
+    delivery_point = structured_data["b_url"]
     price_text = f"{structured_data['price_rub']}₽"
     distance_text = f"{structured_data['distance_km']} км"
     order_forma = (
@@ -91,19 +101,35 @@ async def send_order_confirmation(message, structured_data, reply_kb):
         f"---------------------------------------------\n"
         f"⦿⌁⦿ <a href='{structured_data['yandex_maps_url']}'>Маршрут доставки</a>\n\n"
     )
-    await message.answer(text=order_forma, reply_markup=reply_kb, parse_mode="HTML", disable_notification=True)
+    await message.answer(
+        text=order_forma,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+        disable_notification=True,
+    )
 
 
 async def handle_censorship(recognized_text):
     censore_response = await assistant_censure(recognized_text)
-    censore_data = ["clear", "overprice", "inaudible", "no_item", "censure", "not_order"]
-    most_compatible_response = await find_most_compatible_response(censore_response, censore_data)
+    censore_data = [
+        "clear",
+        "overprice",
+        "inaudible",
+        "no_item",
+        "censure",
+        "not_order",
+    ]
+    most_compatible_response = await find_most_compatible_response(
+        censore_response, censore_data
+    )
     return most_compatible_response
 
 
 async def handle_order_flow(message, state):
     reply_kb = await get_user_kb(text="voice_order_accept")
-    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(tzinfo=None, microsecond=0)
+    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
+        tzinfo=None, microsecond=0
+    )
     tg_id = message.from_user.id
     user_city = await user_data.get_user_city(tg_id)
 
@@ -115,49 +141,70 @@ async def handle_order_flow(message, state):
         recognized_text = await process_text_message(message.text)
 
     if not recognized_text:
-        return await message.answer("Ошибка распознавания. Попробуйте снова.", reply_markup=reply_kb)
+        return await message.answer(
+            "Ошибка распознавания. Попробуйте снова.", reply_markup=reply_kb
+        )
 
     # Проверка на цензуру
     most_compatible_response = await handle_censorship(recognized_text)
 
     if most_compatible_response == "clear":
-        structured_data = await get_order_data(recognized_text, user_city, moscow_time, message, state)
+        structured_data = await get_order_data(
+            recognized_text, user_city, moscow_time, message, state
+        )
         if structured_data:
             await send_order_confirmation(message, structured_data, reply_kb)
         else:
-            await message.answer("Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
-                                 reply_markup=reply_kb)
+            await message.answer(
+                "Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
+                reply_markup=reply_kb,
+            )
 
     elif most_compatible_response == "overprice":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="overprice")
         await message.answer(
             text="<b>Внимание</b>！Ваш заказ содержит табачные изделия или алкогольную продукцию. "
-                 "<b>Доставка будет стоить немного дороже!</b>", reply_markup=reply_kb, parse_mode="HTML"
+            "<b>Доставка будет стоить немного дороже!</b>",
+            reply_markup=reply_kb,
+            parse_mode="HTML",
         )
 
     elif most_compatible_response == "inaudible":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
-        await message.answer("<b>Ошибка</b> ⸘\n\nТекст сообщения неразборчив. Попробуйте отправить заказ снова.",
-                             reply_markup=reply_kb, parse_mode="HTML")
+        await message.answer(
+            "<b>Ошибка</b> ⸘\n\nТекст сообщения неразборчив. Попробуйте отправить заказ снова.",
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
 
     elif most_compatible_response == "no_item":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
-        await message.answer("<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.", reply_markup=reply_kb,
-                             parse_mode="HTML")
+        await message.answer(
+            "<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.",
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
 
     elif most_compatible_response == "not_order":
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
-        await message.answer("<b>...</b> 🫤 \n\nСделайте корректный заказ!", reply_markup=reply_kb, parse_mode="HTML")
+        await message.answer(
+            "<b>...</b> 🫤 \n\nСделайте корректный заказ!",
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
 
     else:
         await state.set_state(UserState.default)
         reply_kb = await get_user_kb(text="rerecord")
-        await message.answer("<b>Отказ!!!</b> 🚫\n\nМы не можем это доставлять!", reply_markup=reply_kb,
-                             parse_mode="HTML")
+        await message.answer(
+            "<b>Отказ!!!</b> 🚫\n\nМы не можем это доставлять!",
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
 
 
 async def handle_message_content(message: Message):
@@ -166,30 +213,51 @@ async def handle_message_content(message: Message):
     return await process_text_message(message.text)
 
 
-async def process_censorship_response(message: Message, state: FSMContext, most_compatible_response: str,
-                                      recognized_text: str, user_city: str, moscow_time: datetime):
+async def process_censorship_response(
+    message: Message,
+    state: FSMContext,
+    most_compatible_response: str,
+    recognized_text: str,
+    user_city: str,
+    moscow_time: datetime,
+):
     if most_compatible_response == "clear":
-        structured_data = await get_order_data(recognized_text, user_city, moscow_time, message, state)
+        structured_data = await get_order_data(
+            recognized_text, user_city, moscow_time, message, state
+        )
         if structured_data:
-            await send_order_confirmation(message, structured_data, await get_user_kb(text="voice_order_accept"))
+            await send_order_confirmation(
+                message, structured_data, await get_user_kb(text="voice_order_accept")
+            )
         else:
-            await message.answer("Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.")
+            await message.answer(
+                "Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова."
+            )
     elif most_compatible_response == "overprice":
-        await message.answer("Ваш заказ содержит табачные изделия или алкоголь. Стоимость будет выше.",
-                             reply_markup=await get_user_kb(text="overprice"))
+        await message.answer(
+            "Ваш заказ содержит табачные изделия или алкоголь. Стоимость будет выше.",
+            reply_markup=await get_user_kb(text="overprice"),
+        )
     elif most_compatible_response == "inaudible":
-        await message.answer("Текст сообщения неразборчив. Попробуйте снова.",
-                             reply_markup=await get_user_kb(text="rerecord"))
+        await message.answer(
+            "Текст сообщения неразборчив. Попробуйте снова.",
+            reply_markup=await get_user_kb(text="rerecord"),
+        )
     elif most_compatible_response == "no_item":
-        await message.answer("Курьер должен знать, что доставлять. Уточните заказ.",
-                             reply_markup=await get_user_kb(text="rerecord"))
+        await message.answer(
+            "Курьер должен знать, что доставлять. Уточните заказ.",
+            reply_markup=await get_user_kb(text="rerecord"),
+        )
     elif most_compatible_response == "not_order":
-        await message.answer("Сделайте корректный заказ.",
-                             reply_markup=await get_user_kb(text="rerecord"))
+        await message.answer(
+            "Сделайте корректный заказ.",
+            reply_markup=await get_user_kb(text="rerecord"),
+        )
     else:
-        await message.answer("Мы не можем это доставлять.",
-                             reply_markup=await get_user_kb(text="rerecord"))
-
+        await message.answer(
+            "Мы не можем это доставлять.",
+            reply_markup=await get_user_kb(text="rerecord"),
+        )
 
 
 # @users_router.message(

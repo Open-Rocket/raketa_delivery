@@ -20,19 +20,19 @@ load_dotenv()
 @test_payment_router.callback_query(F.data == "pay_sub")
 async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
     """
-            Обрабатывает команду доставить заказ /subs.
+    Обрабатывает команду доставить заказ /subs.
 
-            После отправки команды /subs:
-            - Переводит пользователя в состояние (`CourierState.default`).
-            - Отправляет сообщение c предложением преобрести или продлить подписку с InlineButton для перехода на инвойс.
+    После отправки команды /subs:
+    - Переводит пользователя в состояние (`CourierState.default`).
+    - Отправляет сообщение c предложением преобрести или продлить подписку с InlineButton для перехода на инвойс.
 
-            Args:
-                message (Message): Объект, содержащий информацию о нажатии на кнопку.
-                state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
+    Args:
+        message (Message): Объект, содержащий информацию о нажатии на кнопку.
+        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
 
-            Returns:
-                None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-        """
+    Returns:
+        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
+    """
     handler = MessageHandler(state, event.bot)
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
 
@@ -42,7 +42,7 @@ async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=99000  # Сумма указана в копейках (990 рублей)
+            amount=99000,  # Сумма указана в копейках (990 рублей)
         ),
     ]
 
@@ -68,24 +68,35 @@ async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
         need_name=True,
         need_phone_number=True,
         need_email=True,
-        reply_markup=None
+        reply_markup=None,
     )
 
-    await handler.handle_new_message(new_message, event if isinstance(event, Message) else event.message)
+    await handler.handle_new_message(
+        new_message, event if isinstance(event, Message) else event.message
+    )
 
 
 # Обработка подтверждения платежа
 @test_payment_router.pre_checkout_query()
 async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
     try:
-        if pre_checkout_query.currency == 'RUB' and pre_checkout_query.total_amount == 99000:
-            await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+        if (
+            pre_checkout_query.currency == "RUB"
+            and pre_checkout_query.total_amount == 99000
+        ):
+            await pre_checkout_query.bot.answer_pre_checkout_query(
+                pre_checkout_query.id, ok=True
+            )
         else:
-            await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=False,
-                                                                   error_message='Неверная сумма или валюта')
+            await pre_checkout_query.bot.answer_pre_checkout_query(
+                pre_checkout_query.id,
+                ok=False,
+                error_message="Неверная сумма или валюта",
+            )
     except Exception as e:
-        await pre_checkout_query.bot.answer_pre_checkout_query(pre_checkout_query.id, ok=False,
-                                                               error_message=f'Ошибка: {str(e)}')
+        await pre_checkout_query.bot.answer_pre_checkout_query(
+            pre_checkout_query.id, ok=False, error_message=f"Ошибка: {str(e)}"
+        )
 
 
 # Сообщение об успешной оплате
@@ -96,7 +107,7 @@ async def succesful_payment(message: Message, state: FSMContext):
     photo_title = await get_image_title_courier("success_payment")
     text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
     reply_kb = await get_courier_kb(text="success_payment")
-    new_message = await message.answer_photo(photo=photo_title,
-                                             caption=text,
-                                             reply_markup=reply_kb)
+    new_message = await message.answer_photo(
+        photo=photo_title, caption=text, reply_markup=reply_kb
+    )
     await handler.handle_new_message(new_message, message)

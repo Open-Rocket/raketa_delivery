@@ -14,7 +14,6 @@ class CourierState(StatesGroup):
     change_City = State()
 
 
-
 class CourierRegistration(StatesGroup):
     name = State()
     phone_number = State()

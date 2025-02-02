@@ -3,7 +3,9 @@ from aiogram.types import Message, FSInputFile
 
 
 async def get_image_title_user(command: str):
-    title_images_user = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'title_images_user')
+    title_images_user = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "title_images_user"
+    )
 
     image_paths = {
         "/start": os.path.join(title_images_user, "user_start.jpg"),
@@ -39,7 +41,9 @@ async def get_image_title_user(command: str):
 
 
 async def get_image_title_courier(command: str):
-    title_images_courier = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'title_images_courier')
+    title_images_courier = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "title_images_courier"
+    )
 
     image_paths = {
         "/start": os.path.join(title_images_courier, "courier_start.jpg"),
@@ -49,7 +53,7 @@ async def get_image_title_courier(command: str):
         "/faq": os.path.join(title_images_courier, "courier_faq.jpg"),
         "/ai": os.path.join(title_images_courier, "courier_ai.jpg"),
         "on_way": os.path.join(title_images_courier, "courier_on-the-way.jpg"),
-        "success_payment": os.path.join(title_images_courier, "success_payment.jpg")
+        "success_payment": os.path.join(title_images_courier, "success_payment.jpg"),
     }
 
     # image_urls = {

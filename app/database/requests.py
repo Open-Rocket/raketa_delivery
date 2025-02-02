@@ -18,7 +18,9 @@ class UserData:
 
     async def get_user_tg_id_by_phone(self, phone_number: str) -> int:
         async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_phone_number == phone_number))
+            user = await session.scalar(
+                select(User).where(User.user_phone_number == phone_number)
+            )
             if user:
                 return user.user_tg_id
             else:
@@ -64,7 +66,11 @@ class UserData:
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
-                return (user.user_name or "...", user.user_phone_number or "...", user.user_default_city or "...")
+                return (
+                    user.user_name or "...",
+                    user.user_phone_number or "...",
+                    user.user_default_city or "...",
+                )
             return ("...", "...", "...")
 
     async def get_username_userphone(self, tg_id: int):
@@ -90,12 +96,20 @@ class CourierData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def set_courier_info(self, tg_id: int, name: str, phone_number: str,
-                               default_city: str, accept_terms_tou: str,
-                               registration_date: str):
+    async def set_courier_info(
+        self,
+        tg_id: int,
+        name: str,
+        phone_number: str,
+        default_city: str,
+        accept_terms_tou: str,
+        registration_date: str,
+    ):
         async with self.async_session_factory() as session:
             # Пытаемся найти существующего курьера
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 # Если курьер найден, обновляем его данные
                 courier.courier_name = name
@@ -111,7 +125,7 @@ class CourierData:
                     courier_phone_number=phone_number,
                     courier_default_city=default_city,
                     courier_accept_terms_of_use=accept_terms_tou,
-                    courier_registration_date=registration_date
+                    courier_registration_date=registration_date,
                 )
                 session.add(new_courier)
 
@@ -120,28 +134,36 @@ class CourierData:
 
     async def set_courier_name(self, tg_id: int, name: str):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 courier.courier_name = name
                 await session.commit()
 
     async def set_courier_phone(self, tg_id: int, phone: str):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 courier.courier_phone_number = phone
                 await session.commit()
 
     async def set_courier_city(self, tg_id: int, city: str):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 courier.courier_default_city = city
                 await session.commit()
 
     async def get_courier_info(self, tg_id: int):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 return (
                     courier.courier_name or "...",
@@ -153,28 +175,44 @@ class CourierData:
         async with self.async_session_factory() as session:
             # Используем join для извлечения связанных данных о подписке
             courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id).options(selectinload(Courier.subscription))
+                select(Courier)
+                .where(Courier.courier_tg_id == tg_id)
+                .options(selectinload(Courier.subscription))
             )
             if courier:
-                subscription_status = courier.subscription.status if courier.subscription else "Нет подписки"
+                subscription_status = (
+                    courier.subscription.status
+                    if courier.subscription
+                    else "Нет подписки"
+                )
                 return (
                     courier.courier_name or "...",
                     courier.courier_phone_number or "...",
-                    courier.courier_default_city or "...",  # убедитесь, что поле существует в модели
-                    subscription_status
+                    courier.courier_default_city
+                    or "...",  # убедитесь, что поле существует в модели
+                    subscription_status,
                 )
-            return (None, None, None, "Нет подписки")  # добавлено "Нет подписки" для более полного результата
+            return (
+                None,
+                None,
+                None,
+                "Нет подписки",
+            )  # добавлено "Нет подписки" для более полного результата
 
     async def get_courier_phone(self, tg_id: int):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 return courier.courier_phone_number
             return None
 
     async def get_courier_city(self, tg_id: int):
         async with self.async_session_factory() as session:
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
             if courier:
                 return courier.courier_default_city
             return None
@@ -187,7 +225,9 @@ class OrderData:
     async def get_order_customer_phone(self, order_id: int) -> str:
         async with self.async_session_factory() as session:
             # Предполагается, что есть таблица Order и связанная таблица User
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            order = await session.scalar(
+                select(Order).where(Order.order_id == order_id)
+            )
             if order:
                 return order.sender_phone
             else:
@@ -196,52 +236,62 @@ class OrderData:
     async def get_order_customer_tg_id(self, order_id: int) -> int:
         async with self.async_session_factory() as session:
             # Ищем заказ по его ID
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            order = await session.scalar(
+                select(Order).where(Order.order_id == order_id)
+            )
 
             if not order:
                 raise ValueError(f"Заказ с ID {order_id} не найден")
 
             # Получаем tg_id клиента
-            customer_tg_id = order.customer_tg_id  # предполагаем, что у объекта `order` есть поле `customer_tg_id`
+            customer_tg_id = (
+                order.customer_tg_id
+            )  # предполагаем, что у объекта `order` есть поле `customer_tg_id`
             return customer_tg_id
 
     async def create_order(self, user_tg_id: int, data: dict):
         async with self.async_session_factory() as session:  # Открываем асинхронный сеанс
             async with session.begin():  # Начинаем транзакцию
                 # Ищем пользователя по tg_id
-                user = await session.scalar(select(User).where(User.user_tg_id == user_tg_id))
+                user = await session.scalar(
+                    select(User).where(User.user_tg_id == user_tg_id)
+                )
                 if not user:
                     raise ValueError("Пользователь не найден")
 
                 # Создаем новый заказ на основе данных из состояния FSM
                 new_order = Order(
                     user_id=user.user_id,
-                    order_city=data.get('city'),
-                    starting_point_a=data.get('starting_point_a'),
-                    a_coordinates=data.get('a_coordinates'),
+                    order_city=data.get("city"),
+                    starting_point_a=data.get("starting_point_a"),
+                    a_coordinates=data.get("a_coordinates"),
                     a_latitude=data.get("a_latitude"),
                     a_longitude=data.get("a_longitude"),
                     a_url=data.get("a_url"),
-                    destination_point_b=data.get('destination_point_b'),
-                    b_coordinates=data.get('b_coordinates'),
+                    destination_point_b=data.get("destination_point_b"),
+                    b_coordinates=data.get("b_coordinates"),
                     b_latitude=data.get("b_latitude"),
                     b_longitude=data.get("b_longitude"),
                     b_url=data.get("b_url"),
-                    destination_point_c=data.get('destination_point_c', None),  # Латинская "c"
-                    c_coordinates=data.get('c_coordinates', None),  # Латинская "c"
-                    c_latitude=data.get("c_latitude", None),  # Латинская "c"
-                    c_longitude=data.get("c_longitude", None),  # Латинская "c"
-                    c_url=data.get("c_url", None),  # Латинская "c"
-                    delivery_object=data.get('delivery_object'),
-                    customer_name=data.get('customer_name'),
-                    customer_phone=data.get('customer_phone'),
-                    comments=data.get('comments'),
-                    order_text=data.get('order_text'),
-                    distance_km=data.get('distance_km'),
-                    duration_min=data.get('duration_min'),
-                    price_rub=data.get('price_rub'),
-                    created_at_moscow_time=data.get('order_time'),
-                    full_rout=data.get("yandex_maps_url")
+                    destination_point_c=data.get("destination_point_c", None),
+                    c_coordinates=data.get("c_coordinates", None),
+                    c_latitude=data.get("c_latitude", None),
+                    c_longitude=data.get("c_longitude", None),
+                    c_url=data.get("c_url", None),
+                    destination_point_d=data.get("destination_point_d", None),
+                    d_coordinates=data.get("d_coordinates", None),
+                    d_latitude=data.get("d_latitude", None),
+                    d_longitude=data.get("d_longitude", None),
+                    d_url=data.get("d_url", None),
+                    delivery_object=data.get("delivery_object"),
+                    customer_name=data.get("customer_name"),
+                    customer_phone=data.get("customer_phone"),
+                    order_text=data.get("order_text"),
+                    distance_km=data.get("distance_km"),
+                    duration_min=data.get("duration_min"),
+                    price_rub=data.get("price_rub"),
+                    created_at_moscow_time=data.get("order_time"),
+                    full_rout=data.get("yandex_maps_url"),
                 )
 
                 # Добавляем новый заказ в сессию
@@ -261,12 +311,16 @@ class OrderData:
     async def assign_courier_to_order(self, order_id: int, courier_tg_id: int):
         async with self.async_session_factory() as session:
             # Ищем курьера по tg_id
-            courier = await session.scalar(select(Courier).where(Courier.courier_tg_id == courier_tg_id))
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == courier_tg_id)
+            )
             if not courier:
                 raise ValueError("Курьер не найден")
 
             # Ищем заказ и обновляем его
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            order = await session.scalar(
+                select(Order).where(Order.order_id == order_id)
+            )
             if not order:
                 raise ValueError("Заказ не найден")
 
@@ -275,7 +329,9 @@ class OrderData:
 
     async def update_order_status(self, order_id: int, new_status: OrderStatus):
         async with self.async_session_factory() as session:
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            order = await session.scalar(
+                select(Order).where(Order.order_id == order_id)
+            )
             if order:
                 order.order_status = new_status
                 if new_status == OrderStatus.COMPLETED:
@@ -285,13 +341,13 @@ class OrderData:
     async def get_order_courier_info(self, order_id):
         async with self.async_session_factory() as session:
             query = await session.execute(
-                select(Order.courier_id)
-                .where(Order.order_id == order_id)
+                select(Order.courier_id).where(Order.order_id == order_id)
             )
             courier_id = query.scalar()
             query_2 = await session.execute(
-                select(Courier.courier_name, Courier.courier_phone_number)
-                .where(Courier.courier_id == courier_id)
+                select(Courier.courier_name, Courier.courier_phone_number).where(
+                    Courier.courier_id == courier_id
+                )
             )
             courier_info = query_2.first()
 
@@ -299,11 +355,13 @@ class OrderData:
                 courier_name, courier_phone = courier_info
                 return courier_name, courier_phone
             else:
-                return '...', '...'
+                return "...", "..."
 
     async def assign_courier(self, order_id: int, courier_id: int):
         async with self.async_session_factory() as session:
-            order = await session.scalar(select(Order).where(Order.order_id == order_id))
+            order = await session.scalar(
+                select(Order).where(Order.order_id == order_id)
+            )
             if order:
                 order.courier_id = courier_id
                 await session.commit()
@@ -320,7 +378,7 @@ class OrderData:
                 select(Order).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.PENDING
+                        Order.order_status == OrderStatus.PENDING,
                     )
                 )
             )
@@ -339,7 +397,7 @@ class OrderData:
                 select(Order).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.IN_PROGRESS
+                        Order.order_status == OrderStatus.IN_PROGRESS,
                     )
                 )
             )
@@ -349,12 +407,13 @@ class OrderData:
     async def get_canceled_orders(self, user_tg_id: int):
         async with self.async_session_factory() as session:
             orders_query = await session.execute(
-                select(Order)
-                .where(and_(
-                    User.user_tg_id == user_tg_id,
-                    Order.order_status == OrderStatus.CANCELLED
+                select(Order).where(
+                    and_(
+                        User.user_tg_id == user_tg_id,
+                        Order.order_status == OrderStatus.CANCELLED,
+                    )
                 )
-                ))
+            )
 
             canceled_orders = orders_query.scalars().all()
             return canceled_orders
@@ -371,31 +430,37 @@ class OrderData:
                 select(Order).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
             completed_orders = orders_query.scalars().all()
             return completed_orders
 
-    async def get_available_orders(self, courier_tg_id: int,
-                                   courier_lat: float,
-                                   courier_lon: float,
-                                   radius_km: float):
+    async def get_available_orders(
+        self,
+        courier_tg_id: int,
+        courier_lat: float,
+        courier_lon: float,
+        radius_km: float,
+    ):
         async with async_session_factory() as session:
             orders_query = await session.execute(
-                select(Order)
-                .where(and_(
-                    Order.order_status == OrderStatus.PENDING,
-                    # User.user_tg_id != Courier.courier_tg_id
-                ))
+                select(Order).where(
+                    and_(
+                        Order.order_status == OrderStatus.PENDING,
+                        # User.user_tg_id != Courier.courier_tg_id
+                    )
+                )
             )
             orders = orders_query.scalars().all()
 
             available_orders = []
 
             for order in orders:
-                distance = calculate_distance(order.a_latitude, order.a_longitude, courier_lat, courier_lon)
+                distance = calculate_distance(
+                    order.a_latitude, order.a_longitude, courier_lat, courier_lon
+                )
                 if distance <= radius_km:
                     available_orders.append(order)
 
@@ -447,7 +512,7 @@ class OrderData:
                 select(func.count(Order.order_id)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -467,7 +532,7 @@ class OrderData:
                 select(func.count(Order.order_id)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.CANCELLED
+                        Order.order_status == OrderStatus.CANCELLED,
                     )
                 )
             )
@@ -484,11 +549,15 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.avg(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))
-                .where(
+                select(
+                    func.avg(
+                        Order.distance_km
+                        / (extract("epoch", Order.execution_time) / 3600)
+                    )
+                ).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -505,11 +574,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.avg(Order.distance_km))
-                .where(
+                select(func.avg(Order.distance_km)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -526,11 +594,15 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.max(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))
-                .where(
+                select(
+                    func.max(
+                        Order.distance_km
+                        / (extract("epoch", Order.execution_time) / 3600)
+                    )
+                ).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -547,11 +619,15 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.min(Order.distance_km / (extract('epoch', Order.execution_time) / 3600)))
-                .where(
+                select(
+                    func.min(
+                        Order.distance_km
+                        / (extract("epoch", Order.execution_time) / 3600)
+                    )
+                ).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -568,11 +644,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.avg(extract('epoch', Order.execution_time)))
-                .where(
+                select(func.avg(extract("epoch", Order.execution_time))).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -590,11 +665,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.min(extract('epoch', Order.execution_time)))
-                .where(
+                select(func.min(extract("epoch", Order.execution_time))).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -612,11 +686,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.max(extract('epoch', Order.execution_time)))
-                .where(
+                select(func.max(extract("epoch", Order.execution_time))).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -634,11 +707,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.min(Order.distance_km))
-                .where(
+                select(func.min(Order.distance_km)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -655,11 +727,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.max(Order.distance_km))
-                .where(
+                select(func.max(Order.distance_km)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -676,11 +747,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.avg(Order.price_rub))
-                .where(
+                select(func.avg(Order.price_rub)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -697,11 +767,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.max(Order.price_rub))
-                .where(
+                select(func.max(Order.price_rub)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -718,11 +787,10 @@ class OrderData:
                 return 0
 
             result = await session.execute(
-                select(func.min(Order.price_rub))
-                .where(
+                select(func.min(Order.price_rub)).where(
                     and_(
                         Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED
+                        Order.order_status == OrderStatus.COMPLETED,
                     )
                 )
             )
@@ -731,15 +799,16 @@ class OrderData:
     async def get_order_by_id(self, current_order_id):
         async with async_session_factory() as session:
             user_query = await session.execute(
-                select(Order)
-                .where(Order.order_id == current_order_id)
+                select(Order).where(Order.order_id == current_order_id)
             )
             current_order = user_query.scalar()
             return current_order
 
     async def _get_user_id(self, tg_id: int) -> int:
         async with self.async_session_factory() as session:
-            user_query = await session.scalar(select(Courier.courier_id).where(Courier.courier_tg_id == tg_id))
+            user_query = await session.scalar(
+                select(Courier.courier_id).where(Courier.courier_tg_id == tg_id)
+            )
             if not user_query:
                 raise ValueError("Пользователь не найден")
             return user_query
@@ -751,56 +820,138 @@ class OrderData:
             result = await session.execute(
                 select(
                     func.count(Order.order_id).label("total_orders"),
-                    func.count(case((Order.order_status == OrderStatus.COMPLETED, 1))).label("completed_orders"),
-                    func.count(case((Order.order_status == OrderStatus.CANCELLED, 1))).label("canceled_orders"),
-
+                    func.count(
+                        case((Order.order_status == OrderStatus.COMPLETED, 1))
+                    ).label("completed_orders"),
+                    func.count(
+                        case((Order.order_status == OrderStatus.CANCELLED, 1))
+                    ).label("canceled_orders"),
                     # Средняя скорость: средний показатель execution_speed
-                    func.avg(case(
-                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
-                    )).label("avg_order_speed"),
-
+                    func.avg(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.execution_speed,
+                            )
+                        )
+                    ).label("avg_order_speed"),
                     # Среднее расстояние
-                    func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
-                        "avg_order_distance"),
-
+                    func.avg(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.distance_km,
+                            )
+                        )
+                    ).label("avg_order_distance"),
                     # Самая низкая и самая высокая скорость
-                    func.min(case(
-                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
-                    )).label("slowest_order_speed"),
-
-                    func.max(case(
-                        (Order.order_status == OrderStatus.COMPLETED, Order.execution_speed)
-                    )).label("fastest_order_speed"),
-
+                    func.min(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.execution_speed,
+                            )
+                        )
+                    ).label("slowest_order_speed"),
+                    func.max(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.execution_speed,
+                            )
+                        )
+                    ).label("fastest_order_speed"),
                     # Среднее, минимальное и максимальное время доставки (в минутах)
-                    func.avg(case(
-                        (Order.order_status == OrderStatus.COMPLETED,
-                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
-                    )).label("avg_order_time"),
-
-                    func.min(case(
-                        (Order.order_status == OrderStatus.COMPLETED,
-                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
-                    )).label("fastest_order_time"),
-
-                    func.max(case(
-                        (Order.order_status == OrderStatus.COMPLETED,
-                         extract('epoch', Order.completed_at_moscow_time - Order.created_at_moscow_time) / 60)
-                    )).label("longest_order_time"),
-
+                    func.avg(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                extract(
+                                    "epoch",
+                                    Order.completed_at_moscow_time
+                                    - Order.created_at_moscow_time,
+                                )
+                                / 60,
+                            )
+                        )
+                    ).label("avg_order_time"),
+                    func.min(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                extract(
+                                    "epoch",
+                                    Order.completed_at_moscow_time
+                                    - Order.created_at_moscow_time,
+                                )
+                                / 60,
+                            )
+                        )
+                    ).label("fastest_order_time"),
+                    func.max(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                extract(
+                                    "epoch",
+                                    Order.completed_at_moscow_time
+                                    - Order.created_at_moscow_time,
+                                )
+                                / 60,
+                            )
+                        )
+                    ).label("longest_order_time"),
                     # Самое короткое и самое длинное расстояние
-                    func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
-                        "shortest_order_distance"),
-                    func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.distance_km))).label(
-                        "longest_order_distance"),
-
+                    func.min(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.distance_km,
+                            )
+                        )
+                    ).label("shortest_order_distance"),
+                    func.max(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.distance_km,
+                            )
+                        )
+                    ).label("longest_order_distance"),
                     # Минимальная, максимальная и средняя стоимость заказов
-                    func.min(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("min_price"),
-                    func.max(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("max_price"),
-                    func.avg(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("avg_price"),
-
+                    func.min(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.price_rub,
+                            )
+                        )
+                    ).label("min_price"),
+                    func.max(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.price_rub,
+                            )
+                        )
+                    ).label("max_price"),
+                    func.avg(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.price_rub,
+                            )
+                        )
+                    ).label("avg_price"),
                     # Общая выручка
-                    func.sum(case((Order.order_status == OrderStatus.COMPLETED, Order.price_rub))).label("total_earn")
+                    func.sum(
+                        case(
+                            (
+                                Order.order_status == OrderStatus.COMPLETED,
+                                Order.price_rub,
+                            )
+                        )
+                    ).label("total_earn"),
                 ).where(Order.user_id == user_id)
             )
 
@@ -816,9 +967,19 @@ class OrderData:
                 "avg_order_distance": stats.avg_order_distance or 0,
                 "slowest_order_speed": stats.slowest_order_speed or 0,
                 "fastest_order_speed": stats.fastest_order_speed or 0,
-                "avg_order_time": stats.avg_order_time if stats.avg_order_time is not None else 0,
-                "fastest_order_time": stats.fastest_order_time if stats.fastest_order_time is not None else 0,
-                "longest_order_time": stats.longest_order_time if stats.longest_order_time is not None else 0,
+                "avg_order_time": (
+                    stats.avg_order_time if stats.avg_order_time is not None else 0
+                ),
+                "fastest_order_time": (
+                    stats.fastest_order_time
+                    if stats.fastest_order_time is not None
+                    else 0
+                ),
+                "longest_order_time": (
+                    stats.longest_order_time
+                    if stats.longest_order_time is not None
+                    else 0
+                ),
                 "shortest_order_distance": stats.shortest_order_distance or 0,
                 "longest_order_distance": stats.longest_order_distance or 0,
                 "min_price": stats.min_price or 0,
@@ -827,11 +988,15 @@ class OrderData:
                 "total_earn": stats.total_earn or 0,
             }
 
-    async def update_order_status_and_time(self, order_id: int, new_status: OrderStatus, completed_time: datetime):
+    async def update_order_status_and_time(
+        self, order_id: int, new_status: OrderStatus, completed_time: datetime
+    ):
         async with self.async_session_factory() as session:
             async with session.begin():
                 # Получаем заказ по ID
-                order = await session.execute(select(Order).where(Order.order_id == order_id))
+                order = await session.execute(
+                    select(Order).where(Order.order_id == order_id)
+                )
                 order = order.scalars().first()
 
                 if not order:

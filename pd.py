@@ -22,8 +22,8 @@ class User(BaseModel):
 
     @model_validator(mode="before")
     def validate_all(cls, values):
-        if not values.get('fullName') or not values.get('email'):
-            raise ValueError('Username is required')
+        if not values.get("fullName") or not values.get("email"):
+            raise ValueError("Username is required")
         return values
 
 
@@ -42,16 +42,16 @@ user_data = """
             }
              """
 
-user_data2 = {"fullName": "Jimmy",
-              "email":
-                  "Jimbo13@gmail.com",
-              "account_id": 13,
-              "user_minds": [
-                  {"mind": "by", "action": "go_out"},
-                  {"mind": "fun", "action": "laugh"},
-              ],
-              "password": "1234"
-              }
+user_data2 = {
+    "fullName": "Jimmy",
+    "email": "Jimbo13@gmail.com",
+    "account_id": 13,
+    "user_minds": [
+        {"mind": "by", "action": "go_out"},
+        {"mind": "fun", "action": "laugh"},
+    ],
+    "password": "1234",
+}
 
 try:
     user = User.parse_raw(user_data)

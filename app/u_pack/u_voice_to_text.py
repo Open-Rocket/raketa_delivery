@@ -2,6 +2,7 @@ import io
 from pydub import AudioSegment
 import speech_recognition as sr
 
+
 async def process_audio_data(audio_data: bytes) -> str:
     recognizer = sr.Recognizer()
     audio_file = io.BytesIO(audio_data)

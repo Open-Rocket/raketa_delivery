@@ -56,6 +56,7 @@ async def calculate_total_distance(coordinates, adjustment_factor=1.34):
 
     return total_distance, duration
 
+
 async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
     """
     Рассчитывает манхэттенское расстояние между набором координат с учётом погрешности.
@@ -89,17 +90,16 @@ async def calculate_manhattan_distance(coordinates, adjustment_factor=1.34):
 
     return total_distance, duration
 
+
 async def get_coordinates(address):
     base_url = "https://geocode-maps.yandex.ru/1.x/"
-    params = {
-        "apikey": YANDEX_API_KEY,
-        "geocode": address,
-        "format": "json"
-    }
+    params = {"apikey": YANDEX_API_KEY, "geocode": address, "format": "json"}
     response = requests.get(base_url, params=params)
     if response.status_code == 200:
         json_data = response.json()
-        pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
+        pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0][
+            "GeoObject"
+        ]["Point"]["pos"]
         longitude, latitude = pos.split()
         return latitude, longitude
     else:
@@ -147,9 +147,7 @@ async def get_price(distance, order_time, city=None, over_price=0) -> int:
     return int(total_price + over_price)
 
 
-
-
-# OSRM 
+# OSRM
 async def calculate_osrm_route(*coordinates):
     """
     Вычисление маршрута с использованием OSRM для любого количества точек.
@@ -180,14 +178,20 @@ async def calculate_osrm_route(*coordinates):
 
                 time_coefficient = 1.6  # коэффициент для более точного времени доставки
 
-                if data.get('routes'):
-                    total_distance = data['routes'][0].get('distance', 0) / 1000  # расстояние в километрах
-                    total_duration = data['routes'][0].get('duration')  # время в секундах
+                if data.get("routes"):
+                    total_distance = (
+                        data["routes"][0].get("distance", 0) / 1000
+                    )  # расстояние в километрах
+                    total_duration = data["routes"][0].get(
+                        "duration"
+                    )  # время в секундах
 
                     # Проверяем, что total_duration не является None
                     if total_duration is not None:
                         total_duration /= 60  # переводим в минуты
-                        return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
+                        return int(math.ceil(total_distance)), int(
+                            math.ceil(total_duration * time_coefficient)
+                        )
                     else:
                         print("Ошибка: Продолжительность маршрута не найдена")
                         return None, None

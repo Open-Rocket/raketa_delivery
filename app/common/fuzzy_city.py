@@ -14,8 +14,7 @@ async def find_most_compatible_response(response: str, scenarios: list) -> str:
     :return: Сценарий с наибольшей совместимостью
     """
     most_compatible_response = max(
-        scenarios,
-        key=lambda scenario: fuzz.ratio(response.lower(), scenario.lower())
+        scenarios, key=lambda scenario: fuzz.ratio(response.lower(), scenario.lower())
     )
     return most_compatible_response
 

@@ -11,11 +11,15 @@ load_dotenv()
 password = os.getenv("ADMIN_PASSWORD")
 
 # Настройка логгера для одного сообщения на логический блок
-logging.basicConfig(level=logging.INFO, format='--------------------\n%(message)s\n--------------------')
+logging.basicConfig(
+    level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
+)
 logger = logging.getLogger(__name__)
 
-async def check_state_and_handle_message(state: str, event: Message, handler: Callable,
-                                         data: Dict[str, Any]) -> Any:
+
+async def check_state_and_handle_message(
+    state: str, event: Message, handler: Callable, data: Dict[str, Any]
+) -> Any:
     message_text = event.text
 
     # Обработка команды /start в любом состоянии
@@ -27,8 +31,19 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
         await event.delete()
         return
 
-    if state in (UserState.reg_Name.state, UserState.reg_City.state, UserState.reg_tou.state):
-        if message_text in ["/order", "/profile", "/my_orders", "/faq", "/rules", "/become_courier"]:
+    if state in (
+        UserState.reg_Name.state,
+        UserState.reg_City.state,
+        UserState.reg_tou.state,
+    ):
+        if message_text in [
+            "/order",
+            "/profile",
+            "/my_orders",
+            "/faq",
+            "/rules",
+            "/become_courier",
+        ]:
             await event.delete()
             return
 
@@ -46,9 +61,14 @@ async def check_state_and_handle_message(state: str, event: Message, handler: Ca
     # Обработка сообщения в случае, если ни одно состояние не совпало
     return await handler(event, data)
 
+
 class OuterMiddleware(BaseMiddleware):
-    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject, data: Dict[str, Any]) -> Any:
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
 
         fsm_context = data.get("state")
         state = await fsm_context.get_state() if fsm_context else "No state"
@@ -73,9 +93,14 @@ class OuterMiddleware(BaseMiddleware):
 
             return await handler(event, data)
 
+
 class InnerMiddleware(BaseMiddleware):
-    async def __call__(self, handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-                       event: TelegramObject, data: Dict[str, Any]) -> Any:
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
 
         fsm_context = data.get("state")
         state = await fsm_context.get_state() if fsm_context else "No state"

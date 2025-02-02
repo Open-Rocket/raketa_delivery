@@ -12,7 +12,9 @@ class MessageHandler:
         previous_message_id = data.get("previous_message_id")
         if previous_message_id:
             try:
-                await self.bot.delete_message(chat_id=chat_id, message_id=previous_message_id)
+                await self.bot.delete_message(
+                    chat_id=chat_id, message_id=previous_message_id
+                )
             except Exception as e:
                 print(f"Failed to delete the previous message: {e}")
 
