@@ -9,10 +9,10 @@ from aiogram import filters
 
 from app.c_pack.c_middlewares import logger
 from app.common.coords_and_price import (
-    calculate_osrm_route,
     get_coordinates,
     get_price,
     calculate_total_distance,
+    get_rout,
 )
 from app.common.fuzzy_city import find_most_compatible_response
 from app.database.models import OrderStatus
@@ -380,13 +380,6 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
     handler = MessageHandler(state, callback_query.bot)
     text = (
-        "✔︎ <b>Укажите в описании к заказу:</b>\n\n"
-        "<b>Город:</b> <i>*если нужно</i>\n"
-        "<b>Адреса доставки:</b> <i>*обязательно</i>\n"
-        "<b>Предмет доставки:</b> <i>*обязательно</i>\n"
-        "<b>Имя получателя:</b> <i>*желательно</i>\n"
-        "<b>Номер получателя:</b> <i>*желательно</i>\n"
-        "<b>Комментарии курьеру:</b> <i>*если нужно</i>\n\n"
         "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
         "заказ будет оформлен в считанные секунды.</i>"
     )
@@ -1072,6 +1065,7 @@ async def process_message(message: Message, state: FSMContext):
 
     # Инициализация переменных
     reply_kb = await get_user_kb(text="voice_order_accept")
+    rerecord_kb = await get_user_kb(text="rerecord")
     moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
         tzinfo=None, microsecond=0
     )
@@ -1096,13 +1090,18 @@ async def process_message(message: Message, state: FSMContext):
     if not recognized_text:
 
         recognized_text = new_message
-        new_message = await message.answer(recognized_text, reply_markup=reply_kb)
+        new_message = await message.answer(
+            text="Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
+            reply_markup=rerecord_kb,
+            disable_notification=True,
+        )
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
         return
 
-        # Обработка для разрешенных заказов (обычные товары)
+    # Обработка для разрешенных заказов (обычные товары)
     addresses = await get_parsed_addresses(recognized_text, user_city)
+
     if len(addresses) == 2:
         pickup_address, delivery_address = addresses
         pickup_coords = await get_coordinates(pickup_address)
@@ -1110,18 +1109,10 @@ async def process_message(message: Message, state: FSMContext):
         all_coordinates = [pickup_coords, delivery_coords]
 
         if all(pickup_coords) and all(delivery_coords):
-            # Продолжение обработки заказа
-            yandex_maps_url = (
-                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
-                f"~{delivery_coords[0]},{delivery_coords[1]}&rtt=auto"
-            )
-            pickup_point = (
-                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
-                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
-            )
-            delivery_point = (
-                f"https://yandex.ru/maps/?ll={delivery_coords[1]},{delivery_coords[0]}"
-                f"&pt={delivery_coords[1]},{delivery_coords[0]}&z=14"
+
+            # Формирование координат
+            yandex_maps_url, pickup_point, delivery_point = await get_rout(
+                pickup_coords, [delivery_coords]
             )
 
             distance, duration = await calculate_total_distance(all_coordinates)
@@ -1207,23 +1198,10 @@ async def process_message(message: Message, state: FSMContext):
         all_coordinates = [pickup_coords, delivery_coords_1, delivery_coords_2]
 
         if all(pickup_coords) and all(delivery_coords_1) and (delivery_coords_2):
-            # Продолжение обработки заказа
-            yandex_maps_url = (
-                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
-                f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
-                f"~{delivery_coords_2[0]},{delivery_coords_2[1]}&rtt=auto"
-            )
-            pickup_point = (
-                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
-                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
-            )
-            delivery_point_1 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
-                f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
-            )
-            delivery_point_2 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
-                f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
+
+            # Формирование координат
+            yandex_maps_url, pickup_point, delivery_point_1, delivery_point_2 = (
+                await get_rout(pickup_coords, [delivery_coords_1, delivery_coords_2])
             )
 
             distance, duration = await calculate_total_distance(all_coordinates)
@@ -1286,7 +1264,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Стоимость доставки:</b> {price + (price * 0.07)}₽\n\n"
                 f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
@@ -1321,30 +1299,16 @@ async def process_message(message: Message, state: FSMContext):
             and all(delivery_coords_2)
             and all(delivery_coords_3)
         ):
-            # Формирование ссылки для маршрута на Яндекс.Картах
-            yandex_maps_url = (
-                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
-                f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
-                f"~{delivery_coords_2[0]},{delivery_coords_2[1]}"
-                f"~{delivery_coords_3[0]},{delivery_coords_3[1]}&rtt=auto"
-            )
 
-            # Ссылки на точки на карте
-            pickup_point = (
-                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
-                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
-            )
-            delivery_point_1 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
-                f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
-            )
-            delivery_point_2 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
-                f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
-            )
-            delivery_point_3 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_3[1]},{delivery_coords_3[0]}"
-                f"&pt={delivery_coords_3[1]},{delivery_coords_3[0]}&z=14"
+            # Формирование координат
+            (
+                yandex_maps_url,
+                pickup_point,
+                delivery_point_1,
+                delivery_point_2,
+                delivery_point_3,
+            ) = await get_rout(
+                pickup_coords, [delivery_coords_1, delivery_coords_2, delivery_coords_3]
             )
 
             # Рассчет дистанции и продолжительности
@@ -1415,7 +1379,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Стоимость доставки:</b> {price + (price * 0.1)}₽\n\n"
                 f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
@@ -1459,37 +1423,23 @@ async def process_message(message: Message, state: FSMContext):
             and all(delivery_coords_3)
             and all(delivery_coords_4)
         ):
-            # Формирование ссылки для маршрута на Яндекс.Картах
-            yandex_maps_url = (
-                f"https://yandex.ru/maps/?rtext={pickup_coords[0]},{pickup_coords[1]}"
-                f"~{delivery_coords_1[0]},{delivery_coords_1[1]}"
-                f"~{delivery_coords_2[0]},{delivery_coords_2[1]}"
-                f"~{delivery_coords_3[0]},{delivery_coords_3[1]}"
-                f"~{delivery_coords_4[0]},{delivery_coords_4[1]}&rtt=auto"
+            # Формирование координат
+            (
+                yandex_maps_url,
+                pickup_point,
+                delivery_point_1,
+                delivery_point_2,
+                delivery_point_3,
+                delivery_point_4,
+            ) = await get_rout(
+                pickup_coords,
+                [
+                    delivery_coords_1,
+                    delivery_coords_2,
+                    delivery_coords_3,
+                    delivery_coords_4,
+                ],
             )
-
-            # Ссылки на точки на карте
-            pickup_point = (
-                f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
-                f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
-            )
-            delivery_point_1 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_1[1]},{delivery_coords_1[0]}"
-                f"&pt={delivery_coords_1[1]},{delivery_coords_1[0]}&z=14"
-            )
-            delivery_point_2 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_2[1]},{delivery_coords_2[0]}"
-                f"&pt={delivery_coords_2[1]},{delivery_coords_2[0]}&z=14"
-            )
-            delivery_point_3 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_3[1]},{delivery_coords_3[0]}"
-                f"&pt={delivery_coords_3[1]},{delivery_coords_3[0]}&z=14"
-            )
-            delivery_point_4 = (
-                f"https://yandex.ru/maps/?ll={delivery_coords_4[1]},{delivery_coords_4[0]}"
-                f"&pt={delivery_coords_4[1]},{delivery_coords_4[0]}&z=14"
-            )
-
             # Рассчет дистанции и продолжительности
             distance, duration = await calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
@@ -1565,7 +1515,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 5:</b> <a href='{delivery_point_4}'>{destination_point_e}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Стоимость доставки:</b> {price + (price * 0.15)}₽\n\n"
                 f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
@@ -1580,20 +1530,18 @@ async def process_message(message: Message, state: FSMContext):
                 disable_notification=True,
                 parse_mode="HTML",
             )
-
     elif len(addresses) > 5:
         new_message = await message.answer(
             text=f"<b>Слишком много пунктов</b> 𐒀 \n\nМы не оформляем доставки с более чем 5 адресами, "
             "так как курьер может запутаться и не выполнить ваш заказ!",
-            reply_markup=reply_kb,
+            reply_markup=rerecord_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
-
     else:
         new_message = await message.answer(
-            text=f"Ваш заказ ✍︎\n\n{recognized_text}\n\nПроверьте ваш заказ и разместите его, если всё верно.",
-            reply_markup=reply_kb,
+            text="Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
+            reply_markup=rerecord_kb,
             disable_notification=True,
         )
 

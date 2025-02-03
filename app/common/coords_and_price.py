@@ -120,23 +120,23 @@ async def get_price(distance, order_time, city=None, over_price=0) -> int:
 
     # Коэффициент на основе времени заказа
     if 0 <= order_time.hour < 6:
-        time_coefficient = 1.1  # Ночью наибольший
+        time_coefficient = 1.2  # Ночью наибольший
     elif 6 <= order_time.hour < 12:
         time_coefficient = 1  # Утро стандартное
     elif 12 <= order_time.hour < 18:
-        time_coefficient = 1  # Днем стандартное
+        time_coefficient = 1.15  # Днем повышенный
     else:
-        time_coefficient = 1.05  # Вечером выше
+        time_coefficient = 1.1  # Вечером выше среднего
 
     # Коэффициент на основе дистанции
     if distance <= 5:
         distance_coefficient = 1
     elif 5 < distance <= 10:
-        distance_coefficient = 0.8
+        distance_coefficient = 0.9
     elif 10 < distance <= 20:
-        distance_coefficient = 0.7
+        distance_coefficient = 0.8
     else:
-        distance_coefficient = 0.6
+        distance_coefficient = 0.7
 
     # Общий коэффициент
     total_coefficient = city_coefficient * time_coefficient * distance_coefficient
@@ -147,157 +147,23 @@ async def get_price(distance, order_time, city=None, over_price=0) -> int:
     return int(total_price + over_price)
 
 
-# OSRM
-async def calculate_osrm_route(*coordinates):
-    """
-    Вычисление маршрута с использованием OSRM для любого количества точек.
-    :param coordinates: пары (latitude, longitude) для каждой точки.
-    :return: общая дистанция в км и общее время в минутах для всего маршрута.
-    """
-    if len(coordinates) < 2:
-        print("Необходимо как минимум две точки для расчета маршрута.")
-        return None, None
+async def get_rout(pickup_coords: tuple, delivery_coords: list) -> tuple:
+    pickup_point = (
+        f"https://yandex.ru/maps/?ll={pickup_coords[1]},{pickup_coords[0]}"
+        f"&pt={pickup_coords[1]},{pickup_coords[0]}&z=14"
+    )
 
-    # Создаем URL для запроса, соединяя все координаты через точку с запятой
-    coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
-    url = f"http://localhost:5001/route/v1/driving/{coord_str}?overview=false"  # Изменен порт на 5001
+    # Формируем маршрутную ссылку
+    route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
+        f"{coord[0]},{coord[1]}" for coord in delivery_coords
+    ]
+    yandex_maps_url = f"https://yandex.ru/maps/?rtext={'~'.join(route_points)}&rtt=auto"
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                if response.status != 200:
-                    print(f"Ошибка: {response.status}, Ответ: {await response.text()}")
-                    return None, None
+    # Формируем ссылки на точки доставки
+    delivery_points = [
+        f"https://yandex.ru/maps/?ll={coord[1]},{coord[0]}"
+        f"&pt={coord[1]},{coord[0]}&z=14"
+        for coord in delivery_coords
+    ]
 
-                # Проверяем, что ответ не пустой и данные в формате JSON
-                try:
-                    data = await response.json()
-                except ValueError:
-                    print("Ошибка: Невозможно декодировать JSON ответ")
-                    return None, None
-
-                time_coefficient = 1.6  # коэффициент для более точного времени доставки
-
-                if data.get("routes"):
-                    total_distance = (
-                        data["routes"][0].get("distance", 0) / 1000
-                    )  # расстояние в километрах
-                    total_duration = data["routes"][0].get(
-                        "duration"
-                    )  # время в секундах
-
-                    # Проверяем, что total_duration не является None
-                    if total_duration is not None:
-                        total_duration /= 60  # переводим в минуты
-                        return int(math.ceil(total_distance)), int(
-                            math.ceil(total_duration * time_coefficient)
-                        )
-                    else:
-                        print("Ошибка: Продолжительность маршрута не найдена")
-                        return None, None
-                else:
-                    print("Маршрут не найден")
-                    return None, None
-    except Exception as e:
-        print(f"Произошла ошибка: {e}")
-        return None, None
-
-
-# async def calculate_osrm_route(*coordinates):
-#     """
-#     Вычисление маршрута с использованием OSRM для любого количества точек.
-#     :param coordinates: пары (latitude, longitude) для каждой точки.
-#     :return: общая дистанция в км и общее время в минутах для всего маршрута.
-#     """
-#     if len(coordinates) < 2:
-#         print("Необходимо как минимум две точки для расчета маршрута.")
-#         return None, None
-#
-#     # Создаем URL для запроса, соединяя все координаты через точку с запятой
-#     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
-#     url = f"http://localhost:5000/route/v1/driving/{coord_str}?overview=false"  # Укажите адрес вашего сервера OSRM
-#
-#     try:
-#         response = requests.get(url)  # Запрос к вашему серверу OSRM
-#         if response.status_code != 200:
-#             print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
-#             return None, None
-#
-#         # Проверяем, что ответ не пустой и данные в формате JSON
-#         try:
-#             data = response.json()
-#         except ValueError:
-#             print("Ошибка: Невозможно декодировать JSON ответ")
-#             return None, None
-#
-#         time_coefficient = 1.6  # коэфициент для более точного времени доставки
-#
-#         if data.get('routes'):
-#             total_distance = data['routes'][0].get('distance', 0) / 1000  # расстояние в километрах
-#             total_duration = data['routes'][0].get('duration')  # время в секундах
-#
-#             # Проверяем, что total_duration не является None
-#             if total_duration is not None:
-#                 total_duration /= 60  # переводим в минуты
-#                 return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
-#             else:
-#                 print("Ошибка: Продолжительность маршрута не найдена")
-#                 return None, None
-#         else:
-#             print("Маршрут не найден")
-#             return None, None
-#     except Exception as e:
-#         print(f"Произошла ошибка: {e}")
-#         return None, None
-
-
-# async def calculate_osrm_route(*coordinates):
-#     """
-#     Вычисление маршрута с использованием OSRM для любого количества точек.
-#     :param coordinates: пары (latitude, longitude) для каждой точки.
-#     :return: общая дистанция в км и общее время в минутах для всего маршрута.
-#     """
-#     if len(coordinates) < 2:
-#         print("Необходимо как минимум две точки для расчета маршрута.")
-#         return None, None
-#
-#     # Создаем URL для запроса, соединяя все координаты через точку с запятой
-#     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
-#     url = f"https://router.project-osrm.org/route/v1/driving/{coord_str}?overview=false"
-#
-#     response = requests.get(url)
-#     data = response.json()
-#     time_coefficient = 1.6  # коэфициент для более точного времени доставки
-#
-#     if response.status_code == 200:
-#         if data['routes']:
-#             total_distance = data['routes'][0]['distance'] / 1000  # расстояние в километрах
-#             total_duration = data['routes'][0]['duration'] / 60  # время в минутах
-#             return int(math.ceil(total_distance)), int(math.ceil(total_duration * time_coefficient))
-#         else:
-#             print("Маршрут не найден")
-#             return None, None
-#     else:
-#         print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
-#         return None, None
-
-
-# async def calculate_osrm_route(pickup_latitude, pickup_longitude, delivery_latitude, delivery_longitude):
-#     url = (f"https://router.project-osrm.org/route/v1/driving/{pickup_longitude},{pickup_latitude};"
-#            f"{delivery_longitude},{delivery_latitude}?overview=false")
-#
-#     response = requests.get(url)
-#     data = response.json()
-#     time_coefficient = 1.6
-#
-#     if response.status_code == 200:
-#         if data['routes']:
-#             distance = data['routes'][0]['distance'] / 1000  # расстояние в километрах
-#             duration = data['routes'][0]['duration'] / 60  # время в минутах
-#             return int(math.ceil(distance)), int(math.ceil(duration * time_coefficient))
-#         else:
-#             print("Маршрут не найден")
-#             return None, None
-#     else:
-#         print(f"Ошибка: {response.status_code}, Ответ: {response.text}")
-#         return None, None
+    return (yandex_maps_url, pickup_point, *delivery_points)
