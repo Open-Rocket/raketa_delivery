@@ -962,9 +962,8 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
         # Удаляем предыдущее сообщение курьера
         await handler.delete_previous_message(callback_query.message.chat.id)
 
-        # Очищаем состояние после завершения заказа
-        logger.info(f"Очистка состояния после завершения заказа {current_order_id}")
-        await state.clear()
+        # Устанавливаем состояние курьера в начальное состояние
+        await state.set_state(CourierState.default)
 
         # Удаляем уведомление заказчику через 15 минут
         await asyncio.sleep(900)
