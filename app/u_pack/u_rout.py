@@ -70,7 +70,9 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
         await state.set_state(UserState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
-        new_message = await message.answer(text)
+        new_message = await message.answer(
+            text, parse_mode="HTML", disable_notification=True
+        )
         await handler.handle_new_message(new_message, message)
         return
     else:
@@ -349,14 +351,7 @@ async def cmd_order(message: Message, state: FSMContext):
         await state.update_data(read_info=True)
         await state.set_state(UserState.ai_voice_order)
         text = (
-            "✔︎ <b>Укажите в описании к заказу:</b>\n\n"
-            "<b>Город:</b> <i>*если нужно</i>\n"
-            "<b>Адреса доставки:</b> <i>*обязательно</i>\n"
-            "<b>Предмет доставки:</b> <i>*обязательно</i>\n"
-            "<b>Имя получателя:</b> <i>*желательно</i>\n"
-            "<b>Номер получателя:</b> <i>*желательно</i>\n"
-            "<b>Комментарии курьеру:</b> <i>*если нужно</i>\n\n"
-            "<i>*Вы можете отрпвить как голосовое сообщение так и текстовое, "
+            "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             "заказ будет оформлен в считанные секунды.</i>"
         )
 
@@ -556,161 +551,143 @@ async def handle_my_orders(event, state: FSMContext):
     )
 )
 async def get_orders(callback_query: CallbackQuery, state: FSMContext):
-    # Если пользователь листает заказы (вперёд или назад)
     data = await state.get_data()
 
-    if callback_query.data == "next_order" or callback_query.data == "prev_order":
+    # Переключение между заказами (если нажали "следующий" или "предыдущий")
+    if callback_query.data in {"next_order", "prev_order"}:
         counter = data.get("counter", 0)
-        total_orders = len(data.get("orders_text", []))
-
-        if callback_query.data == "next_order":
-            counter = (
-                counter + 1
-            ) % total_orders  # Циклический переход к следующему заказу
-        elif callback_query.data == "prev_order":
-            counter = (
-                counter - 1
-            ) % total_orders  # Циклический переход к предыдущему заказу
-
-        await state.update_data(counter=counter)
         orders_text = data.get("orders_text", [])
-        reply_kb = await get_user_kb(text="one_my_order")
+
+        if not orders_text:
+            await callback_query.answer("Нет доступных заказов.", show_alert=True)
+            return
+
+        total_orders = len(orders_text)
+        counter = (
+            (counter + 1) % total_orders
+            if callback_query.data == "next_order"
+            else (counter - 1) % total_orders
+        )
+        await state.update_data(counter=counter)
+
         await callback_query.message.edit_text(
             orders_text[counter],
-            reply_markup=reply_kb,
-            parse_mode="HTML",
+            reply_markup=await get_user_kb(text="one_my_order"),
             disable_notification=True,
+            parse_mode="HTML",
         )
         return
 
-    # Основная логика получения заказов
-    order_type = callback_query.data
+    # Определение типа заказа
+    order_status_mapping = {
+        "pending_orders": (
+            order_data.get_pending_orders,
+            UserState.myOrders_pending,
+            "ожидающих",
+        ),
+        "active_orders": (
+            order_data.get_active_orders,
+            UserState.myOrders_active,
+            "активных",
+        ),
+        "canceled_orders": (
+            order_data.get_canceled_orders,
+            UserState.myOrders_canceled,
+            "отменённых",
+        ),
+        "completed_orders": (
+            order_data.get_completed_orders,
+            UserState.myOrders_completed,
+            "завершённых",
+        ),
+    }
+
+    get_orders_func, state_status, status_text = order_status_mapping.get(
+        callback_query.data, (None, None, "")
+    )
+    if not get_orders_func:
+        await callback_query.answer("Ошибка запроса заказов.", show_alert=True)
+        return
+
+    # Получение заказов пользователя
     user_tg_id = callback_query.from_user.id
+    user_orders = await get_orders_func(user_tg_id)
 
-    if order_type == "pending_orders":
-        user_orders = await order_data.get_pending_orders(user_tg_id)
-        await state.set_state(UserState.myOrders_pending)
-        keyboard_type = "pending_orders"
-        status_text = "ожидающих"
-    elif order_type == "active_orders":
-        user_orders = await order_data.get_active_orders(user_tg_id)
-        await state.set_state(UserState.myOrders_active)
-        keyboard_type = "active_orders"
-        status_text = "активных"
-    elif order_type == "canceled_orders":
-        user_orders = await order_data.get_canceled_orders(user_tg_id)
-        await state.set_state(UserState.myOrders_canceled)
-        keyboard_type = "canceled_orders"
-        status_text = "отмененных"
-    elif order_type == "completed_orders":
-        user_orders = await order_data.get_completed_orders(user_tg_id)
-        await state.set_state(UserState.myOrders_completed)
-        keyboard_type = "completed_orders"
-        status_text = "завершенных"
+    await state.set_state(state_status)
+    await state.update_data(orders={order.order_id: order for order in user_orders})
 
-    orders_dict = {order.order_id: order for order in user_orders}
-    await state.update_data(orders=orders_dict)
+    def format_address(number, address, url):
+        return f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
 
-    def format_address(number, address, name, phone, url):
-        return (
-            f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
-            f"<b>Имя:</b> {name if name else '-'}\n"
-            f"<b>Телефон:</b> {phone if phone else '-'}\n\n"
-        )
-
+    # Формирование текста для каждого заказа
     orders_text = []
-    for order in user_orders:
+    for index, order in enumerate(user_orders, start=1):
         base_info = (
-            f"{user_orders.index(order) + 1}/{len(user_orders)}\n\n"
+            f"<b>{index}/{len(user_orders)}</b>\n"
+            f"<b>Заказ: №{order.order_id}</b>\n"
+            f"---------------------------------------------\n\n"
+            f"<b>Город:</b> {order.order_city}\n\n"
             f"<b>Заказ №{order.order_id}</b>\n"
             f"<b>Дата оформления:</b> {order.created_at_moscow_time}\n"
-            f"<b>Статус заказа:</b> {order.order_status.value}\n"
-            f"---------------------------------------------\n"
-            f"<b>Город:</b> {order.order_city}\n\n"
-            f"{format_address(1, order.starting_point_a, order.sender_name, order.sender_phone, order.a_url)}"
+            f"<b>Статус заказа:</b> {order.order_status.value}\n\n"
+            f"<b>Заказчик:</b> {order.customer_name if order.customer_name else '-'}\n"
+            f"<b>Телефон:</b> {order.customer_phone if order.customer_phone else '-'}\n\n"
         )
 
-        if order.destination_point_b:
-            base_info += format_address(
-                2,
-                order.destination_point_b,
-                order.receiver_name_1,
-                order.receiver_phone_1,
-                order.b_url,
-            )
-        if order.destination_point_c:
-            base_info += format_address(
-                3,
-                order.destination_point_c,
-                order.receiver_name_2,
-                order.receiver_phone_2,
-                order.c_url,
-            )
-        if order.destination_point_d:
-            base_info += format_address(
-                4,
-                order.destination_point_d,
-                order.receiver_name_3,
-                order.receiver_phone_3,
-                order.d_url,
-            )
-        if order.destination_point_e:
-            base_info += format_address(
-                5,
-                order.destination_point_e,
-                order.receiver_name_4,
-                order.receiver_phone_4,
-                order.e_url,
-            )
+        base_info += format_address(1, order.starting_point_a, order.a_url)
 
-        counter = 0
-        current_order_id = user_orders[counter].order_id
+        delivery_points = [
+            (order.destination_point_b, order.b_url),
+            (order.destination_point_c, order.c_url),
+            (order.destination_point_d, order.d_url),
+            (order.destination_point_e, order.e_url),
+        ]
+
+        for i, (point, url) in enumerate(delivery_points, start=2):
+            if point:
+                base_info += format_address(i, point, url)
+
+        # Информация о курьере
         courier_name, courier_phone = await order_data.get_order_courier_info(
-            current_order_id
+            order.order_id
         )
+
         base_info += (
-            f"<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n\n"
+            f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n"
             f"<b>Расстояние:</b> {order.distance_km} км\n"
-            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n"
+            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
+            f"<b>Курьер:</b> {courier_name if courier_name else '-'}\n"
+            f"<b>Телефон курьера:</b> {courier_phone if courier_phone else '-'}\n\n"
+            f"<b>Описание:</b> <i>{order.description if order.description else '...'}</i>\n\n"
             f"---------------------------------------------\n"
-            f"✰ <b>Курьер</b>\n"
-            f"Имя: {courier_name}\n"
-            f"Номер: {courier_phone}\n"
-            f"---------------------------------------------\n"
-            f"<b>Комментарии:</b> <i>{'*'}{order.comments if order.comments else '...'}</i>\n\n"
-            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут</a>\n\n"
+            f"• Проверьте ваш заказ и если всё верно, то разместите.\n"
+            f"• Курьер может связаться с вами для уточнения деталей!\n"
+            f"• Оплачивайте курьеру наличными или переводом.\n\n"
+            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n\n"
         )
 
         orders_text.append(base_info)
 
+    # Если заказов нет
     if not orders_text:
-        handler = MessageHandler(state, callback_query.message)
-        await handler.delete_previous_message(callback_query.message.chat.id)
-        text = f"У вас нет {status_text} заказов."
-        reply_kb = await get_user_kb(text="one_my_order")
         await callback_query.message.edit_text(
-            text, reply_markup=reply_kb, disable_notification=True
+            f"У вас нет {status_text} заказов.",
+            reply_markup=await get_user_kb(text="one_my_order"),
+            disable_notification=True,
         )
         return
 
-    await state.update_data(
-        orders_text=orders_text, counter=counter, current_order_id=current_order_id
+    # Сохранение данных и отправка первого заказа
+    await state.update_data(orders_text=orders_text, counter=0)
+    reply_kb = await get_user_kb(
+        text="one_my_order" if len(orders_text) == 1 else callback_query.data
     )
 
-    if order_type == "pending_orders":
-        reply_kb = await get_user_kb(
-            text="one_my_pending" if len(orders_text) == 1 else keyboard_type
-        )
-    else:
-        reply_kb = await get_user_kb(
-            text="one_my_order" if len(orders_text) == 1 else keyboard_type
-        )
-
     await callback_query.message.edit_text(
-        orders_text[counter],
+        orders_text[0],
         reply_markup=reply_kb,
-        parse_mode="HTML",
         disable_notification=True,
+        parse_mode="HTML",
     )
 
 
@@ -1048,19 +1025,43 @@ async def ai_answer(message: Message, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-# form_Order
 @users_router.message(
     filters.StateFilter(UserState.ai_voice_order),
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
 )
 async def process_message(message: Message, state: FSMContext):
-    await state.set_state(UserState.waiting_Courier)
-
+    handler = MessageHandler(state, message.bot)
     wait_message = await message.answer(
         f"Заказ обрабатывается, подождите ...", disable_notification=True
     )
 
-    handler = MessageHandler(state, message.bot)
+    try:
+        await asyncio.wait_for(
+            process_order_logic(message, state, handler, wait_message), timeout=120
+        )
+    except asyncio.TimeoutError:
+        await wait_message.delete()
+        new_message = await message.answer(
+            "⚠ Время обработки заказа превышено. Попробуйте снова.",
+            reply_markup=await get_user_kb(text="rerecord"),
+            disable_notification=True,
+        )
+        await handler.handle_new_message(new_message, message)
+    except Exception as e:
+        await wait_message.delete()
+        new_message = await message.answer(
+            f"⚠ Ошибка при обработке заказа: {str(e)}",
+            reply_markup=await get_user_kb(text="rerecord"),
+            disable_notification=True,
+        )
+        await handler.handle_new_message(new_message, message)
+
+
+# form_Order
+async def process_order_logic(
+    message: Message, state: FSMContext, handler, wait_message
+):
+    await state.set_state(UserState.waiting_Courier)
     await handler.delete_previous_message(message.chat.id)
 
     # Инициализация переменных
@@ -1170,7 +1171,7 @@ async def process_message(message: Message, state: FSMContext):
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
                 f"<b>Стоимость доставки:</b> {price}₽\n\n"
-                f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
+                f"<b>Описание:</b> {description if description else '...'}\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
                 f"• Курьер может связаться с вами для уточнения деталей!\n"
@@ -1206,7 +1207,7 @@ async def process_message(message: Message, state: FSMContext):
 
             distance, duration = await calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=50)
+            price = await get_price(distance, moscow_time, over_price=70)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1264,8 +1265,8 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price + (price * 0.07)}₽\n\n"
-                f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
+                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Описание:</b> {description if description else '...'}\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
                 f"• Курьер может связаться с вами для уточнения деталей!\n"
@@ -1314,7 +1315,7 @@ async def process_message(message: Message, state: FSMContext):
             # Рассчет дистанции и продолжительности
             distance, duration = await calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=50)
+            price = await get_price(distance, moscow_time, over_price=90)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1379,8 +1380,8 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price + (price * 0.1)}₽\n\n"
-                f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
+                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Описание:</b> {description if description else '...'}\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
                 f"• Курьер может связаться с вами для уточнения деталей!\n"
@@ -1443,7 +1444,7 @@ async def process_message(message: Message, state: FSMContext):
             # Рассчет дистанции и продолжительности
             distance, duration = await calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=50)
+            price = await get_price(distance, moscow_time, over_price=120)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1515,8 +1516,8 @@ async def process_message(message: Message, state: FSMContext):
                 f"⦿ <b>Адрес 5:</b> <a href='{delivery_point_4}'>{destination_point_e}</a>\n\n"
                 f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
                 f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price + (price * 0.15)}₽\n\n"
-                f"<b>Описание:</b> <i>{'*'}{description if description else '...'}</i>\n\n"
+                f"<b>Стоимость доставки:</b> {price}₽\n\n"
+                f"<b>Описание:</b> {description if description else '...'}\n\n"
                 f"---------------------------------------------\n"
                 f"• Проверьте ваш заказ и если все верно, то разместите.\n"
                 f"• Курьер может связаться с вами для уточнения деталей!\n"

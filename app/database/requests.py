@@ -229,7 +229,7 @@ class OrderData:
                 select(Order).where(Order.order_id == order_id)
             )
             if order:
-                return order.sender_phone
+                return order.customer_phone
             else:
                 raise ValueError("Заказ не найден")
 
@@ -286,7 +286,7 @@ class OrderData:
                     delivery_object=data.get("delivery_object"),
                     customer_name=data.get("customer_name"),
                     customer_phone=data.get("customer_phone"),
-                    order_text=data.get("order_text"),
+                    description=data.get("description"),
                     distance_km=data.get("distance_km"),
                     duration_min=data.get("duration_min"),
                     price_rub=data.get("price_rub"),
@@ -443,7 +443,7 @@ class OrderData:
         courier_lat: float,
         courier_lon: float,
         radius_km: float,
-    ):
+    ) -> list:
         async with async_session_factory() as session:
             orders_query = await session.execute(
                 select(Order).where(

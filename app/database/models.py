@@ -205,11 +205,10 @@ class Order(Base):
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
 
-    comments: Mapped[textData]
+    description: Mapped[textData]
     distance_km: Mapped[floatData]
     duration_min: Mapped[intData]
     price_rub: Mapped[intData]
-    order_text = Mapped[textData]
     created_at_moscow_time: Mapped[datetime] = mapped_column(
         DateTime, default=moscow_time, nullable=True
     )

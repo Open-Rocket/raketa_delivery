@@ -100,11 +100,11 @@ async def parse_response(response: str) -> dict:
 
 async def process_order_text(order_text: str) -> dict | str | None:
     # Проверяем текст заказа на цензуру
-    response_assist = await assistant_censure(order_text)
+    # response_assist = await assistant_censure(order_text)
 
     # Если заказ не прошел проверку, возвращаем None
-    if response_assist in ("censure", "zero"):
-        return response_assist
+    # if response_assist in ("censure", "zero"):
+    # return response_assist
 
     # Если заказ прошел проверку, формируем JSON с извлеченными данными
     prompt = (

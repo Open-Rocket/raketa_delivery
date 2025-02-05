@@ -120,13 +120,13 @@ async def get_price(distance, order_time, city=None, over_price=0) -> int:
 
     # Коэффициент на основе времени заказа
     if 0 <= order_time.hour < 6:
-        time_coefficient = 1.2  # Ночью наибольший
+        time_coefficient = 1.15  # Ночью наибольший
     elif 6 <= order_time.hour < 12:
         time_coefficient = 1  # Утро стандартное
     elif 12 <= order_time.hour < 18:
-        time_coefficient = 1.15  # Днем повышенный
+        time_coefficient = 1.1  # Днем повышенный
     else:
-        time_coefficient = 1.1  # Вечером выше среднего
+        time_coefficient = 1.07  # Вечером выше среднего
 
     # Коэффициент на основе дистанции
     if distance <= 5:
