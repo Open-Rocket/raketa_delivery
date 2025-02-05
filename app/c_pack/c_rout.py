@@ -748,6 +748,7 @@ async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
                 f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
             )
 
+            # Список адресов
             delivery_points = [
                 (order.destination_point_b, order.b_url),
                 (order.destination_point_c, order.c_url),
