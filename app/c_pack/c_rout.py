@@ -399,7 +399,7 @@ async def get_location(message: Message, state: FSMContext) -> None:
             f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
             f"<b>Расстояние:</b> {order.distance_km} км\n"
             f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-            f"<b>Описание:</b> <i>{'*'}{order.description if order.description else '...'}</i>\n\n"
+            f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
             f"---------------------------------------------\n"
             f"• Принимайте оплату наличными или переводом.\n\n"
             f"<a href='{order.full_rout}'>Маршрут доставки</a>\n\n"
@@ -627,184 +627,119 @@ async def cmd_my_orders(event, state: FSMContext):
 )
 async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    courier_tg_id = callback_query.from_user.id
 
+    # Если курьер листает заказы (вперёд или назад)
     if callback_query.data in {"next_order", "prev_order"}:
         counter = data.get("counter", 0)
         orders_text = data.get("orders_text", [])
-        total_orders = len(orders_text)
 
-        if total_orders == 0:
-            await callback_query.answer("Нет доступных заказов.", show_alert=True)
-            logger.warning(
-                f"Курьер {courier_tg_id} пытается прокрутить заказы, но у него их нет."
+        # Переключение по заказам (вперёд или назад) с циклическим зацикливанием
+        if orders_text:
+            total_orders = len(orders_text)
+            if callback_query.data == "next_order":
+                counter = (counter + 1) % total_orders
+            elif callback_query.data == "prev_order":
+                counter = (counter - 1) % total_orders
+
+            await state.update_data(counter=counter)
+            reply_kb = await get_courier_kb(text="one_my_order")
+            await callback_query.message.edit_text(
+                orders_text[counter],
+                reply_markup=reply_kb,
+                parse_mode="HTML",
+                disable_notification=True,
             )
-            return
-
-        counter = (
-            (counter + 1) % total_orders
-            if callback_query.data == "next_order"
-            else (counter - 1) % total_orders
-        )
-        await state.update_data(counter=counter)
-        logger.info(
-            f"Курьер {courier_tg_id} прокрутил заказ на {counter+1}/{total_orders}."
-        )
-
-        reply_kb = await get_courier_kb(
-            text="active_one" if data.get("status") == "active" else "complete_one"
-        )
-
-        await callback_query.message.edit_text(
-            orders_text[counter],
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-            disable_notification=True,
-        )
         return
 
+    # Основная логика получения заказов
     order_type = callback_query.data
-    order_status_mapping = {
-        "active_orders": (
-            order_data.get_active_orders,
-            CourierState.myOrders_active,
-            "активных",
-            "active",
-        ),
-        "completed_orders": (
-            order_data.get_completed_orders,
-            CourierState.myOrders_completed,
-            "завершённых",
-            "completed",
-        ),
-    }
+    courier_tg_id = callback_query.from_user.id
 
-    get_orders_func, state_status, status_text, status_key = order_status_mapping.get(
-        order_type, (None, None, "", "")
+    if order_type == "active_orders":
+        courier_orders = await order_data.get_active_orders(courier_tg_id)
+        await state.set_state(CourierState.myOrders_active)
+        status_text = "активных"
+    elif order_type == "completed_orders":
+        courier_orders = await order_data.get_completed_orders(courier_tg_id)
+        await state.set_state(CourierState.myOrders_completed)
+        status_text = "завершенных"
+
+    # Проверяем наличие заказов и настраиваем клавиатуру соответственно
+    num_orders = len(courier_orders)
+    if num_orders == 0:
+        text = f"У вас нет {status_text} заказов."
+        reply_kb = await get_courier_kb(text="empty_orders")
+        await callback_query.message.edit_text(
+            text, reply_markup=reply_kb, disable_notification=True
+        )
+        return
+    elif num_orders == 1:
+        keyboard_type = (
+            "active_one" if order_type == "active_orders" else "complete_one"
+        )
+    else:
+        keyboard_type = (
+            "active_orders" if order_type == "active_orders" else "complete_orders"
+        )
+
+    # Формируем текст для каждого заказа с учетом нового формата
+    orders_text = []
+    orders_dict = {}  # Храним заказы в виде словаря с ID в качестве ключей
+    for index, order in enumerate(courier_orders, start=1):
+        order_forma = (
+            f"<b>{index}/{len(courier_orders)}</b>\n"  # Добавляем индекс заказа
+            f"<b>Заказ: №{order.order_id}</b>\n"
+            f"---------------------------------------------\n\n"
+            f"<b>Город:</b> {order.order_city}\n\n"
+            f"<b>Заказчик:</b> {order.customer_name if order.customer_name else '-'}\n"
+            f"<b>Телефон:</b> {order.customer_phone if order.customer_phone else '-'}\n\n"
+            f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
+        )
+
+        # Добавляем дополнительные адреса
+        delivery_points = [
+            (order.destination_point_b, order.b_url),
+            (order.destination_point_c, order.c_url),
+            (order.destination_point_d, order.d_url),
+            (order.destination_point_e, order.e_url),
+        ]
+
+        for i, (point, url) in enumerate(delivery_points, start=2):
+            if point:
+                order_forma += f"⦿ <b>Адрес {i}:</b> <a href='{url}'>{point}</a>\n"
+
+        order_forma += (
+            f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
+            f"<b>Расстояние:</b> {order.distance_km} км\n"
+            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
+            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
+            f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
+            f"---------------------------------------------\n"
+            f"• Принимайте оплату наличными или переводом.\n\n"
+            f"⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n"
+        )
+
+        orders_text.append(order_forma)
+        orders_dict[order.order_id] = order  # Сохраняем каждый заказ по его ID
+
+    # Устанавливаем данные для состояния
+    counter = 0
+    current_order_id = courier_orders[counter].order_id
+    await state.update_data(
+        orders_text=orders_text,
+        orders=orders_dict,
+        counter=counter,
+        current_order_id=current_order_id,
     )
 
-    if not get_orders_func:
-        await callback_query.answer("Ошибка запроса заказов.", show_alert=True)
-        logger.error(
-            f"Неизвестный запрос типа {order_type} от курьера {courier_tg_id}."
-        )
-        return
-
-    try:
-        # Получаем все заказы для курьера
-        courier_orders = await get_orders_func(courier_tg_id)
-        logger.info(
-            f"Курьер {courier_tg_id} получил {len(courier_orders)} заказов из БД."
-        )
-
-        if not courier_orders:
-            await callback_query.message.edit_text(
-                f"У вас нет {status_text} заказов.",
-                reply_markup=await get_courier_kb(text="go_back"),
-                disable_notification=True,
-            )
-            return
-
-        filtered_orders = []
-        for order in courier_orders:
-            logger.info(
-                f"Обрабатываю заказ {order.order_id}, статус: {order.order_status}"
-            )
-
-            if order.order_status == (
-                OrderStatus.IN_PROGRESS
-                if status_key == "active"
-                else OrderStatus.COMPLETED
-            ):
-                filtered_orders.append(order)
-            else:
-                logger.warning(
-                    f"Заказ {order.order_id} пропущен, его статус не соответствует {status_key}."
-                )
-
-        if not filtered_orders:
-            await callback_query.message.edit_text(
-                f"У вас нет {status_text} заказов.",
-                reply_markup=await get_courier_kb(text="go_back"),
-                disable_notification=True,
-            )
-            logger.info(
-                f"Курьер {courier_tg_id} не имеет заказов с нужным статусом {status_key}."
-            )
-            return
-
-        await state.set_state(state_status)
-
-        # Формируем текст для заказов
-        orders_text = []
-        for index, order in enumerate(filtered_orders, start=1):
-            order_forma = (
-                f"<b>{index}/{len(filtered_orders)}</b>\n"
-                f"<b>Заказ: №{order.order_id}</b>\n"
-                f"---------------------------------------------\n\n"
-                f"<b>Город:</b> {order.order_city}\n\n"
-                f"<b>Заказчик:</b> {order.customer_name}\n"
-                f"<b>Телефон:</b> {order.customer_phone}\n\n"
-                f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
-            )
-
-            # Список адресов
-            delivery_points = [
-                (order.destination_point_b, order.b_url),
-                (order.destination_point_c, order.c_url),
-                (order.destination_point_d, order.d_url),
-                (order.destination_point_e, order.e_url),
-            ]
-
-            for i, (point, url) in enumerate(delivery_points, start=2):
-                if point:
-                    order_forma += f"⦿ <b>Адрес {i}:</b> <a href='{url}'>{point}</a>\n"
-
-            order_forma += (
-                f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
-                f"<b>Расстояние:</b> {order.distance_km} км\n"
-                f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-                f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
-                f"---------------------------------------------\n"
-                f"• Принимайте оплату наличными или переводом.\n\n"
-                f"⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n"
-            )
-
-            orders_text.append(order_forma)
-
-        # Сохраняем обновленные данные в состоянии
-        await state.update_data(orders_text=orders_text, counter=0)
-        logger.info(
-            f"Для курьера {courier_tg_id} подготовлено {len(orders_text)} заказов."
-        )
-
-        reply_kb = await get_courier_kb(
-            text=(
-                "active_one"
-                if status_key == "active" and len(orders_text) == 1
-                else (
-                    "active_orders"
-                    if status_key == "active"
-                    else "complete_one" if len(orders_text) == 1 else "complete_orders"
-                )
-            )
-        )
-
-        # Отправляем первый заказ или сообщение о пустом статусе
-        await callback_query.message.edit_text(
-            orders_text[0],
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-            disable_notification=True,
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Ошибка при обработке заказов для курьера {courier_tg_id}: {str(e)}"
-        )
-        await callback_query.answer(
-            "Произошла ошибка при загрузке заказов. Попробуйте позже.", show_alert=True
-        )
+    # Устанавливаем соответствующую клавиатуру
+    reply_kb = await get_courier_kb(text=keyboard_type)
+    await callback_query.message.edit_text(
+        orders_text[counter],
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+        disable_notification=True,
+    )
 
 
 @couriers_router.callback_query(F.data == "my_statistic")
@@ -907,7 +842,7 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
 
-    logger.info(f"Состояние перед завершением заказа: {data}")
+    # logger.info(f"Состояние перед завершением заказа: {data}")
     logger.info(f"current_order_id: {current_order_id}")
 
     # Проверка наличия активного заказа
