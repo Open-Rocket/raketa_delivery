@@ -1,7 +1,14 @@
 import asyncio
-from app.u_pack.u_ai_assistant import assistant_censure
+import logging
+from app.u_pack.u_ai_assistant import AssistantAi
+
+assistant = AssistantAi()
+logger = logging.getLogger(__name__)
 
 messages = [
+    (
+        "Забрать заказ нужно в Москве, на проспекте Вернадского, дом 76, корпус 2. Отправить на улицу Академика Анохина, дом 20. В коробке находится одежда. Получателем будет Иван, его номер — 89991234567. Очень важно, чтобы курьер доставил заказ до 18:00  Спасибо!"
+    ),
     # Чистый заказ
     (
         "Нужно забрать букет цветов на улице Цветочная, дом 8, Санкт-Петербург и доставить к дому 24 на улице Ленина. "
@@ -51,21 +58,15 @@ messages = [
     ),
 ]
 
-no_item_test1 = "Нужно сделать доставку с улицы Лобачевского 92 корпус 2 на станцию метро Маяковская"
-no_item_test2 = "Нужно сделать доставку с улицы Херсонская 43 на Рыбный переулок дом 3"
-no_item_test3 = "Нужно сделать 10 отжиманий с утра"
-no_item_test4 = "Нужно сделать утипу акипи аляля секс шпекс пулапекс атубату"
-no_item_test5 = "ываывьтпдылвпдлытьудп"
-no_item_test6 = (
-    "Нужно сделать доставку из Изингарда в Мордор, доставлять будем кольцо всевластия"
-)
-no_item_test7 = "Нужно доставить коробку с котятами с улицы Лобачевского 92 корпус 2 на станцию метро Маяковская"
-no_item_test8 = "Нужно доставить документы из Москвы в Санкт-Петербург"
 
 
-async def print_answer(msg):
-    answer = await assistant_censure(no_item_test7)
-    print(answer)
+
+async def get_assistant_response():
+    assistant_response = assistant.process_order(messages[0], city="Москва")
+    logger.info(f"Response: {assistant_response}")
 
 
-asyncio.run(print_answer(messages))
+asyncio.run(get_assistant_response)
+
+
+# python ./u_pack/testing_assistant.py 

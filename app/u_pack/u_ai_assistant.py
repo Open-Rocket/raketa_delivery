@@ -37,20 +37,8 @@ class AssistantAi:
         return completion.choices[0].message.content
     
 
-    async def _get_parsed_addresses(self, form: dict, city: str) -> list:
+    async def _get_parsed_addresses(self, response) -> list:
 
-        city_form = form.get("city")
-        city = city_form if city_form else city
-
-        prompt = (
-            "Пожалуйста, извлеки из этой формы все адреса в следующем формате:\n"
-            "Город (обязательно), Тип объекта: улица, поселок, деревня, село, аэропорт, вокзал, станция, станция метро и т.д., "
-            "Название объекта, номер улицы или дома, город или населенный пункт).\n"
-            "addresses: [(Передай в этот список кортеж из адресов по указанному формату)]\n"
-            f"text: {city + ' ' if city else ''}{form} - извлеки отсюда только адреса.\n"
-        )
-
-        response = await self._get_gpt_text(prompt)
 
         address_pattern = re.compile(r"\((.*?)\)")
         matches = address_pattern.findall(response)
@@ -62,50 +50,31 @@ class AssistantAi:
 
         return addresses
 
-
-    async def _parse_response(self, request: str) -> dict:
-        try:
-            json_start = request.find("{")
-            json_end = request.rfind("}") + 1
-            clean_response = request[json_start:json_end]
-            json_response = json.loads(clean_response)
-
-            return json_response
-        except json.JSONDecodeError as error:
-            logger.info(f"Ошибка при разборе JSON ответа от модели: {error}")
-            return {}
-
     
-    async def process_order(self, order_text: str, city: str) -> tuple[dict, list] | None:
-
-
-        prompt = (
-            f"Пожалуйста, извлеките и структурируйте следующую информацию "
-            f"о заказе в формате JSON без дополнительных комментариев и текстов, "
-            f"если о чем то нет информации то обязательно ничего не заполняй,\n"
-            f"если нужно возвращаться из определенной точки в одну из предыдущих, "
-            f"то указывай точку возврата, полным его адресом (как в тексте), как следующую. "
-            f"Обрати внимание на тот факт если пользователь просит вернуться обратно, то есть ABA - маршрут, "
-            f"но ты заполняй как ABC\n"
-            f"Заказ: \n{order_text}\n\n"
-            f"Строго в формате JSON:\n"
-            f"{{\n"
-            f'  "City": ,\n'
-            f'  "Starting point A": "Первый пункт доставки",\n'
-            f'  "Destination point B": "Второй пункт доставки",\n'
-            f'  "Destination point C": "Третий пункт доставки",\n'
-            f'  "Destination point D": "Четвертый пункт доставки",\n'
-            f'  "Destination point E": "Пятый пункт доставки",\n'
-            f'  "Delivery object": "Объект доставки",\n'
-            f'  "Description": "Опиши грамотно и полностью заказ"\n'
-            f"}}"
+    async def process_order(self, order_text: str, city: str = None) -> tuple[str, dict, str] | None:
+        
+        instruction = "Извлеки и структурируй следующую информацию о заказе без дополнительных комментариев и текстов"
+        only_city = "Извлеки только город заказа."
+        parsed_address = (
+            "Извлеки все адреса в следующем формате:\n"
+            "(Город (обязательно), Тип объекта: улица, поселок, деревня, село, аэропорт, вокзал, станция, станция метро и т.д., "
+            "Название объекта, номер улицы или дома, город или населенный пункт)\n"
         )
+        description = "Опиши грамотно и полностью заказ"
 
-        response = await self._get_gpt_text(prompt)
-        form = await self._parse_response(response)
-        addresses = await self._get_parsed_addresses(form, city)
+        request = {
+            "instruction": instruction,
+            "order_text": order_text,
+            "returned_data": {"city": only_city, "addresses": parsed_address, "description": description}
+        }
 
-        return form, addresses
+        response: dict = await self._get_gpt_text(request)
+        returned_data: dict = response.get("returned_data")
+        city = returned_data.get("city")
+        addresses = await self._get_parsed_addresses(returned_data.get("addresses"))
+        description = response.get("description")
+
+        return city, addresses, description
 
 
 
