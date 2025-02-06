@@ -19,16 +19,11 @@ from app.database.models import OrderStatus
 from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
 from app.u_pack.u_states import UserState
 from app.u_pack.u_kb import get_user_kb, get_my_orders_kb, get_switch
-from app.u_pack.u_ai_assistant import (
-    assistant_censure,
-    process_order_text,
-    get_parsed_addresses,
-)
+from app.u_pack.u_ai_assistant import AssistantAi
 
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
 
-# from app.u_pack.u_order_utills import (handle_censorship, handle_message_content, process_censorship_response)
 
 from app.database.requests import user_data, order_data
 
