@@ -13,6 +13,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class AssistantAi:
     def __init__(self):
         self.proxy = os.getenv("PROXY")
@@ -32,11 +33,15 @@ class AssistantAi:
 
             # logger.info(f"Sending request to GPT: {request}")
 
-
             completion = await self.client.chat.completions.create(
-                messages=[{"role": "system", "content": "Ты — ассистент по обработке заказов."},
-                          {"role": "user", "content": request}], 
-                          model=model
+                messages=[
+                    # {
+                    #     "role": "system",
+                    #     "content": "Ты — ассистент по обработке заказов.",
+                    # },
+                    {"role": "user", "content": request},
+                ],
+                model=model,
             )
             response_text = completion.choices[0].message.content
             # logger.info(f"\n-----\nGPT response: {response_text}\n-----")
@@ -56,7 +61,9 @@ class AssistantAi:
 
         return addresses
 
-    async def process_order(self, order_text: str, city: str = None) -> tuple[str, list, str] | None:
+    async def process_order(
+        self, order_text: str, city: str = None
+    ) -> tuple[str, list, str] | None:
 
         instruction = "Извлеки и структурируй следующую информацию о заказе без дополнительных комментариев и текстов."
         only_city = "Город заказа."
@@ -66,13 +73,19 @@ class AssistantAi:
             "(Город, улица, дом, корпус, индекс, если доступно). Например: 'Москва, проспект Вернадского, дом 76, корпус 2, 119333'. "
             "Убедись, что все элементы адреса извлечены корректно и без ошибок."
         )
-        description = "Опиши грамотно и полностью заказ."
+        description = "Опиши текстом, грамотно и полностью заказ."
+        delivery_object = "Извлеки только предмет доставки"
 
         request = {
             "instruction": instruction,
             "order_text": order_text,
             "order_city": if_not_city_use,
-            "returned_data": {"city": only_city, "addresses": parsed_address, "description": description}
+            "returned_data": {
+                "city": only_city,
+                "addresses": parsed_address,
+                "delivery_object": delivery_object,
+                "description": description,
+            },
         }
 
         messages_json = json.dumps(request, ensure_ascii=False)
@@ -87,8 +100,8 @@ class AssistantAi:
 
             response = json.loads(response_str)
 
-            city = response.get("city", "")  
-            addresses = response.get("addresses", [])  
+            city = response.get("city", "")
+            addresses = response.get("addresses", [])
             description = response.get("description", "")
 
             logger.info(f"\n-----\ncity: {city}\n-----")

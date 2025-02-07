@@ -11,6 +11,8 @@ from app.common.coords_and_price import (
     get_rout,
 )
 
+from app.database.requests import user_data, order_data
+
 
 assistant = AssistantAi()
 
@@ -43,6 +45,7 @@ async def get_order_form(city, addresses, description):
         coordinates = []
         address_links = []
         formatted_addresses = []
+        order_addresses_data = []
 
         for address in addresses:
             coords = await get_coordinates(address)
@@ -52,15 +55,17 @@ async def get_order_form(city, addresses, description):
                 address_links.append(maps_url)
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
 
+                order_addresses_data.append([coords, address])
+
+        logger.info(f"Order address data: {order_addresses_data}")
+
         if len(coordinates) >= 2:
-            yandex_maps_url, *route_points = await get_rout(
-                coordinates[0], coordinates[1:]
-            )
-            distance, duration = await calculate_total_distance(coordinates)
+            yandex_maps_url = await get_rout(coordinates[0], coordinates[1:])
+            distance = await calculate_total_distance(coordinates)
             distance = round(distance, 2)
             price = await get_price(distance, moscow_time)
 
-            address_text = "\n".join(
+            addresses_text = "\n".join(
                 [
                     f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
                     for i in range(len(formatted_addresses))
@@ -100,7 +105,7 @@ async def get_order_form(city, addresses, description):
                 f"<b>Город:</b> {city}\n\n"
                 f"<b>Заказчик:</b> {customer_name}\n"
                 f"<b>Телефон:</b> {customer_phone}\n\n"
-                f"{address_text}\n\n"
+                f"{addresses_text}\n\n"
                 f"<b>Расстояние:</b> {distance} км\n"
                 f"<b>Стоимость доставки:</b> {price}₽\n\n"
                 f"<b>Описание:</b> {description}\n\n"
@@ -110,8 +115,6 @@ async def get_order_form(city, addresses, description):
                 f"• Оплачивайте курьеру наличными или переводом.\n\n"
                 f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
             )
-
-            logger.info(f"Coords: {coordinates}")
 
             return order_forma
 
@@ -130,7 +133,7 @@ async def get_assistant_response():
 
     # logger.info(f"Response: {assistant_response}")
     logger.info(f"\n-----\nTime taken: {execution_time:.4f} seconds\n-----")
-    logger.info(f"\n-----\nOrder form: {form}\n-----")
+    logger.info(f"\n-----\nOrder form: \n{form}\n-----")
 
 
 asyncio.run(get_assistant_response())

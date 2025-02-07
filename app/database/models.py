@@ -55,6 +55,7 @@ floatData = Annotated[float, mapped_column(Float, nullable=True)]
 coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
 datetimeData = Annotated[datetime, mapped_column(DateTime, default=utc_time)]
+full_address_data = Annotated[list, mapped_column(JSONB, nullable=True)]
 
 
 # Enums
@@ -103,12 +104,6 @@ class OrderStatus(enum.Enum):
     CANCELLED = "Отменен"
 
 
-# class SubscriptionType(enum.Enum):
-#     ONE_DAY = 1
-#     TEN_DAYS = 10
-#     ONE_MONTH = 30
-
-
 # Tables
 
 
@@ -138,14 +133,6 @@ class Courier(Base):
     courier_default_city: Mapped[stringData]
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[stringData]
-    order_low_speed: Mapped[floatData]
-    order_max_speed: Mapped[floatData]
-    order_avg_speed: Mapped[floatData]
-
-    # courier_passport_photos: Mapped[List[str]] = mapped_column(ARRAY(String))
-
-    # courier_lat: Mapped[floatData]
-    # courier_lon: Mapped[floatData]
 
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
@@ -166,55 +153,18 @@ class Order(Base):
         Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"), nullable=True
     )
 
-    order_city: Mapped[stringData]
-
-    starting_point_a: Mapped[textData]
-    a_latitude: Mapped[floatData]
-    a_longitude: Mapped[floatData]
-    a_coordinates: Mapped[coordinates]
-    a_url: Mapped[stringData]
-
-    destination_point_b: Mapped[textData]
-    b_latitude: Mapped[floatData]
-    b_longitude: Mapped[floatData]
-    b_coordinates: Mapped[coordinates]
-    b_url: Mapped[stringData]
-
-    destination_point_c: Mapped[textData]
-    c_latitude: Mapped[floatData]
-    c_longitude: Mapped[floatData]
-    c_coordinates: Mapped[coordinates]
-    c_url: Mapped[stringData]
-
-    destination_point_d: Mapped[textData]
-    d_latitude: Mapped[floatData]
-    d_longitude: Mapped[floatData]
-    d_coordinates: Mapped[coordinates]
-    d_url: Mapped[stringData]
-
-    destination_point_e: Mapped[textData]
-    e_latitude: Mapped[floatData]
-    e_longitude: Mapped[floatData]
-    e_coordinates: Mapped[coordinates]
-    e_url: Mapped[stringData]
-
-    full_rout: Mapped[stringData]
-
-    delivery_object: Mapped[stringData]
-
-    customer_name: Mapped[stringData]
-    customer_phone: Mapped[stringData]
-
-    description: Mapped[textData]
-    distance_km: Mapped[floatData]
-    duration_min: Mapped[intData]
-    price_rub: Mapped[intData]
     created_at_moscow_time: Mapped[datetime] = mapped_column(
         DateTime, default=moscow_time, nullable=True
     )
-    completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    execution_speed: Mapped[float] = mapped_column(Float, nullable=True)
-    execution_time: Mapped[timedelta] = mapped_column(Interval, nullable=True)
+    order_city: Mapped[stringData]
+    customer_name: Mapped[stringData]
+    customer_phone: Mapped[stringData]
+    order_addresses_data: Mapped[full_address_data]
+    delivery_object: Mapped[stringData]
+    distance_km: Mapped[floatData]
+    price_rub: Mapped[intData]
+    description: Mapped[textData]
+    full_rout: Mapped[stringData]
 
     courier = relationship("Courier", back_populates="orders")
     user = relationship("User", back_populates="orders")

@@ -222,17 +222,6 @@ class OrderData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def get_order_customer_phone(self, order_id: int) -> str:
-        async with self.async_session_factory() as session:
-            # Предполагается, что есть таблица Order и связанная таблица User
-            order = await session.scalar(
-                select(Order).where(Order.order_id == order_id)
-            )
-            if order:
-                return order.customer_phone
-            else:
-                raise ValueError("Заказ не найден")
-
     async def get_order_customer_tg_id(self, order_id: int) -> int:
         async with self.async_session_factory() as session:
             # Ищем заказ по его ID
@@ -249,64 +238,30 @@ class OrderData:
             )  # предполагаем, что у объекта `order` есть поле `customer_tg_id`
             return customer_tg_id
 
-    async def create_order(self, user_tg_id: int, data: dict):
-        async with self.async_session_factory() as session:  # Открываем асинхронный сеанс
-            async with session.begin():  # Начинаем транзакцию
-                # Ищем пользователя по tg_id
-                user = await session.scalar(
-                    select(User).where(User.user_tg_id == user_tg_id)
-                )
-                if not user:
-                    raise ValueError("Пользователь не найден")
+    async def create_order(self, user_id: int, data: dict):
+        async with self.async_session_factory() as session:
+            async with session.begin():
 
-                # Создаем новый заказ на основе данных из состояния FSM
                 new_order = Order(
-                    user_id=user.user_id,
+                    user_id=user_id,
                     order_city=data.get("city"),
-                    starting_point_a=data.get("starting_point_a"),
-                    a_coordinates=data.get("a_coordinates"),
-                    a_latitude=data.get("a_latitude"),
-                    a_longitude=data.get("a_longitude"),
-                    a_url=data.get("a_url"),
-                    destination_point_b=data.get("destination_point_b"),
-                    b_coordinates=data.get("b_coordinates"),
-                    b_latitude=data.get("b_latitude"),
-                    b_longitude=data.get("b_longitude"),
-                    b_url=data.get("b_url"),
-                    destination_point_c=data.get("destination_point_c", None),
-                    c_coordinates=data.get("c_coordinates", None),
-                    c_latitude=data.get("c_latitude", None),
-                    c_longitude=data.get("c_longitude", None),
-                    c_url=data.get("c_url", None),
-                    destination_point_d=data.get("destination_point_d", None),
-                    d_coordinates=data.get("d_coordinates", None),
-                    d_latitude=data.get("d_latitude", None),
-                    d_longitude=data.get("d_longitude", None),
-                    d_url=data.get("d_url", None),
                     delivery_object=data.get("delivery_object"),
                     customer_name=data.get("customer_name"),
                     customer_phone=data.get("customer_phone"),
                     description=data.get("description"),
                     distance_km=data.get("distance_km"),
-                    duration_min=data.get("duration_min"),
                     price_rub=data.get("price_rub"),
                     created_at_moscow_time=data.get("order_time"),
                     full_rout=data.get("yandex_maps_url"),
                 )
 
-                # Добавляем новый заказ в сессию
                 session.add(new_order)
-
-                # Принудительно сохраняем изменения (чтобы объект привязался к сессии и получил ID)
                 await session.flush()
-
-                # Получаем ID заказа после flush
                 order_id = new_order.order_id
 
-            # Коммитим изменения
             await session.commit()
 
-        return order_id  # Возвращаем ID созданного заказа
+        return order_id
 
     async def assign_courier_to_order(self, order_id: int, courier_tg_id: int):
         async with self.async_session_factory() as session:
