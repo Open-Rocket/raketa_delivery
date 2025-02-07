@@ -24,7 +24,6 @@ from app.u_pack.u_ai_assistant import AssistantAi
 from app.common.message_handler import MessageHandler
 from app.common.titles import get_image_title_user
 
-
 from app.database.requests import user_data, order_data
 
 from datetime import datetime
@@ -702,10 +701,10 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     fastest_order_time = await order_data.get_fastest_order_time(user_tg_id) or 0
     longest_order_time = await order_data.get_longest_order_time(user_tg_id) or 0
     shortest_order_distance = (
-        await order_data.get_shortest_order_distance(user_tg_id) or 0
+            await order_data.get_shortest_order_distance(user_tg_id) or 0
     )
     longest_order_distance = (
-        await order_data.get_longest_order_distance(user_tg_id) or 0
+            await order_data.get_longest_order_distance(user_tg_id) or 0
     )
 
     # Если заказов нет, то процент успешных заказов будет 0
@@ -1054,7 +1053,7 @@ async def process_message(message: Message, state: FSMContext):
 
 # form_Order
 async def process_order_logic(
-    message: Message, state: FSMContext, handler, wait_message
+        message: Message, state: FSMContext, handler, wait_message
 ):
     await state.set_state(UserState.waiting_Courier)
     await handler.delete_previous_message(message.chat.id)
@@ -1084,7 +1083,6 @@ async def process_order_logic(
 
     # Если распознавание не удалось
     if not recognized_text:
-
         recognized_text = new_message
         new_message = await message.answer(
             text="Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
@@ -1290,10 +1288,10 @@ async def process_order_logic(
         ]
 
         if (
-            all(pickup_coords)
-            and all(delivery_coords_1)
-            and all(delivery_coords_2)
-            and all(delivery_coords_3)
+                all(pickup_coords)
+                and all(delivery_coords_1)
+                and all(delivery_coords_2)
+                and all(delivery_coords_3)
         ):
 
             # Формирование координат
@@ -1413,11 +1411,11 @@ async def process_order_logic(
         ]
 
         if (
-            all(pickup_coords)
-            and all(delivery_coords_1)
-            and all(delivery_coords_2)
-            and all(delivery_coords_3)
-            and all(delivery_coords_4)
+                all(pickup_coords)
+                and all(delivery_coords_1)
+                and all(delivery_coords_2)
+                and all(delivery_coords_3)
+                and all(delivery_coords_4)
         ):
             # Формирование координат
             (
@@ -1529,7 +1527,7 @@ async def process_order_logic(
     elif len(addresses) > 5:
         new_message = await message.answer(
             text=f"<b>Слишком много пунктов</b> 𐒀 \n\nМы не оформляем доставки с более чем 5 адресами, "
-            "так как курьер может запутаться и не выполнить ваш заказ!",
+                 "так как курьер может запутаться и не выполнить ваш заказ!",
             reply_markup=rerecord_kb,
             disable_notification=True,
             parse_mode="HTML",
