@@ -165,6 +165,9 @@ class Order(Base):
     price_rub: Mapped[intData]
     description: Mapped[textData]
     full_rout: Mapped[stringData]
+    order_status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus, native_enum=False), nullable=False
+    )
 
     courier = relationship("Courier", back_populates="orders")
     user = relationship("User", back_populates="orders")
