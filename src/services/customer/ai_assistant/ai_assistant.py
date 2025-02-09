@@ -1,16 +1,4 @@
-import os
-import re
-import httpx
-import json
-from openai import AsyncOpenAI
-from app.customer.customer_services import logger
-from dotenv import load_dotenv
-
-load_dotenv()
-
-PROXY = os.getenv("PROXY")
-OPENAI_API_KEY = os.getenv("OPENAI_API")
-AI_ASSISTANT_ID = os.getenv("AI_ASSISTANT_ID")
+from .__deps__ import *
 
 
 class AssistantAi:
@@ -117,3 +105,6 @@ class AssistantAi:
         except Exception as e:
             logger.error(f"Произошла ошибка: {e}")
             return None
+
+
+__all__ = ["AssistantAi"]

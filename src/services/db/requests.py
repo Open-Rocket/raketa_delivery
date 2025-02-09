@@ -1,14 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import select, update, delete, desc, func, extract, case
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
-from app.database.models import async_session_factory, moscow_time, Order, utc_time
-from app.database.models import User, Courier, OrderStatus
-from app.database.models import moscow_time
-from sqlalchemy import select, and_
-from app.customer.customer_services.coords_and_price import calculate_total_distance
+from .__deps__ import *
 
 
 class UserData:
@@ -550,3 +540,6 @@ class OrderData:
 user_data = UserData(async_session_factory)
 courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
+
+
+__all__ = ["user_data", "courier_data", "order_data"]

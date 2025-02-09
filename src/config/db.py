@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from .__deps__ import BaseSettings, SettingsConfigDict
 
 
 class SettingsDB(BaseSettings):
@@ -16,5 +16,7 @@ class SettingsDB(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 
-# Создание экземпляра настроек
-settings = SettingsDB()
+db_settings = SettingsDB()
+
+
+__all__ = ["db_settings"]

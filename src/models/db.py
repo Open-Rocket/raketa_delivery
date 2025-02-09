@@ -1,51 +1,4 @@
-import os
-from datetime import datetime, timedelta
-from typing import Optional, Annotated, List
-from sqlalchemy import (
-    ForeignKey,
-    String,
-    BigInteger,
-    Enum,
-    Boolean,
-    DateTime,
-    Text,
-    Float,
-    Date,
-    func,
-    MetaData,
-    text,
-    Table,
-    JSON,
-    Interval,
-)
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-    DeclarativeBase,
-    relationship,
-    MappedColumn,
-)
-from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
-from sqlalchemy import Column, Integer
-from dotenv import load_dotenv
-import enum
-import pytz
-
-from app.database.config_db import settings
-
-load_dotenv()
-
-sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
-engine = create_async_engine(
-    url=settings.DB_URL_asyncpg, echo=False
-)  # pool_size=5, max_overflow=10
-async_session_factory = async_sessionmaker(engine)
-
-moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
-    tzinfo=None, microsecond=0
-)
-utc_time = datetime.now(pytz.timezone("utc")).replace(tzinfo=None, microsecond=0)
+from .__deps__ import *
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
@@ -58,9 +11,6 @@ datetimeData = Annotated[datetime, mapped_column(DateTime, default=utc_time)]
 full_address_data = Annotated[list, mapped_column(JSONB, nullable=True)]
 
 
-# Enums
-
-
 class Base(AsyncAttrs, DeclarativeBase):
     repr_cols_num = 3
     repr_cols = tuple()
@@ -71,24 +21,6 @@ class Base(AsyncAttrs, DeclarativeBase):
             if col in self.repr_cols or idx < self.repr_cols_num:
                 cols.append(f"{col}={getattr(self, col)}")
         return f"<{self.__class__.__name__}{','.join(cols)}>"
-
-
-class AssociateTables:
-    # Ассоциативная таблица для связывания заказов и курьеров
-    order_courier_association = Table(
-        "order_courier_association",
-        Base.metadata,
-        Column("order_id", Integer, ForeignKey("orders.order_id")),
-        Column("courier_id", Integer, ForeignKey("users.user_id")),
-    )
-
-    # Ассоциативная таблица для связывания заказов и клиентов
-    order_customer_association = Table(
-        "order_customer_association",
-        Base.metadata,
-        Column("order_id", Integer, ForeignKey("orders.order_id")),
-        Column("customer_id", Integer, ForeignKey("users.user_id")),
-    )
 
 
 class Role(enum.Enum):
@@ -224,6 +156,17 @@ class DailyEvent(Base):
             f"DailyEvent(date={self.event_date}, total_orders={self.total_orders}, "
             f"completed_orders={self.completed_orders}, total_revenue={self.total_order_revenue})"
         )
+
+
+__all__ = [
+    "async_session_factory",
+    "User",
+    "Courier",
+    "Order",
+    "OrderStatus",
+    "Subscription",
+    "DailyEvent",
+]
 
 
 # Функция

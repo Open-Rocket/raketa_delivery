@@ -1,7 +1,7 @@
-from aiogram.fsm.state import StatesGroup, State
+from .__deps__ import *
 
 
-class UserState(StatesGroup):
+class CustomerState(StatesGroup):
     default = State()
 
     reg_state = State()
@@ -24,3 +24,6 @@ class UserState(StatesGroup):
     myOrders_completed = State()
     myOrders_canceled = State()
     assistant_run = State()
+
+
+__all__ = ["CustomerState"]

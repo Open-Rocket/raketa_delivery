@@ -1,0 +1,21 @@
+# Среда разработки
+.idea/
+.vscode/
+
+# Виртуальное окружение
+.venv/
+venv/
+
+# Кеши Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pycache/
+.pytest_cache/
+
+# Файлы окружения
+.env
+.env.local
+.env.*.local
+.test.env

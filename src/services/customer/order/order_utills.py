@@ -1,9 +1,4 @@
-import pytz
-from datetime import datetime
-
-from aiogram.enums import ContentType
-from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from .__deps__ import *
 
 from app.customer.customer_services.coords_and_price import (
     get_coordinates,
@@ -110,104 +105,6 @@ async def send_order_confirmation(message, structured_data, reply_kb):
         parse_mode="HTML",
         disable_notification=True,
     )
-
-
-async def handle_censorship(recognized_text):
-    censore_response = await assistant_censure(recognized_text)
-    censore_data = [
-        "clear",
-        "overprice",
-        "inaudible",
-        "no_item",
-        "censure",
-        "not_order",
-    ]
-    most_compatible_response = await find_most_compatible_response(
-        censore_response, censore_data
-    )
-    return most_compatible_response
-
-
-async def handle_order_flow(message, state):
-    reply_kb = await get_user_kb(text="voice_order_accept")
-    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
-        tzinfo=None, microsecond=0
-    )
-    tg_id = message.from_user.id
-    user_city = await user_data.get_user_city(tg_id)
-
-    # Обработка сообщения в зависимости от типа контента
-    recognized_text = None
-    if message.content_type == ContentType.VOICE:
-        recognized_text = await process_audio_message(message.bot, message.voice)
-    else:
-        recognized_text = await process_text_message(message.text)
-
-    if not recognized_text:
-        return await message.answer(
-            "Ошибка распознавания. Попробуйте снова.", reply_markup=reply_kb
-        )
-
-    # Проверка на цензуру
-    most_compatible_response = await handle_censorship(recognized_text)
-
-    if most_compatible_response == "clear":
-        structured_data = await get_order_data(
-            recognized_text, user_city, moscow_time, message, state
-        )
-        if structured_data:
-            await send_order_confirmation(message, structured_data, reply_kb)
-        else:
-            await message.answer(
-                "Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
-                reply_markup=reply_kb,
-            )
-
-    elif most_compatible_response == "overprice":
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="overprice")
-        await message.answer(
-            text="<b>Внимание</b>！Ваш заказ содержит табачные изделия или алкогольную продукцию. "
-            "<b>Доставка будет стоить немного дороже!</b>",
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-        )
-
-    elif most_compatible_response == "inaudible":
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="rerecord")
-        await message.answer(
-            "<b>Ошибка</b> ⸘\n\nТекст сообщения неразборчив. Попробуйте отправить заказ снова.",
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-        )
-
-    elif most_compatible_response == "no_item":
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="rerecord")
-        await message.answer(
-            "<b>Что везем?!</b> \n\nКурьер должен знать что он доставляет.",
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-        )
-
-    elif most_compatible_response == "not_order":
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="rerecord")
-        await message.answer(
-            "<b>...</b> 🫤 \n\nСделайте корректный заказ!",
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-        )
-
-    else:
-        await state.set_state(UserState.default)
-        reply_kb = await get_user_kb(text="rerecord")
-        await message.answer(
-            "<b>Отказ!!!</b> 🚫\n\nМы не можем это доставлять!",
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-        )
 
 
 async def handle_message_content(message: Message):

@@ -1,4 +1,5 @@
-import logging
+from .__deps__ import logging
+
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -7,3 +8,6 @@ handler.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 log.addHandler(handler)
+
+
+__all__ = ["log"]
