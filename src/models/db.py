@@ -1,4 +1,4 @@
-from .__deps__ import *
+from ._deps import *
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]

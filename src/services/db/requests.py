@@ -1,4 +1,4 @@
-from .__deps__ import *
+from ._deps import *
 
 
 class UserData:

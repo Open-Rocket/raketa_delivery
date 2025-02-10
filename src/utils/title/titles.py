@@ -1,0 +1,48 @@
+from ._deps import os, FSInputFile
+
+
+class Title:
+
+    @staticmethod
+    async def get_title_courier(command: str):
+        dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "title_images_courier"
+        )
+
+        paths = {
+            "/start": "courier_start.jpg",
+            "/run": "run.jpg",
+            "/profile": "courier_profile.jpg",
+            "/subs": "subs.jpg",
+            "/faq": "courier_faq.jpg",
+            "/ai": "courier_ai.jpg",
+            "on_way": "courier_on-the-way.jpg",
+            "success_payment": "success_payment.jpg",
+        }
+
+        img = os.path.join(dir, paths.get(command, ""))
+        if os.path.isfile(img):
+            return FSInputFile(img)
+
+        return None
+
+    @staticmethod
+    async def get_title_customer(command: str):
+        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "images")
+
+        paths = {
+            "/start": "user_start.jpg",
+            "/order": "order.jpg",
+            "/become_courier": "became_a_courier.jpg",
+        }
+
+        img = os.path.join(dir, paths.get(command, ""))
+        if os.path.isfile(img):
+            return FSInputFile(img)
+
+        return None
+
+
+title = Title()
+
+__all__ = ["title"]

@@ -3,6 +3,8 @@ from db import *
 from logger import *
 from ai import *
 from geocoder import *
+from payment import *
+from routers import *
 
 
 __all__ = [
@@ -14,4 +16,8 @@ __all__ = [
     "OPENAI_API_KEY",
     "AI_ASSISTANT_ID",
     "YANDEX_API_KEY",
+    "payment",
+    "customer",
+    "courier",
+    "payment_provider",
 ]

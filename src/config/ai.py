@@ -1,4 +1,4 @@
-from .__deps__ import os, load_dotenv
+from ._deps import os, load_dotenv
 
 load_dotenv()
 

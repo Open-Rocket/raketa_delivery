@@ -1,1 +1,1 @@
-from .__global__ import *
+from ._global import *
