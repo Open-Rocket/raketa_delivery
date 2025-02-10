@@ -1,20 +1,14 @@
-import logging
+from .__deps__ import *
+
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
-import os
-from dotenv import load_dotenv
 from app.u_pack.u_states import UserState
 
-# Загрузка переменных окружения
-load_dotenv()
-password = os.getenv("ADMIN_PASSWORD")
 
-# Настройка логгера для одного сообщения на логический блок
 logging.basicConfig(
     level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
 )
-logger = logging.getLogger(__name__)
 
 
 async def check_state_and_handle_message(
@@ -78,8 +72,8 @@ class OuterMiddleware(BaseMiddleware):
             message_text = event.text
 
             # Формируем лог-сообщение для OuterMiddleware
-            log_message = f"Users - 🧍\nOuter_mw\nUser message: {message_text}\nUser ID: {user_id}\nUser state previous: {state}"
-            logger.info(log_message)
+            log_message = f"Customer - 🧍\nOuter_mw\nUser message: {message_text}\Customer ID: {user_id}\Customer state previous: {state}"
+            log.info(log_message)
 
             result = await check_state_and_handle_message(state, event, handler, data)
             return result
@@ -88,8 +82,8 @@ class OuterMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             callback_data = event.data
 
-            log_message = f"Users - 🧍\nOuter_mw\nCallback data: {callback_data}\nUser ID: {user_id}\nUser state previous: {state}"
-            logger.info(log_message)
+            log_message = f"Customer - 🧍\nOuter_mw\nCallback data: {callback_data}\Customer ID: {user_id}\Customer state previous: {state}"
+            log.info(log_message)
 
             return await handler(event, data)
 
@@ -110,18 +104,18 @@ class InnerMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             message_text = event.text
 
-            log_message += f"Users - 🧍\nInner_mw\nUser message: {message_text}\nUser ID: {user_id}\nUser state previous: {state}"
+            log_message += f"Customer - 🧍\nInner_mw\nUser message: {message_text}\Customer ID: {user_id}\nUser state previous: {state}"
 
         elif isinstance(event, CallbackQuery):
             user_id = event.from_user.id
             callback_data = event.data
 
-            log_message += f"Users - 🧍\nInner_mw\nCallback data: {callback_data}\nUser ID: {user_id}"
+            log_message += f"Customer - 🧍\nInner_mw\nCallback data: {callback_data}\Customer ID: {user_id}"
 
         result = await handler(event, data)
 
         updated_state = await fsm_context.get_state() if fsm_context else "No state"
         log_message += f"\nUser state now: {updated_state}"
 
-        logger.info(log_message)
+        log.info(log_message)
         return result

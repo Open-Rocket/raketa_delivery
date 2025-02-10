@@ -1,4 +1,4 @@
 from ai_assistant import *
 
 
-__all__ = ["AssistantAi"]
+__all__ = ["assistant"]

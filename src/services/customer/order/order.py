@@ -1,3 +1,4 @@
+from .__deps__ import io, sr, AudioSegment, Message, ContentType, log
 from route import route_master
 
 
@@ -89,9 +90,44 @@ class OrderFormatter:
         )
 
 
-class OrderMessage
+class MessageRecognizer:
 
-order_formatter = OrderFormatter()
+    async def get_recognition_text(self, message: Message) -> str:
+        """Обрабатывает голосовое сообщение или текст и возвращает распознанный текст."""
+
+        if message.content_type == ContentType.VOICE:
+            voice = message.voice
+            file_info = await message.bot.get_file(voice.file_id)
+            file = await message.bot.download_file(file_info.file_path)
+            audio_data = io.BytesIO(file.read())  # Приведение к io.BytesIO
+            return await self._process_audio_data(audio_data)  # Вызов через cls
+        return message.text
+
+    async def _process_audio_data(self, audio_data: bytes) -> str:
+        """Распознаёт речь из аудиофайла."""
+
+        r = sr.Recognizer()
+
+        # Конвертация ogg -> wav
+        audio_segment = AudioSegment.from_file(audio_data, format="ogg")
+        audio_wav = io.BytesIO()
+        audio_segment.export(audio_wav, format="wav")
+        audio_wav.seek(0)
+
+        with sr.AudioFile(audio_wav) as source:
+            audio = r.record(source)
+            try:
+                return r.recognize_google(audio, language="ru-RU")
+            except (
+                sr.UnknownValueError,
+                sr.RequestError,
+            ) as e:
+                log.error(f"ERROR: {e}")
+                return f"Не удалось распознать речь"
 
 
-__all__ = ["order_formatter"]
+formatter = OrderFormatter()
+recognizer = MessageRecognizer()
+
+
+__all__ = ["formatter", "recognizer"]

@@ -3,6 +3,7 @@ from config import YANDEX_API_KEY
 
 __all__ = [
     "YANDEX_API_KEY",
+    "datetime",
     "urllib3",
     "requests",
     "datetime" "cos",
@@ -10,4 +11,5 @@ __all__ = [
     "sin",
     "sqrt",
     "atan2",
+    "cos",
 ]

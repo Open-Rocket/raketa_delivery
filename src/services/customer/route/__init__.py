@@ -1,4 +1,4 @@
 from route import *
 
 
-__all__ = ["route_master"]
+__all__ = ["route"]

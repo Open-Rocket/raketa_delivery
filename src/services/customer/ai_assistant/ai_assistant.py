@@ -107,4 +107,7 @@ class AssistantAi:
             return None
 
 
-__all__ = ["AssistantAi"]
+assistant = AssistantAi()
+
+
+__all__ = ["assistant"]

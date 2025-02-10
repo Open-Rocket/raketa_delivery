@@ -10,6 +10,27 @@ class RouteMaster:
     """
 
     @staticmethod
+    async def get_coordinates(address: str) -> tuple[str, str] | tuple[None, None]:
+        """
+        Получает координаты по адресу через API Яндекса.
+        :param address: строка с адресом
+        :return: кортеж (широта, долгота) или (None, None) при ошибке
+        """
+
+        base_url = "https://geocode-maps.yandex.ru/1.x/"
+        params = {"apikey": YANDEX_API_KEY, "geocode": address, "format": "json"}
+        response = requests.get(base_url, params=params)
+
+        if response.status_code == 200:
+            json_data = response.json()
+            pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0][
+                "GeoObject"
+            ]["Point"]["pos"]
+            longitude, latitude = pos.split()
+            return latitude, longitude
+        return None, None
+
+    @staticmethod
     async def calculate_total_distance(
         coordinates, adjustment_factor: int = 1.34
     ) -> int:
@@ -36,6 +57,19 @@ class RouteMaster:
             total_distance += distance
 
         return total_distance * adjustment_factor
+
+    @staticmethod
+    async def get_rout(pickup_coords: tuple, delivery_coords: list) -> str:
+        """
+        Генерирует URL маршрута на Яндекс.Картах.
+        :param pickup_coords: координаты точки отправки (широта, долгота)
+        :param delivery_coords: список координат точек доставки [(широта, долгота), ...]
+        :return: URL маршрута
+        """
+        route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
+            f"{coord[0]},{coord[1]}" for coord in delivery_coords
+        ]
+        return f"https://yandex.ru/maps/?rtext={'~'.join(route_points)}&rtt=auto"
 
     @staticmethod
     async def get_price(
@@ -75,42 +109,8 @@ class RouteMaster:
 
         return int(total_price + over_price)
 
-    @staticmethod
-    async def get_coordinates(address: str) -> tuple[str, str] | tuple[None, None]:
-        """
-        Получает координаты по адресу через API Яндекса.
-        :param address: строка с адресом
-        :return: кортеж (широта, долгота) или (None, None) при ошибке
-        """
 
-        base_url = "https://geocode-maps.yandex.ru/1.x/"
-        params = {"apikey": YANDEX_API_KEY, "geocode": address, "format": "json"}
-        response = requests.get(base_url, params=params)
-
-        if response.status_code == 200:
-            json_data = response.json()
-            pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0][
-                "GeoObject"
-            ]["Point"]["pos"]
-            longitude, latitude = pos.split()
-            return latitude, longitude
-        return None, None
-
-    @staticmethod
-    async def get_rout(pickup_coords: tuple, delivery_coords: list) -> str:
-        """
-        Генерирует URL маршрута на Яндекс.Картах.
-        :param pickup_coords: координаты точки отправки (широта, долгота)
-        :param delivery_coords: список координат точек доставки [(широта, долгота), ...]
-        :return: URL маршрута
-        """
-        route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
-            f"{coord[0]},{coord[1]}" for coord in delivery_coords
-        ]
-        return f"https://yandex.ru/maps/?rtext={'~'.join(route_points)}&rtt=auto"
+route = RouteMaster()
 
 
-route_master = RouteMaster()
-
-
-__all__ = ["route_master"]
+__all__ = ["route"]

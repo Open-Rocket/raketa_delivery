@@ -6,7 +6,10 @@ import urllib3
 import requests
 import sys
 import json
+import io
+import speech_recognition as sr
 
+from pydub import AudioSegment
 
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
@@ -141,4 +144,7 @@ __all__ = [
     "Message",
     "StatesGroup",
     "State",
+    "io",
+    "sr",
+    "AudioSegment",
 ]
