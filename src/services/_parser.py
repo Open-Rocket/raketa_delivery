@@ -1,4 +1,12 @@
-from imports import os, sys, json, fromstring, BasicParser, NetworkManager, FileCache
+from _dependencies import (
+    os,
+    sys,
+    json,
+    fromstring,
+    BasicParser,
+    NetworkManager,
+    FileCache,
+)
 from config import log
 
 

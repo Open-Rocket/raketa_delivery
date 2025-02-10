@@ -1,4 +1,4 @@
-from imports import (
+from _dependencies import (
     FSMContext,
     Message,
     LabeledPrice,

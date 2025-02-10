@@ -1,5 +1,6 @@
-from ._deps import io, sr, AudioSegment, Message, ContentType, log
-from route import route_master
+from _dependencies import io, sr, AudioSegment, Message, ContentType
+from router import route
+from config import log
 
 
 class OrderFormatter:
@@ -24,7 +25,7 @@ class OrderFormatter:
         order_addresses_data = []
 
         for address in addresses:
-            coords = await route_master.get_coordinates(address)
+            coords = await route.get_coordinates(address)
             if coords:
                 coordinates.append(coords)
                 maps_url = f"https://maps.yandex.ru/?text={address.replace(' ', '+')}"
@@ -35,9 +36,9 @@ class OrderFormatter:
         if len(coordinates) < 2:
             return {}
 
-        yandex_maps_url = await route_master.get_rout(coordinates[0], coordinates[1:])
-        distance = round(await route_master.calculate_total_distance(coordinates), 2)
-        price = await route_master.get_price(distance, time)
+        yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
+        distance = round(await route.calculate_total_distance(coordinates), 2)
+        price = await route.get_price(distance, time)
         addresses_text = "\n".join(
             [
                 f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
@@ -68,6 +69,7 @@ class OrderFormatter:
         distance: int,
         price: int,
         description: int,
+        yandex_maps_url: str,
     ) -> str:
         """Форматирует и возвращает текст заказа на основе подготовленных данных."""
 
@@ -86,7 +88,7 @@ class OrderFormatter:
             f"• Проверьте ваш заказ и если все верно, то разместите.\n"
             f"• Курьер может связаться с вами для уточнения деталей!\n"
             f"• Оплачивайте курьеру наличными или переводом.\n\n"
-            f"⦿⌁⦿ <a href='{data['yandex_maps_url']}'>Маршрут доставки</a>\n\n"
+            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
         )
 
 

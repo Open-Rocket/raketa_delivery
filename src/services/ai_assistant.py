@@ -1,4 +1,5 @@
-from ._deps import *
+from config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
+from _dependencies import AsyncOpenAI, httpx, re, json
 
 
 class AssistantAi:
@@ -34,7 +35,7 @@ class AssistantAi:
             # logger.info(f"\n-----\nGPT response: {response_text}\n-----")
             return response_text
         except Exception as e:
-            logger.error(f"Error in getting response from GPT: {e}")
+            log.error(f"Error in getting response from GPT: {e}")
             return None
 
     async def _get_parsed_addresses(self, response) -> list:
@@ -82,7 +83,7 @@ class AssistantAi:
             response_str = await self._get_gpt_text(messages_json)
 
             if not response_str:
-                logger.error("Empty response from GPT.")
+                log.error("Empty response from GPT.")
                 return None
 
             response: dict = json.loads(response_str)
@@ -99,11 +100,11 @@ class AssistantAi:
             return city, addresses, delivery_object, description
 
         except json.JSONDecodeError:
-            logger.error("Ошибка при парсинге JSON ответа от GPT.")
+            log.error("Ошибка при парсинге JSON ответа от GPT.")
             return None
 
         except Exception as e:
-            logger.error(f"Произошла ошибка: {e}")
+            log.error(f"Произошла ошибка: {e}")
             return None
 
 

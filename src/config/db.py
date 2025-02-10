@@ -1,4 +1,4 @@
-from ._deps import BaseSettings, SettingsConfigDict
+from _dependencies import BaseSettings, SettingsConfigDict
 
 
 class SettingsDB(BaseSettings):

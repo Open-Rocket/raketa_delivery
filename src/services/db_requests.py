@@ -1,4 +1,19 @@
-from ._deps import *
+from models import async_session_factory, User, Courier, OrderStatus, Order
+from router import route
+from config import moscow_time
+from _dependencies import (
+    async_session_factory,
+    User,
+    Courier,
+    OrderStatus,
+    Order,
+    datetime,
+    select,
+    selectinload,
+    and_,
+    func,
+    route,
+)
 
 
 class UserData:
@@ -418,7 +433,7 @@ class OrderData:
             available_orders = []
 
             for order in orders:
-                distance = calculate_distance(
+                distance = route.calculate_total_distance(
                     order.a_latitude, order.a_longitude, courier_lat, courier_lon
                 )
                 if distance <= radius_km:

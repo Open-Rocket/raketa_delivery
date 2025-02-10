@@ -1,4 +1,4 @@
-from imports import StatesGroup, State, logging
+from _dependencies import StatesGroup, State, logging
 from config import log
 
 

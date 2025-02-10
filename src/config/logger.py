@@ -1,4 +1,4 @@
-from ._deps import logging
+from _dependencies import logging
 
 
 log = logging.getLogger()

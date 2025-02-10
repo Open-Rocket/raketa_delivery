@@ -1,4 +1,4 @@
-from ._deps import pytz, datetime
+from _dependencies import pytz, datetime
 
 
 moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(

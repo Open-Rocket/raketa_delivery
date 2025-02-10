@@ -1,4 +1,4 @@
-from imports import StatesGroup, State
+from _dependencies import StatesGroup, State
 
 
 __all__ = ["StatesGroup", "State"]

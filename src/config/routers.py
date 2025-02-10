@@ -1,4 +1,4 @@
-from ._deps import Router
+from _dependencies import Router
 
 payment = Router()
 customer = Router()

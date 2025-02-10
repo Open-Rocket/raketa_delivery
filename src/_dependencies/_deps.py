@@ -9,6 +9,8 @@ import json
 import io
 import speech_recognition as sr
 import asyncio
+import httpx
+import re
 
 from openai import AsyncOpenAI
 from lxml.html import fromstring
@@ -86,6 +88,9 @@ from sqlalchemy import (
 
 __all__ = [
     "asyncio",
+    "httpx",
+    "re",
+    "httpx" "asyncio",
     "os",
     "enum",
     "pytz",
