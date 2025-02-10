@@ -1,6 +1,3 @@
-from models import async_session_factory, User, Courier, OrderStatus, Order
-from router import route
-from config import moscow_time
 from _dependencies import (
     async_session_factory,
     User,
@@ -14,6 +11,9 @@ from _dependencies import (
     func,
     route,
 )
+from config import moscow_time
+from models import async_session_factory, User, Courier, OrderStatus, Order
+from router import route
 
 
 class UserData:

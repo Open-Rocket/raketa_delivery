@@ -1,4 +1,39 @@
-from ._deps import *
+from _dependencies import (
+    os,
+    enum,
+    datetime,
+    Optional,
+    Annotated,
+    load_dotenv,
+    JSONB,
+    ARRAY,
+    AsyncAttrs,
+    async_sessionmaker,
+    create_async_engine,
+    Integer,
+    ForeignKey,
+    String,
+    BigInteger,
+    Enum,
+    Boolean,
+    DateTime,
+    Text,
+    Float,
+    Date,
+    func,
+    JSONB,
+    Mapped,
+    mapped_column,
+    DeclarativeBase,
+    relationship,
+)
+from config import db_settings, moscow_time
+
+load_dotenv()
+
+sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
+engine = create_async_engine(url=db_settings.DB_URL_asyncpg, echo=False)
+async_session_factory = async_sessionmaker(engine)
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]

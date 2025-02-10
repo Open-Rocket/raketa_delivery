@@ -5,9 +5,7 @@ class Title:
 
     @staticmethod
     async def get_title_courier(command: str):
-        dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "title_images_courier"
-        )
+        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "images")
 
         paths = {
             "/start": "courier_start.jpg",

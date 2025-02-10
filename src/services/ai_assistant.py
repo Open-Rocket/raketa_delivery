@@ -1,5 +1,5 @@
-from config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 from _dependencies import AsyncOpenAI, httpx, re, json
+from config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 
 
 class AssistantAi:

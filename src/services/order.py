@@ -1,6 +1,6 @@
 from _dependencies import io, sr, AudioSegment, Message, ContentType
-from router import route
 from config import log
+from router import route
 
 
 class OrderFormatter:
