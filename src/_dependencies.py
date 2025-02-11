@@ -1,37 +1,36 @@
 import os
+import re
+import io
+import sys
 import enum
 import pytz
+import json
+import httpx
+import asyncio
 import logging
 import urllib3
 import requests
-import sys
-import json
-import io
 import speech_recognition as sr
-import asyncio
-import httpx
-import re
 
-from openai import AsyncOpenAI
-from lxml.html import fromstring
-from pydub import AudioSegment
-from fuzzywuzzy import process, fuzz
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
+from pydub import AudioSegment
+from lxml.html import fromstring
+from fuzzywuzzy import process, fuzz
 from datetime import datetime, timedelta
-from typing import Optional, Annotated, List, Union, Callable, Dict, Any, Awaitable
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from math import cos, radians, sin, sqrt, atan2
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional, Annotated, List, Union, Callable, Dict, Any, Awaitable
 
+from parselab.cache import FileCache
 from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
-from parselab.cache import FileCache
 
-from aiogram import Router, BaseMiddleware, filters, F
-
-from aiogram.filters import CommandStart
 from aiogram.enums import ContentType
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram import Router, BaseMiddleware, filters, F
 from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
