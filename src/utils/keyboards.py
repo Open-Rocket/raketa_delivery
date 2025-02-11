@@ -1,10 +1,17 @@
-from ._deps import *
+from _dependencies import (
+    Message,
+    Optional,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 
 
 class Keyboard:
 
     @staticmethod
-    async def get_user_kb(
+    async def get_customer_kb(
         message: Optional[Message] = None,
         callback_data: Optional[str] = None,
         text: str = None,
@@ -192,7 +199,7 @@ class Keyboard:
                 return kb[text]
 
     @staticmethod
-    async def get_my_orders_kb(
+    async def get_customer_orders_kb(
         pending_count: int, active_count: int, canceled_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
         my_orders_kb = InlineKeyboardMarkup(
@@ -402,7 +409,7 @@ class Keyboard:
                 return kb[text]
 
     @staticmethod
-    async def get_my_orders_kb_courier(
+    async def get_courier_orders_kb(
         active_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
         my_orders_kb = InlineKeyboardMarkup(

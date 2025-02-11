@@ -9,5 +9,9 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 log.addHandler(handler)
 
+logging.basicConfig(
+    level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
+)
+
 
 __all__ = ["log"]

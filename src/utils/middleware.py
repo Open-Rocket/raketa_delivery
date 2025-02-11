@@ -1,9 +1,16 @@
-from ._deps import *
-
-from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Message, CallbackQuery
-from typing import Callable, Dict, Any, Awaitable
-from app.u_pack.u_states import UserState
+from _dependencies import (
+    BaseMiddleware,
+    logging,
+    TelegramObject,
+    Message,
+    CallbackQuery,
+    Callable,
+    Dict,
+    Any,
+    Awaitable,
+)
+from config import log
+from states import CustomerState
 
 
 logging.basicConfig(
@@ -21,14 +28,14 @@ async def check_state_and_handle_message(
         return await handler(event, data)
 
     # Проверка на каждое состояние пользователя
-    if state == UserState.reg_state.state:
+    if state == CustomerState.reg_state.state:
         await event.delete()
         return
 
     if state in (
-        UserState.reg_Name.state,
-        UserState.reg_City.state,
-        UserState.reg_tou.state,
+        CustomerState.reg_Name.state,
+        CustomerState.reg_City.state,
+        CustomerState.reg_tou.state,
     ):
         if message_text in [
             "/order",
@@ -41,14 +48,17 @@ async def check_state_and_handle_message(
             await event.delete()
             return
 
-    if state == UserState.reg_Phone.state or state == UserState.change_Phone.state:
+    if (
+        state == CustomerState.reg_Phone.state
+        or state == CustomerState.change_Phone.state
+    ):
         if event.content_type == "contact":  # Если тип контента - контакт
             return await handler(event, data)
         else:
             await event.delete()
             return
 
-    if state == UserState.waiting_Courier.state:
+    if state == CustomerState.waiting_Courier.state:
         await event.delete()
         return
 
@@ -56,7 +66,7 @@ async def check_state_and_handle_message(
     return await handler(event, data)
 
 
-class OuterMiddleware(BaseMiddleware):
+class CustomerOuterMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -88,7 +98,7 @@ class OuterMiddleware(BaseMiddleware):
             return await handler(event, data)
 
 
-class InnerMiddleware(BaseMiddleware):
+class CustomerInnerMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -119,3 +129,6 @@ class InnerMiddleware(BaseMiddleware):
 
         log.info(log_message)
         return result
+
+
+__all__ = ["CustomerOuterMiddleware", "CustomerInnerMiddleware"]

@@ -1,11 +1,11 @@
-from ._deps import os, FSInputFile
+from _dependencies import os, FSInputFile
 
 
 class Title:
 
     @staticmethod
     async def get_title_courier(command: str):
-        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "images")
+        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
 
         paths = {
             "/start": "courier_start.jpg",
@@ -26,7 +26,7 @@ class Title:
 
     @staticmethod
     async def get_title_customer(command: str):
-        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "images")
+        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
 
         paths = {
             "/start": "user_start.jpg",

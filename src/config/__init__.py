@@ -17,7 +17,9 @@ __all__ = [
     "AI_ASSISTANT_ID",
     "YANDEX_API_KEY",
     "payment",
-    "customer",
-    "courier",
+    "customer_r",
+    "courier_r",
+    "customer_fallback",
+    "courier_fallback",
     "payment_provider",
 ]

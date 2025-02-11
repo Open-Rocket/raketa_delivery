@@ -18,7 +18,7 @@ from pydub import AudioSegment
 from fuzzywuzzy import process, fuzz
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from typing import Optional, Annotated, List, Union
+from typing import Optional, Annotated, List, Union, Callable, Dict, Any, Awaitable
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from math import cos, radians, sin, sqrt, atan2
 
@@ -26,7 +26,9 @@ from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
 from parselab.cache import FileCache
 
-from aiogram import Router, F
+from aiogram import Router, BaseMiddleware, filters, F
+
+from aiogram.filters import CommandStart
 from aiogram.enums import ContentType
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -40,6 +42,7 @@ from aiogram.types import (
     PreCheckoutQuery,
     CallbackQuery,
     FSInputFile,
+    TelegramObject,
 )
 
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
@@ -87,6 +90,10 @@ from sqlalchemy import (
 
 
 __all__ = [
+    "filters",
+    "CommandStart",
+    "TelegramObject",
+    "BaseMiddleware",
     "asyncio",
     "httpx",
     "re",
@@ -175,4 +182,8 @@ __all__ = [
     "LabeledPrice",
     "PreCheckoutQuery",
     "CallbackQuery",
+    "Callable",
+    "Dict",
+    "Any",
+    "Awaitable",
 ]

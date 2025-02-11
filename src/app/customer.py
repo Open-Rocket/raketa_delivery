@@ -1,50 +1,40 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
-import asyncio
-from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart
-from aiogram.fsm.context import FSMContext
-from aiogram.enums import ContentType
-from aiogram import filters
-
-from app.c_pack.c_middlewares import logger
-from app.user.services.coords_and_price import (
-    get_coordinates,
-    get_price,
-    calculate_total_distance,
-    get_rout,
+from _dependencies import (
+    Router,
+    asyncio,
+    Message,
+    CallbackQuery,
+    CommandStart,
+    FSMContext,
+    ContentType,
+    filters,
+    F,
 )
-from app.user.services.fuzzy_city import find_most_compatible_response
-from app.database.models import OrderStatus
-from app.u_pack.u_middlewares import InnerMiddleware, OuterMiddleware
-from app.u_pack.u_states import UserState
-from app.u_pack.u_kb import get_user_kb, get_my_orders_kb, get_switch
-from app.u_pack.service.u_ai_assistant import AssistantAi
+from config import moscow_time, customer_r, customer_fallback, log
+from utils import (
+    MessageHandler,
+    CustomerInnerMiddleware,
+    CustomerOuterMiddleware,
+    CustomerState,
+    kb,
+    title,
+)
+from services import user_data, order_data, assistant, route, recognizer
+from models import OrderStatus
 
-from app.common.message_handler import MessageHandler
-from app.user.services.titles import get_image_title_user
-
-from app.database.requests import user_data, order_data
-
-from datetime import datetime
-import pytz
-
-from app.u_pack.service.u_voice_to_text import process_audio_data
 
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                             ⇣ Initializing Variables ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
-users_router = Router()
-u_fallback_router = Router()
 
 # middlewares_Outer
-users_router.message.outer_middleware(OuterMiddleware())
-users_router.callback_query.outer_middleware(OuterMiddleware())
+customer_r.message.outer_middleware(CustomerOuterMiddleware())
+customer_r.callback_query.outer_middleware(CustomerOuterMiddleware())
 
 # middlewares_Inner
-users_router.message.middleware(InnerMiddleware())
-users_router.callback_query.middleware(InnerMiddleware())
+customer_r.message.middleware(CustomerInnerMiddleware())
+customer_r.callback_query.middleware(CustomerInnerMiddleware())
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -53,16 +43,16 @@ users_router.callback_query.middleware(InnerMiddleware())
 
 
 # start
-@users_router.message(CommandStart())
+@customer_r.message(CommandStart())
 async def cmd_start_user(message: Message, state: FSMContext) -> None:
-    await state.set_state(UserState.reg_state)
+    await state.set_state(CustomerState.reg_state)
     handler = MessageHandler(state, message.bot)
     user = await user_data.get_username_userphone(message.from_user.id)
     user_name, user_phone = user
 
     # Если пользователь уже зарегистрирован
     if user_name and user_phone:
-        await state.set_state(UserState.default)
+        await state.set_state(CustomerState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
         new_message = await message.answer(
@@ -73,7 +63,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
     else:
         await user_data.set_user(message.from_user.id)
         await handler.delete_previous_message(message.chat.id)
-        photo_title = await get_image_title_user("/start")
+        photo_title = await title.get_title_customer("/start")
         text = (
             f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
             f"Почему выбирают нас?\n\n"
@@ -82,7 +72,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
             f"◉ Простота и удобство:\n"
             f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
         )
-        reply_kb = await get_user_kb(message)
+        reply_kb = await kb.get_customer_kb(message)
 
         new_message = await message.answer_photo(
             photo=photo_title,
@@ -95,9 +85,9 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
 
 
 # registration_Name
-@users_router.callback_query(F.data == "reg")
+@customer_r.callback_query(F.data == "reg")
 async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.reg_Name)
+    await state.set_state(CustomerState.reg_Name)
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
     # await callback_query.answer(text, show_alert=True)
@@ -113,7 +103,7 @@ async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
 
 
 # registration_Phone
-@users_router.message(filters.StateFilter(UserState.reg_Name))
+@customer_r.message(filters.StateFilter(CustomerState.reg_Name))
 async def data_name_user(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
@@ -124,9 +114,9 @@ async def data_name_user(message: Message, state: FSMContext):
         text = f"Слишком длинное имя!\n\n" f"<b>Введите имя еще раз:</b>"
         msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
     else:
-        await state.set_state(UserState.reg_Phone)
+        await state.set_state(CustomerState.reg_Phone)
         await user_data.set_user_name(tg_id, name)
-        reply_kb = await get_user_kb(text="phone_number")
+        reply_kb = await kb.get_customer_kb(text="phone_number")
         text = (
             f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
             f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
@@ -142,9 +132,9 @@ async def data_name_user(message: Message, state: FSMContext):
 
 
 # registration_City
-@users_router.message(filters.StateFilter(UserState.reg_Phone))
+@customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
 async def data_phone_user(message: Message, state: FSMContext):
-    await state.set_state(UserState.reg_City)
+    await state.set_state(CustomerState.reg_City)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -164,9 +154,9 @@ async def data_phone_user(message: Message, state: FSMContext):
 
 
 # terms of use
-@users_router.message(filters.StateFilter(UserState.reg_City))
+@customer_r.message(filters.StateFilter(CustomerState.reg_City))
 async def data_city_user(message: Message, state: FSMContext):
-    await state.set_state(UserState.reg_tou)
+    await state.set_state(CustomerState.reg_tou)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -174,7 +164,7 @@ async def data_city_user(message: Message, state: FSMContext):
     city = message.text
 
     await user_data.set_user_city(tg_id, city)
-    reply_kb = await get_user_kb(text="accept_tou")
+    reply_kb = await kb.get_customer_kb(text="accept_tou")
     text = (
         f"Начиная использование сервиса, вы соглашаетесь с "
         f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
@@ -190,9 +180,9 @@ async def data_city_user(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.callback_query(F.data == "accept_tou")
+@customer_r.callback_query(F.data == "accept_tou")
 async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, callback_query.bot)
 
     tg_id = callback_query.from_user.id
@@ -220,13 +210,13 @@ async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
 
 # commands_Profile
-@users_router.message(F.text == "/profile")
+@customer_r.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
-    await get_image_title_user(message.text)
+    await get_title_customer(message.text)
     name, phone_number, city = await user_data.get_user_info(tg_id)
 
     text = (
@@ -239,7 +229,7 @@ async def cmd_profile(message: Message, state: FSMContext):
         f"<b>Номер:</b> {phone_number}\n"
         f"<b>Город:</b> {city}"
     )
-    reply_kb = await get_user_kb(message=message)
+    reply_kb = await kb.get_customer_kb(message=message)
 
     new_message = await message.answer(
         text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
@@ -248,9 +238,9 @@ async def cmd_profile(message: Message, state: FSMContext):
 
 
 # faq
-@users_router.message(F.text == "/faq")
+@customer_r.message(F.text == "/faq")
 async def cmd_faq(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -267,9 +257,9 @@ async def cmd_faq(message: Message, state: FSMContext):
 
 
 # rules
-@users_router.message(F.text == "/rules")
+@customer_r.message(F.text == "/rules")
 async def cmd_rules(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -291,17 +281,17 @@ async def cmd_rules(message: Message, state: FSMContext):
 
 
 # commands_BecomeCourier
-@users_router.message(F.text == "/become_courier")
+@customer_r.message(F.text == "/become_courier")
 async def cmd_become_courier(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
-    photo_title = await get_image_title_user("/become_courier")
+    photo_title = await get_title_customer("/become_courier")
     text = (
         "⦿ Стать курьером у нас — это отличный способ заработать без комиссии!\n\n"
         "⦿ Работайте в удобное время, выбирайте заказы рядом и получайте бонусы за быструю доставку.\n\n"
         "⦿ Зарабатывайте до 7000₽ в день уже сегодня!"
     )
-    reply_kb = await get_user_kb(message)
+    reply_kb = await kb.get_customer_kb(message)
     new_message = await message.answer_photo(
         photo=photo_title,
         caption=text,
@@ -312,7 +302,7 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.message(F.text == "/order")
+@customer_r.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     data = await state.get_data()
     read_info = data.get(
@@ -323,16 +313,16 @@ async def cmd_order(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
 
     if not read_info:
-        await state.set_state(UserState.default)
+        await state.set_state(CustomerState.default)
         # Отправляем инструкцию пользователю
-        photo_title = await get_image_title_user(message.text)
+        photo_title = await get_title_customer(message.text)
         text = (
             "◉ Вы можете сделать заказ с помощью текста или голоса, "
             "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
             "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
             "ассистент создаст заявку для вашего заказа.</i>"
         )
-        reply_kb = await get_user_kb(message)
+        reply_kb = await kb.get_customer_kb(message)
 
         new_message = await message.answer_photo(
             photo=photo_title,
@@ -344,7 +334,7 @@ async def cmd_order(message: Message, state: FSMContext):
 
     else:
         await state.update_data(read_info=True)
-        await state.set_state(UserState.ai_voice_order)
+        await state.set_state(CustomerState.ai_voice_order)
         text = (
             "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             "заказ будет оформлен в считанные секунды.</i>"
@@ -361,10 +351,10 @@ async def cmd_order(message: Message, state: FSMContext):
 
 
 # read_Info
-@users_router.callback_query(F.data == "ai_order")
+@customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем нужный стейт
-    await state.set_state(UserState.ai_voice_order)
+    await state.set_state(CustomerState.ai_voice_order)
     # Устанавливаем флаг прочитанной информации
     await state.update_data(read_info=True)
 
@@ -383,9 +373,9 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
 
 # cancel_Order
-@users_router.callback_query(F.data == "cancel_order")
+@customer_r.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, callback_query.bot)
     text = "▼ <b>Выберите действие ...</b>"
     new_message = await callback_query.message.answer(
@@ -394,9 +384,9 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-@users_router.callback_query(F.data == "set_my_name")
+@customer_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.change_Name)
+    await state.set_state(CustomerState.change_Name)
     handler = MessageHandler(state, callback_query.bot)
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
     new_message = await callback_query.message.answer(
@@ -405,11 +395,11 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-@users_router.callback_query(F.data == "set_my_phone")
+@customer_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.change_Phone)
+    await state.set_state(CustomerState.change_Phone)
     handler = MessageHandler(state, callback_query.bot)
-    reply_kb = await get_user_kb(text="phone_number")
+    reply_kb = await kb.get_customer_kb(text="phone_number")
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш Телефон:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
@@ -417,9 +407,9 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-@users_router.callback_query(F.data == "set_my_city")
+@customer_r.callback_query(F.data == "set_my_city")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(UserState.change_City)
+    await state.set_state(CustomerState.change_City)
     handler = MessageHandler(state, callback_query.bot)
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
     new_message = await callback_query.message.answer(
@@ -428,9 +418,9 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-@users_router.message(filters.StateFilter(UserState.change_Name))
+@customer_r.message(filters.StateFilter(CustomerState.change_Name))
 async def change_name(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -446,9 +436,9 @@ async def change_name(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.message(filters.StateFilter(UserState.change_Phone))
+@customer_r.message(filters.StateFilter(CustomerState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -464,9 +454,9 @@ async def change_phone(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-@users_router.message(filters.StateFilter(UserState.change_City))
+@customer_r.message(filters.StateFilter(CustomerState.change_City))
 async def change_city(message: Message, state: FSMContext):
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -487,8 +477,8 @@ async def change_city(message: Message, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-@users_router.message(F.text == "/my_orders")
-@users_router.callback_query(F.data == "back_myOrders")
+@customer_r.message(F.text == "/my_orders")
+@customer_r.callback_query(F.data == "back_myOrders")
 async def handle_my_orders(event, state: FSMContext):
     is_callback = isinstance(event, CallbackQuery)
     user_tg_id = event.from_user.id
@@ -499,14 +489,14 @@ async def handle_my_orders(event, state: FSMContext):
         handler = MessageHandler(state, bot)
         await handler.delete_previous_message(chat_id)
 
-    await state.set_state(UserState.myOrders)
+    await state.set_state(CustomerState.myOrders)
 
     pending_count = len(await order_data.get_pending_orders(user_tg_id))
     active_count = len(await order_data.get_active_orders(user_tg_id))
     canceled_count = len(await order_data.get_canceled_orders(user_tg_id))
     completed_count = len(await order_data.get_completed_orders(user_tg_id))
 
-    reply_kb = await get_my_orders_kb(
+    reply_kb = await kb.get_customer_orders_kb(
         pending_count, active_count, canceled_count, completed_count
     )
     text = (
@@ -533,7 +523,7 @@ async def handle_my_orders(event, state: FSMContext):
         await event.answer()
 
 
-@users_router.callback_query(
+@customer_r.callback_query(
     F.data.in_(
         {
             "pending_orders",
@@ -567,7 +557,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
         await callback_query.message.edit_text(
             orders_text[counter],
-            reply_markup=await get_user_kb(text="one_my_order"),
+            reply_markup=await kb.get_customer_kb(text="one_my_order"),
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -577,22 +567,22 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     order_status_mapping = {
         "pending_orders": (
             order_data.get_pending_orders,
-            UserState.myOrders_pending,
+            CustomerState.myOrders_pending,
             "ожидающих",
         ),
         "active_orders": (
             order_data.get_active_orders,
-            UserState.myOrders_active,
+            CustomerState.myOrders_active,
             "активных",
         ),
         "canceled_orders": (
             order_data.get_canceled_orders,
-            UserState.myOrders_canceled,
+            CustomerState.myOrders_canceled,
             "отменённых",
         ),
         "completed_orders": (
             order_data.get_completed_orders,
-            UserState.myOrders_completed,
+            CustomerState.myOrders_completed,
             "завершённых",
         ),
     }
@@ -667,14 +657,14 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     if not orders_text:
         await callback_query.message.edit_text(
             f"У вас нет {status_text} заказов.",
-            reply_markup=await get_user_kb(text="one_my_order"),
+            reply_markup=await kb.get_customer_kb(text="one_my_order"),
             disable_notification=True,
         )
         return
 
     # Сохранение данных и отправка первого заказа
     await state.update_data(orders_text=orders_text, counter=0)
-    reply_kb = await get_user_kb(
+    reply_kb = await kb.get_customer_kb(
         text="one_my_order" if len(orders_text) == 1 else callback_query.data
     )
 
@@ -686,7 +676,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-@users_router.callback_query(F.data == "my_statistic")
+@customer_r.callback_query(F.data == "my_statistic")
 async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     user_tg_id = callback_query.from_user.id
 
@@ -736,7 +726,7 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
         f"Процент успешных: {success_rate:.2f}%\n"
     )
 
-    reply_kb = await get_user_kb(text="one_my_order")
+    reply_kb = await kb.get_customer_kb(text="one_my_order")
 
     # Отправка сообщения пользователю
     await callback_query.message.edit_text(
@@ -745,7 +735,7 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
 
 
 # Обработчик кнопки "⇥" для перехода вперёд
-@users_router.callback_query(F.data == "next_right_mo")
+@customer_r.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     orders_text = data.get("orders_text")
@@ -771,7 +761,7 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
 
 
 # Обработчик кнопки "⇤" для перехода назад
-@users_router.callback_query(F.data == "back_left_mo")
+@customer_r.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     orders_text = data.get("orders_text")
@@ -799,7 +789,7 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-@users_router.callback_query(F.data == "cancel_my_order")
+@customer_r.callback_query(F.data == "cancel_my_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.message.bot)
     data = await state.get_data()
@@ -836,8 +826,8 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-@users_router.message(
-    filters.StateFilter(UserState.ai_voice_order),
+@customer_r.message(
+    filters.StateFilter(CustomerState.ai_voice_order),
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
 )
 async def process_message(message: Message, state: FSMContext):
@@ -854,7 +844,7 @@ async def process_message(message: Message, state: FSMContext):
         await wait_message.delete()
         new_message = await message.answer(
             "⚠ Время обработки заказа превышено. Попробуйте снова.",
-            reply_markup=await get_user_kb(text="rerecord"),
+            reply_markup=await kb.get_customer_kb(text="rerecord"),
             disable_notification=True,
         )
         await handler.handle_new_message(new_message, message)
@@ -862,7 +852,7 @@ async def process_message(message: Message, state: FSMContext):
         await wait_message.delete()
         new_message = await message.answer(
             f"⚠ Ошибка при обработке заказа: {str(e)}",
-            reply_markup=await get_user_kb(text="rerecord"),
+            reply_markup=await kb.get_customer_kb(text="rerecord"),
             disable_notification=True,
         )
         await handler.handle_new_message(new_message, message)
@@ -872,31 +862,18 @@ async def process_message(message: Message, state: FSMContext):
 async def process_order_logic(
     message: Message, state: FSMContext, handler, wait_message
 ):
-    await state.set_state(UserState.waiting_Courier)
+    await state.set_state(CustomerState.waiting_Courier)
     await handler.delete_previous_message(message.chat.id)
 
     # Инициализация переменных
-    reply_kb = await get_user_kb(text="voice_order_accept")
-    rerecord_kb = await get_user_kb(text="rerecord")
-    moscow_time = datetime.now(pytz.timezone("Europe/Moscow")).replace(
-        tzinfo=None, microsecond=0
-    )
+    reply_kb = await kb.get_customer_kb(text="voice_order_accept")
+    rerecord_kb = await kb.get_customer_kb(text="rerecord")
     tg_id = message.from_user.id
     user_city = await user_data.get_user_city(tg_id)
     customer_name, customer_phone = await user_data.get_username_userphone(tg_id)
     new_message = "Ошибка распознавания. Попробуйте снова."
 
-    recognized_text = None
-
-    # Обработка сообщения в зависимости от типа контента
-    if message.content_type == ContentType.VOICE:
-        voice = message.voice
-        file_info = await message.bot.get_file(voice.file_id)
-        file = await message.bot.download_file(file_info.file_path)
-        audio_data = file.read()
-        recognized_text = await process_audio_data(audio_data)
-    else:
-        recognized_text = message.text
+    recognized_text = await recognizer.get_recognition_text(message)
 
     # Если распознавание не удалось
     if not recognized_text:
@@ -915,20 +892,20 @@ async def process_order_logic(
 
     if len(addresses) == 2:
         pickup_address, delivery_address = addresses
-        pickup_coords = await get_coordinates(pickup_address)
-        delivery_coords = await get_coordinates(delivery_address)
+        pickup_coords = await route.get_coordinates(pickup_address)
+        delivery_coords = await route.get_coordinates(delivery_address)
         all_coordinates = [pickup_coords, delivery_coords]
 
         if all(pickup_coords) and all(delivery_coords):
 
             # Формирование координат
-            yandex_maps_url, pickup_point, delivery_point = await get_rout(
+            yandex_maps_url, pickup_point, delivery_point = await route.get_rout(
                 pickup_coords, [delivery_coords]
             )
 
-            distance, duration = await calculate_total_distance(all_coordinates)
+            distance, duration = await route.calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time)
+            price = await route.get_price(distance, moscow_time)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1003,21 +980,23 @@ async def process_order_logic(
             )
     elif len(addresses) == 3:
         pickup_address, delivery_address_1, delivery_address_2 = addresses
-        pickup_coords = await get_coordinates(pickup_address)
-        delivery_coords_1 = await get_coordinates(delivery_address_1)
-        delivery_coords_2 = await get_coordinates(delivery_address_2)
+        pickup_coords = await route.get_coordinates(pickup_address)
+        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
+        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
         all_coordinates = [pickup_coords, delivery_coords_1, delivery_coords_2]
 
         if all(pickup_coords) and all(delivery_coords_1) and (delivery_coords_2):
 
             # Формирование координат
             yandex_maps_url, pickup_point, delivery_point_1, delivery_point_2 = (
-                await get_rout(pickup_coords, [delivery_coords_1, delivery_coords_2])
+                await route.get_rout(
+                    pickup_coords, [delivery_coords_1, delivery_coords_2]
+                )
             )
 
-            distance, duration = await calculate_total_distance(all_coordinates)
+            distance, duration = await route.calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=70)
+            price = await route.get_price(distance, moscow_time, over_price=70)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1093,10 +1072,10 @@ async def process_order_logic(
         pickup_address, delivery_address_1, delivery_address_2, delivery_address_3 = (
             addresses
         )
-        pickup_coords = await get_coordinates(pickup_address)
-        delivery_coords_1 = await get_coordinates(delivery_address_1)
-        delivery_coords_2 = await get_coordinates(delivery_address_2)
-        delivery_coords_3 = await get_coordinates(delivery_address_3)
+        pickup_coords = await route.get_coordinates(pickup_address)
+        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
+        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
+        delivery_coords_3 = await route.get_coordinates(delivery_address_3)
         all_coordinates = [
             pickup_coords,
             delivery_coords_1,
@@ -1118,14 +1097,14 @@ async def process_order_logic(
                 delivery_point_1,
                 delivery_point_2,
                 delivery_point_3,
-            ) = await get_rout(
+            ) = await route.get_rout(
                 pickup_coords, [delivery_coords_1, delivery_coords_2, delivery_coords_3]
             )
 
             # Рассчет дистанции и продолжительности
-            distance, duration = await calculate_total_distance(all_coordinates)
+            distance, duration = await route.calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=90)
+            price = await route.get_price(distance, moscow_time, over_price=90)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1213,11 +1192,11 @@ async def process_order_logic(
             delivery_address_4,
         ) = addresses
 
-        pickup_coords = await get_coordinates(pickup_address)
-        delivery_coords_1 = await get_coordinates(delivery_address_1)
-        delivery_coords_2 = await get_coordinates(delivery_address_2)
-        delivery_coords_3 = await get_coordinates(delivery_address_3)
-        delivery_coords_4 = await get_coordinates(delivery_address_4)
+        pickup_coords = await route.get_coordinates(pickup_address)
+        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
+        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
+        delivery_coords_3 = await route.get_coordinates(delivery_address_3)
+        delivery_coords_4 = await route.get_coordinates(delivery_address_4)
 
         all_coordinates = [
             pickup_coords,
@@ -1242,7 +1221,7 @@ async def process_order_logic(
                 delivery_point_2,
                 delivery_point_3,
                 delivery_point_4,
-            ) = await get_rout(
+            ) = await route.get_rout(
                 pickup_coords,
                 [
                     delivery_coords_1,
@@ -1252,9 +1231,9 @@ async def process_order_logic(
                 ],
             )
             # Рассчет дистанции и продолжительности
-            distance, duration = await calculate_total_distance(all_coordinates)
+            distance, duration = await route.calculate_total_distance(all_coordinates)
             distance = round(distance, 2)
-            price = await get_price(distance, moscow_time, over_price=120)
+            price = await route.get_price(distance, moscow_time, over_price=120)
 
             # Структурирование данных заказа
             structured_data = await process_order_text(recognized_text)
@@ -1362,10 +1341,10 @@ async def process_order_logic(
 
 
 # send_Order
-@users_router.callback_query(F.data == "order_sent")
+@customer_r.callback_query(F.data == "order_sent")
 async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние
-    # await state.set_state(UserState.default)
+    # await state.set_state(CustomerState.default)
 
     # Создаем обработчик сообщений
     handler = MessageHandler(state, callback_query.bot)
@@ -1373,7 +1352,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Получаем ID пользователя
     tg_id = callback_query.from_user.id
     data = await state.get_data()
-    await state.set_state(UserState.default)
+    await state.set_state(CustomerState.default)
 
     try:
         # Асинхронно создаем заказ
@@ -1401,7 +1380,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 # ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
 
 
-@u_fallback_router.message()
+@customer_fallback.message()
 async def handle_unrecognized_message(message: Message):
     msg = message.text
     print(msg)

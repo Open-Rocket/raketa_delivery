@@ -1,21 +1,21 @@
-import logging
-from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Message, CallbackQuery
-from typing import Callable, Dict, Any, Awaitable
-import os
-from dotenv import load_dotenv
+from _dependencies import (
+    BaseMiddleware,
+    logging,
+    TelegramObject,
+    Message,
+    CallbackQuery,
+    Callable,
+    Dict,
+    Any,
+    Awaitable,
+)
+from config import log
+from states import CourierState
 
-from app.c_pack.c_states import CourierRegistration, CourierState
 
-# Загрузка переменных окружения
-load_dotenv()
-password = os.getenv("ADMIN_PASSWORD")
-
-# Настройка логгера для одного сообщения на логический блок
 logging.basicConfig(
     level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
 )
-logger = logging.getLogger(__name__)
 
 
 async def check_state_and_handle_message(
@@ -40,10 +40,10 @@ async def check_state_and_handle_message(
         return await handler(event, data)
 
     if state in (
-        CourierRegistration.name.state,
-        CourierRegistration.phone_number.state,
-        CourierRegistration.city.state,
-        CourierRegistration.accept_tou.state,
+        CourierState.name.state,
+        CourierState.phone_number.state,
+        CourierState.city.state,
+        CourierState.accept_tou.state,
         CourierState.change_Name.state,
         CourierState.change_Phone.state,
         CourierState.change_City.state,
@@ -61,14 +61,14 @@ async def check_state_and_handle_message(
         await event.delete()
         return
 
-    if state == CourierRegistration.phone_number.state and not event.contact:
+    if state == CourierState.phone_number.state and not event.contact:
         await event.delete()
         return
 
     return await handler(event, data)
 
 
-class OuterMiddleware(BaseMiddleware):
+class CourierOuterMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -85,7 +85,7 @@ class OuterMiddleware(BaseMiddleware):
 
             # Формируем лог-сообщение для OuterMiddleware
             log_message = f"Couriers - 🚴\nOuter_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            logger.info(log_message)
+            log.info(log_message)
 
             result = await check_state_and_handle_message(state, event, handler, data)
             return result
@@ -95,12 +95,12 @@ class OuterMiddleware(BaseMiddleware):
             callback_data = event.data
 
             log_message = f"Couriers - 🚴\nOuter_mw\nCallback data: {callback_data}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            logger.info(log_message)
+            log.info(log_message)
 
             return await handler(event, data)
 
 
-class InnerMiddleware(BaseMiddleware):
+class CourierInnerMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -129,5 +129,8 @@ class InnerMiddleware(BaseMiddleware):
         updated_state = await fsm_context.get_state() if fsm_context else "No state"
         log_message += f"\nCourier state now: {updated_state}"
 
-        logger.info(log_message)
+        log.info(log_message)
         return result
+
+
+__all__ = ["CourierOuterMiddleware", "CourierInnerMiddleware"]
