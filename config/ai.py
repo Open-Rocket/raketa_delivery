@@ -1,4 +1,4 @@
-from _dependencies import os, load_dotenv
+from dependencies._dependencies import os, load_dotenv
 
 load_dotenv()
 

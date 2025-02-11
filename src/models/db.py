@@ -1,4 +1,4 @@
-from _dependencies import (
+from dependencies._dependencies import (
     os,
     enum,
     datetime,
@@ -201,11 +201,12 @@ __all__ = [
     "OrderStatus",
     "Subscription",
     "DailyEvent",
+    "drop_create_db",
 ]
 
 
 # Функция
-async def async_main():
+async def drop_create_db():
     async with engine.begin() as conn:
         # engine.echo = False
         await conn.run_sync(Base.metadata.drop_all)

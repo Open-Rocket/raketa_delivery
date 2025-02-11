@@ -1,4 +1,4 @@
-from _dependencies import io, sr, AudioSegment, Message, ContentType
+from dependencies._dependencies import io, sr, AudioSegment, Message, ContentType
 from config import log
 from router import route
 

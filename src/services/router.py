@@ -1,4 +1,13 @@
-from _dependencies import requests, datetime, urllib3, sqrt, sin, cos, atan2, radians
+from dependencies._dependencies import (
+    requests,
+    datetime,
+    urllib3,
+    sqrt,
+    sin,
+    cos,
+    atan2,
+    radians,
+)
 from config import YANDEX_API_KEY
 
 

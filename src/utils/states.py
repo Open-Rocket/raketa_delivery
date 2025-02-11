@@ -1,4 +1,4 @@
-from _dependencies import StatesGroup, State
+from dependencies._dependencies import StatesGroup, State
 
 
 class CustomerState(StatesGroup):

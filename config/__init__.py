@@ -5,6 +5,7 @@ from ai import *
 from geocoder import *
 from payment import *
 from routers import *
+from bots import *
 
 
 __all__ = [
@@ -22,4 +23,8 @@ __all__ = [
     "customer_fallback",
     "courier_fallback",
     "payment_provider",
+    "customer_bot",
+    "couriers_bot",
+    "customer_dp",
+    "couriers_dp",
 ]

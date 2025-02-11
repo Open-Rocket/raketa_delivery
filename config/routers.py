@@ -1,6 +1,6 @@
-from _dependencies import Router
+from dependencies._dependencies import Router
 
-payment = Router()
+payment_r = Router()
 customer_r = Router()
 courier_r = Router()
 customer_fallback = Router()
@@ -8,7 +8,7 @@ courier_fallback = Router()
 
 
 __all__ = [
-    "payment",
+    "payment_r",
     "customer_r",
     "courier_r",
     "customer_fallback",

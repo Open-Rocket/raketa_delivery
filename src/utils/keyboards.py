@@ -1,4 +1,4 @@
-from _dependencies import (
+from dependencies._dependencies import (
     Message,
     Optional,
     ReplyKeyboardMarkup,

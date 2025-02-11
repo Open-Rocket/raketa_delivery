@@ -9,4 +9,5 @@ __all__ = [
     "OrderStatus",
     "Subscription",
     "DailyEvent",
+    "drop_create_db",
 ]

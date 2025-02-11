@@ -1,4 +1,4 @@
-from _dependencies import (
+from dependencies._dependencies import (
     async_session_factory,
     User,
     Courier,
@@ -16,11 +16,11 @@ from models import async_session_factory, User, Courier, OrderStatus, Order
 from router import route
 
 
-class UserData:
+class CustomerData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def get_user_tg_id_by_phone(self, phone_number: str) -> int:
+    async def get_customer_tg_id_by_phone(self, phone_number: str) -> int:
         async with self.async_session_factory() as session:
             user = await session.scalar(
                 select(User).where(User.user_phone_number == phone_number)
@@ -30,7 +30,7 @@ class UserData:
             else:
                 raise ValueError("Пользователь не найден")
 
-    async def set_user(self, tg_id: int):
+    async def set_customer(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if not user:
@@ -38,35 +38,35 @@ class UserData:
                 session.add(new_user)
                 await session.commit()
 
-    async def set_user_name(self, tg_id: int, name: str):
+    async def set_customer_name(self, tg_id: int, name: str):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
                 user.user_name = name
                 await session.commit()
 
-    async def set_user_phone(self, tg_id: int, phone: str):
+    async def set_customer_phone(self, tg_id: int, phone: str):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
                 user.user_phone_number = phone
                 await session.commit()
 
-    async def set_user_city(self, tg_id: int, city: str):
+    async def set_customer_city(self, tg_id: int, city: str):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
                 user.user_default_city = city
                 await session.commit()
 
-    async def set_user_accept_tou(self, tg_id: int, accepted: str):
+    async def set_customer_accept_tou(self, tg_id: int, accepted: str):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
                 user.user_accept_terms_of_use = accepted
                 await session.commit()
 
-    async def get_user_info(self, tg_id: int):
+    async def get_customer_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
             if user:
@@ -77,7 +77,7 @@ class UserData:
                 )
             return ("...", "...", "...")
 
-    async def get_username_userphone(self, tg_id: int):
+    async def get_customer_phone(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
 
@@ -86,7 +86,7 @@ class UserData:
             else:
                 return None, None
 
-    async def get_user_city(self, tg_id: int):
+    async def get_customer_city(self, tg_id: int):
         async with self.async_session_factory() as session:
             user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
 
@@ -552,7 +552,7 @@ class OrderData:
                 await session.commit()
 
 
-user_data = UserData(async_session_factory)
+customer_data = CustomerData(async_session_factory)
 courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
 

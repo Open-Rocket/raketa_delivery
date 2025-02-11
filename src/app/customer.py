@@ -1,5 +1,5 @@
 # --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
-from _dependencies import (
+from dependencies._dependencies import (
     Router,
     asyncio,
     Message,
