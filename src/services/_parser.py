@@ -6,8 +6,8 @@ from ._deps import (
     BasicParser,
     NetworkManager,
     FileCache,
+    log,
 )
-from config import log
 
 
 class CityParser(BasicParser):

@@ -1,4 +1,4 @@
-from dependencies._dependencies import (
+from ._deps import (
     os,
     enum,
     datetime,
@@ -10,7 +10,10 @@ from dependencies._dependencies import (
     AsyncAttrs,
     async_sessionmaker,
     create_async_engine,
-    Integer,
+    Mapped,
+    DeclarativeBase,
+    mapped_column,
+    relationship,
     ForeignKey,
     String,
     BigInteger,
@@ -19,12 +22,7 @@ from dependencies._dependencies import (
     DateTime,
     Text,
     Float,
-    func,
-    JSONB,
-    Mapped,
-    mapped_column,
-    DeclarativeBase,
-    relationship,
+    Integer,
 )
 from config import db_settings, moscow_time, utc_time
 
