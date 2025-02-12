@@ -27,9 +27,11 @@ from math import cos, radians, sin, sqrt, atan2
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, Annotated, List, Union, Callable, Dict, Any, Awaitable
 
+
 from parselab.cache import FileCache
 from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
+
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ContentType

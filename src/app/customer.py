@@ -21,7 +21,7 @@ from utils import (
 )
 from services import customer_data, order_data, assistant, route, recognizer
 from models import OrderStatus
-from confredis import redis
+from confredis import rediska
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -30,8 +30,8 @@ from confredis import redis
 
 
 # middlewares_Outer
-customer_r.message.outer_middleware(CustomerOuterMiddleware())
-customer_r.callback_query.outer_middleware(CustomerOuterMiddleware())
+customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
+customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 # middlewares_Inner
 customer_r.message.middleware(CustomerInnerMiddleware())
@@ -46,11 +46,11 @@ customer_r.callback_query.middleware(CustomerInnerMiddleware())
 # start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
-    customer_id = message.from_user.id
     await state.set_state(CustomerState.reg_state)
-    await redis.set_state(customer_id, CustomerState.reg_state)
+    await rediska.set_state(message.bot, customer_id, CustomerState.reg_state)
     handler = MessageHandler(state, message.bot)
-    customer_info = await redis.get_user_info(customer_id)
+    customer_id = message.from_user.id
+    customer_info = await rediska.get_user_info(customer_id)
     customer_name, customer_phone = customer_info
 
     if customer_name and customer_phone:
@@ -63,7 +63,7 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
         await handler.handle_new_message(new_message, message)
         return
     else:
-        await redis.set_user(customer_id)
+        await rediska.set_user_info(customer_id)
         await handler.delete_previous_message(message.chat.id)
         photo_title = await title.get_title_customer("/start")
         text = (

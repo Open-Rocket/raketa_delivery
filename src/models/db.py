@@ -19,7 +19,6 @@ from dependencies._dependencies import (
     DateTime,
     Text,
     Float,
-    Date,
     func,
     JSONB,
     Mapped,
@@ -27,7 +26,7 @@ from dependencies._dependencies import (
     DeclarativeBase,
     relationship,
 )
-from config import db_settings, moscow_time
+from config import db_settings, moscow_time, utc_time
 
 load_dotenv()
 
