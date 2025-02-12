@@ -1,18 +1,12 @@
-from dependencies._dependencies import (
-    async_session_factory,
-    User,
-    Courier,
-    OrderStatus,
-    Order,
+from ._deps import (
     datetime,
     select,
     selectinload,
     and_,
     func,
-    route,
 )
-from config import moscow_time
 from models import async_session_factory, Customer, Courier, OrderStatus, Order
+from config import moscow_time
 from router import route
 
 

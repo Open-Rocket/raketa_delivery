@@ -1,4 +1,4 @@
-from dependencies._dependencies import (
+from ._deps import (
     os,
     sys,
     json,
