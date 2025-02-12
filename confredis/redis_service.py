@@ -35,17 +35,25 @@ class RedisService:
         )
         return True
 
-    async def get_user_info(self, user_id: int) -> tuple[str | None, str | None]:
+    async def get_user_info(
+        self, user_id: int
+    ) -> tuple[str | None, str | None, str | None, bool | None]:
         """Получает имя и телефон пользователя из Redis"""
         user_data = await self.redis.hgetall(f"user:{user_id}")
         if not user_data:
-            return None * 5
+            return None, None, None, None
         return (
             user_data.get(b"name", b"").decode("utf-8"),
             user_data.get(b"phone", b"").decode("utf-8"),
             user_data.get(b"city", b"").decode("utf-8"),
-            user_data.get(b"is_reg", b""),
+            bool(int(user_data.get(b"is_reg", b"0").decode("utf-8"))),
         )
+
+    async def is_reg(self, user_id: int) -> bool:
+        """Получает статус регистрации пользователя из Redis"""
+        is_reg = await self.redis.hget(f"user:{user_id}", "is_reg")
+
+        return bool(int(is_reg.decode("utf-8")))
 
     async def set_state(self, bot: Bot, user_id: int, state: State) -> None:
         """Сохраняет состояние FSM пользователя в Redis"""

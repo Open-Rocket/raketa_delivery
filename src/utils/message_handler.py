@@ -1,5 +1,4 @@
-from aiogram import Bot
-from aiogram.fsm.context import FSMContext
+from ._deps import Bot, FSMContext
 from config import log
 
 

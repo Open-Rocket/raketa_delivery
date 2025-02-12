@@ -1,4 +1,4 @@
-from dependencies._dependencies import os, FSInputFile
+from ._deps import os, FSInputFile
 
 
 class Title:

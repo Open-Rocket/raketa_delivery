@@ -50,10 +50,9 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     await rediska.set_state(message.bot, customer_id, CustomerState.reg_state)
     handler = MessageHandler(state, message.bot)
     customer_id = message.from_user.id
-    customer_info = await rediska.get_user_info(customer_id)
-    customer_name, customer_phone = customer_info
+    is_reg = await rediska.is_reg(customer_id)
 
-    if customer_name and customer_phone:
+    if is_reg:
         await state.set_state(CustomerState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
