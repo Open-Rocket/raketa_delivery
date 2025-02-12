@@ -12,7 +12,7 @@ from dependencies._dependencies import (
     route,
 )
 from config import moscow_time
-from models import async_session_factory, User, Courier, OrderStatus, Order
+from models import async_session_factory, Customer, Courier, OrderStatus, Order
 from router import route
 
 
@@ -68,12 +68,14 @@ class CustomerData:
 
     async def get_customer_info(self, tg_id: int):
         async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            if customer:
                 return (
-                    user.user_name or "...",
-                    user.user_phone_number or "...",
-                    user.user_default_city or "...",
+                    customer.customer_name or "...",
+                    customer.customer_phone or "...",
+                    customer.customer_city or "...",
                 )
             return ("...", "...", "...")
 
@@ -557,4 +559,4 @@ courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
 
 
-__all__ = ["user_data", "courier_data", "order_data"]
+__all__ = ["customer_data", "courier_data", "order_data"]

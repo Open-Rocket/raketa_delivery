@@ -10,8 +10,13 @@ import asyncio
 import logging
 import urllib3
 import requests
+import pytest
 import speech_recognition as sr
+import redis.asyncio as aioredis
 
+
+from unittest.mock import AsyncMock
+from redis.asyncio import Redis
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from pydub import AudioSegment
@@ -90,6 +95,10 @@ from sqlalchemy import (
 
 
 __all__ = [
+    "AsyncMock",
+    "pytest",
+    "Redis",
+    "aioredis",
     "Dispatcher",
     "Bot",
     "filters",

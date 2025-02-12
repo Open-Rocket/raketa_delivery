@@ -27,5 +27,7 @@
   "tests/test_1.py::test_divide[5--1--5]",
   "tests/test_1.py::test_example",
   "tests/test_1.py::test_example1",
-  "tests/test_1.py::test_main_test"
+  "tests/test_1.py::test_main_test",
+  "tests/test_redis_service.py::test_get_user_info",
+  "tests/test_redis_service.py::test_set_user_info"
 ]

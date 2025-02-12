@@ -1,1 +1,1 @@
-from dependencies._dependencies import *
+from ._dependencies import *

@@ -3,11 +3,10 @@ from db import *
 
 __all__ = [
     "async_session_factory",
-    "User",
+    "Customer",
     "Courier",
     "Order",
     "OrderStatus",
     "Subscription",
-    "DailyEvent",
     "drop_create_db",
 ]

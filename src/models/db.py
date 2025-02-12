@@ -74,17 +74,17 @@ class OrderStatus(enum.Enum):
 # Tables
 
 
-class User(Base):
-    __tablename__ = "users"
+class Customer(Base):
+    __tablename__ = "customers"
 
-    user_id: Mapped[intPK]
+    customer_id: Mapped[intPK]
 
-    user_tg_id: Mapped[intData]
-    user_name: Mapped[stringData]
-    user_phone_number: Mapped[stringData]
-    user_default_city: Mapped[stringData]
-    user_accept_terms_of_use: Mapped[stringData]
-    user_registration_date: Mapped[datetimeData]
+    customer_tg_id: Mapped[intData]
+    customer_name: Mapped[stringData]
+    customer_phone: Mapped[stringData]
+    customer_city: Mapped[stringData]
+    customer_accept_terms_of_use: Mapped[stringData]
+    customer_registration_date: Mapped[datetimeData]
 
     orders = relationship("Order", back_populates="user")
 
@@ -113,7 +113,7 @@ class Order(Base):
     order_status: Mapped[OrderStatus] = mapped_column(
         Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING
     )
-    user_id: Mapped[Optional[int]] = mapped_column(
+    customer_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=True
     )
     courier_id: Mapped[Optional[int]] = mapped_column(
@@ -138,7 +138,7 @@ class Order(Base):
     )
 
     courier = relationship("Courier", back_populates="orders")
-    user = relationship("User", back_populates="orders")
+    customer = relationship("Customer", back_populates="orders")
 
 
 class Subscription(Base):
@@ -160,47 +160,13 @@ class Subscription(Base):
     couriers = relationship("Courier", back_populates="subscription")
 
 
-class DailyEvent(Base):
-    __tablename__ = "daily_events"
-
-    # Основные поля
-    daily_event_id: Mapped[intPK]
-
-    event_date: Mapped[Date] = mapped_column(
-        Date, primary_key=True, default=func.current_date(), nullable=False
-    )
-    total_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    completed_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    canceled_orders: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    new_users: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    new_couriers: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    new_subscriptions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    total_order_revenue: Mapped[float] = mapped_column(
-        Float, default=0.0, nullable=False
-    )
-    fastest_order_time: Mapped[float] = mapped_column(
-        Float, nullable=True
-    )  # В секундах или минутах
-    total_reviews: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    support_requests: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-
-    notes: Mapped[str] = mapped_column(Text, nullable=True)
-
-    def __repr__(self):
-        return (
-            f"DailyEvent(date={self.event_date}, total_orders={self.total_orders}, "
-            f"completed_orders={self.completed_orders}, total_revenue={self.total_order_revenue})"
-        )
-
-
 __all__ = [
     "async_session_factory",
-    "User",
+    "Customer",
     "Courier",
     "Order",
     "OrderStatus",
     "Subscription",
-    "DailyEvent",
     "drop_create_db",
 ]
 

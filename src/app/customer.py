@@ -1,6 +1,6 @@
-# --------------------------------------------------- ✺ Start (u_rout) ✺ -------------------------------------------- #
+# ------------------------------------------------------- ✺ Start ✺ ------------------------------------------------ #
+
 from dependencies._dependencies import (
-    Router,
     asyncio,
     Message,
     CallbackQuery,
@@ -19,8 +19,9 @@ from utils import (
     kb,
     title,
 )
-from services import user_data, order_data, assistant, route, recognizer
+from services import customer_data, order_data, assistant, route, recognizer
 from models import OrderStatus
+from confredis import redis
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -44,14 +45,15 @@ customer_r.callback_query.middleware(CustomerInnerMiddleware())
 
 # start
 @customer_r.message(CommandStart())
-async def cmd_start_user(message: Message, state: FSMContext) -> None:
+async def cmd_start_customer(message: Message, state: FSMContext) -> None:
+    customer_id = message.from_user.id
     await state.set_state(CustomerState.reg_state)
+    await redis.set_state(customer_id, CustomerState.reg_state)
     handler = MessageHandler(state, message.bot)
-    user = await user_data.get_username_userphone(message.from_user.id)
-    user_name, user_phone = user
+    customer_info = await redis.get_user_info(customer_id)
+    customer_name, customer_phone = customer_info
 
-    # Если пользователь уже зарегистрирован
-    if user_name and user_phone:
+    if customer_name and customer_phone:
         await state.set_state(CustomerState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
@@ -61,7 +63,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
         await handler.handle_new_message(new_message, message)
         return
     else:
-        await user_data.set_user(message.from_user.id)
+        await redis.set_user(customer_id)
         await handler.delete_previous_message(message.chat.id)
         photo_title = await title.get_title_customer("/start")
         text = (
@@ -72,7 +74,7 @@ async def cmd_start_user(message: Message, state: FSMContext) -> None:
             f"◉ Простота и удобство:\n"
             f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
         )
-        reply_kb = await kb.get_customer_kb(message)
+        reply_kb = await kb.get_customer_kb("/start")
 
         new_message = await message.answer_photo(
             photo=photo_title,
@@ -115,7 +117,7 @@ async def data_name_user(message: Message, state: FSMContext):
         msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
     else:
         await state.set_state(CustomerState.reg_Phone)
-        await user_data.set_user_name(tg_id, name)
+        await customer_data.set_user_name(tg_id, name)
         reply_kb = await kb.get_customer_kb(text="phone_number")
         text = (
             f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
@@ -141,7 +143,7 @@ async def data_phone_user(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     phone = message.contact.phone_number
 
-    await user_data.set_user_phone(tg_id, phone)
+    await customer_data.set_user_phone(tg_id, phone)
     text = (
         f"Последний шаг!\n\n"
         f"Для того чтобы каждый раз не указывать город доставки, "
@@ -163,7 +165,7 @@ async def data_city_user(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     city = message.text
 
-    await user_data.set_user_city(tg_id, city)
+    await customer_data.set_user_city(tg_id, city)
     reply_kb = await kb.get_customer_kb(text="accept_tou")
     text = (
         f"Начиная использование сервиса, вы соглашаетесь с "
@@ -189,8 +191,8 @@ async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     accept_tou = (
         "Пользовательское соглашение и правила использования сервиса - Принимаю"
     )
-    await user_data.set_user_accept_tou(tg_id, accept_tou)
-    name, phone_number, city = await user_data.get_user_info(tg_id)
+    await customer_data.set_user_accept_tou(tg_id, accept_tou)
+    name, phone_number, city = await customer_data.get_user_info(tg_id)
     text = (
         "Вы успешно зарегистрировались! 🎉\n\n"
         f"Имя: {name}\n"
@@ -217,7 +219,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
     tg_id = message.from_user.id
     await get_title_customer(message.text)
-    name, phone_number, city = await user_data.get_user_info(tg_id)
+    name, phone_number, city = await customer_data.get_user_info(tg_id)
 
     text = (
         f"👥 <b>Профиль</b>\n\n"
@@ -427,7 +429,7 @@ async def change_name(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     name = message.text
 
-    await user_data.set_user_name(tg_id, name)
+    await customer_data.set_user_name(tg_id, name)
     text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
@@ -445,7 +447,7 @@ async def change_phone(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     phone = message.contact.phone_number
 
-    await user_data.set_user_phone(tg_id, phone)
+    await customer_data.set_user_phone(tg_id, phone)
     text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
@@ -463,7 +465,7 @@ async def change_city(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     city = message.text
 
-    await user_data.set_user_city(tg_id, city)
+    await customer_data.set_user_city(tg_id, city)
     text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
@@ -869,8 +871,8 @@ async def process_order_logic(
     reply_kb = await kb.get_customer_kb(text="voice_order_accept")
     rerecord_kb = await kb.get_customer_kb(text="rerecord")
     tg_id = message.from_user.id
-    user_city = await user_data.get_user_city(tg_id)
-    customer_name, customer_phone = await user_data.get_username_userphone(tg_id)
+    user_city = await customer_data.get_user_city(tg_id)
+    customer_name, customer_phone = await customer_data.get_username_userphone(tg_id)
     new_message = "Ошибка распознавания. Попробуйте снова."
 
     recognized_text = await recognizer.get_recognition_text(message)

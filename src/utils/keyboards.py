@@ -12,9 +12,7 @@ class Keyboard:
 
     @staticmethod
     async def get_customer_kb(
-        message: Optional[Message] = None,
-        callback_data: Optional[str] = None,
-        text: str = None,
+        key: str = None,
     ) -> InlineKeyboardMarkup:
         kb = {
             "/order": InlineKeyboardMarkup(
@@ -30,7 +28,7 @@ class Keyboard:
                 one_time_keyboard=False,
                 input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
             ),
-            "next_kb": InlineKeyboardMarkup(
+            "/start": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -183,20 +181,7 @@ class Keyboard:
             ),
         }
 
-        if message:
-            if message.text == "/start":
-                return kb["next_kb"]
-            else:
-                return kb[message.text]
-        if message and message.text in kb:
-            return kb[message.text]
-
-        if callback_data:
-            pass
-
-        if text:
-            if text in kb:
-                return kb[text]
+        return kb[key]
 
     @staticmethod
     async def get_customer_orders_kb(

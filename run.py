@@ -1,5 +1,6 @@
 from dependencies import asyncio
 from models import drop_create_db
+from confredis import rediska
 from config import (
     customer_bot,
     couriers_bot,
@@ -16,15 +17,21 @@ from config import (
 
 async def main():
 
+    customer_dp["redis"] = rediska
+    courier_dp["redis"] = rediska
+
     customer_dp.include_routers(customer_r, customer_fallback)
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
     customer_dp.startup.register(on_startup)
 
-    await asyncio.gather(
-        customer_dp.start_polling(customer_bot, skip_updates=True),
-        courier_dp.start_polling(couriers_bot, skip_updates=True),
-    )
+    try:
+        await asyncio.gather(
+            customer_dp.start_polling(customer_bot, skip_updates=True),
+            courier_dp.start_polling(couriers_bot, skip_updates=True),
+        )
+    finally:
+        await rediska.close()
 
 
 async def on_startup(dispatcher):

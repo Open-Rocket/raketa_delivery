@@ -9,7 +9,7 @@ __all__ = [
     "route",
     "formatter",
     "recognizer",
-    "user_data",
+    "customer_data",
     "courier_data",
     "order_data",
     "city_parser",
