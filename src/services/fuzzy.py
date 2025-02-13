@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 import json
-from fuzzywuzzy import process
+from fuzzywuzzy import process, fuzz
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from config import log
@@ -53,8 +53,13 @@ async def main():
     # await CityList._load_cities_from_json()
     russian_cities = await CityList.get_cities()
 
-    user_input = "Москва"
+    user_input = "Яркутск"
+    if user_input.lower() == "питер":
+        user_input = "Санкт-Петербург"
+    elif user_input.lower() == "екб":
+        user_input = "Екатеринбург"
     closest_city = await find_closest_city(user_input, russian_cities)
+    # closest_city = await find_most_compatible_response(user_input, russian_cities)
 
     if closest_city:
         match, score = closest_city
@@ -66,4 +71,4 @@ async def main():
 asyncio.run(main())
 
 
-# python -m src.services.fuzz
+# python -m src.services.fuzzy
