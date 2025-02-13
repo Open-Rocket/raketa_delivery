@@ -61,49 +61,6 @@ class CustomerOuterMiddleware(BaseMiddleware):
             return await handler(event, data)
 
 
-class CustomerInnerMiddleware(BaseMiddleware):
-
-    def __init__(self, rediska: RedisService):
-        super().__init__()
-        self.rediska = rediska
-
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any],
-    ) -> Any:
-
-        fsm_context = data.get("state")
-        fsm_context = data.get("state")
-        state: FSMContext = (
-            await fsm_context.get_state()
-            if fsm_context
-            else await self.rediska.get_state()
-        )
-
-        log_message = ""
-        if isinstance(event, Message):
-            user_id = event.from_user.id
-            message_text = event.text
-
-            log_message += f"Customer - 🧍\nInner_mw\nUser message: {message_text}\Customer ID: {user_id}\nUser state previous: {state}"
-
-        elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id
-            callback_data = event.data
-
-            log_message += f"Customer - 🧍\nInner_mw\nCallback data: {callback_data}\Customer ID: {user_id}"
-
-        result = await handler(event, data)
-
-        updated_state = await fsm_context.get_state() if fsm_context else "No state"
-        log_message += f"\nUser state now: {updated_state}"
-
-        log.info(log_message)
-        return result
-
-
 async def _check_state_and_handle_message(
     state: str, event: Message, handler: Callable, data: Dict[str, Any]
 ) -> Any:
@@ -152,4 +109,4 @@ async def _check_state_and_handle_message(
     return await handler(event, data)
 
 
-__all__ = ["CustomerOuterMiddleware", "CustomerInnerMiddleware"]
+__all__ = ["CustomerOuterMiddleware"]

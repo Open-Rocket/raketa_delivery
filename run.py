@@ -1,4 +1,4 @@
-from dependencies import asyncio
+import asyncio
 from models import drop_create_db
 from confredis import rediska
 from config import (

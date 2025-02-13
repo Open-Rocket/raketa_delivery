@@ -1,10 +1,8 @@
-from middleware_customer import CustomerOuterMiddleware, CustomerInnerMiddleware
-from middlewares_courier import CourierOuterMiddleware, CourierInnerMiddleware
+from middleware_customer import CustomerOuterMiddleware
+from middlewares_courier import CourierOuterMiddleware
 
 
 __all__ = [
     "CustomerOuterMiddleware",
-    "CustomerInnerMiddleware",
     "CourierOuterMiddleware",
-    "CourierInnerMiddleware",
 ]

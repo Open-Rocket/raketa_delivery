@@ -1,26 +1,30 @@
 # ------------------------------------------------------- ✺ Start ✺ ------------------------------------------------ #
-
-from dependencies import (
+from ._deps import (
     asyncio,
-    Message,
-    CallbackQuery,
     CommandStart,
     FSMContext,
     ContentType,
     filters,
-    F,
-)
-from config import moscow_time, customer_r, customer_fallback, log
-from utils import (
+    Message,
+    CallbackQuery,
+    OrderStatus,
     MessageHandler,
     CustomerState,
+    CustomerOuterMiddleware,
+    moscow_time,
+    customer_r,
+    customer_fallback,
     kb,
     title,
+    customer_data,
+    order_data,
+    route,
+    recognizer,
+    rediska,
+    assistant,
+    log,
+    F,
 )
-from middlewares import CustomerOuterMiddleware, CustomerInnerMiddleware
-from services import customer_data, order_data, assistant, route, recognizer
-from models import OrderStatus
-from confredis import rediska
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -31,10 +35,6 @@ from confredis import rediska
 # middlewares_Outer
 customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
 customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
-
-# middlewares_Inner
-customer_r.message.middleware(CustomerInnerMiddleware())
-customer_r.callback_query.middleware(CustomerInnerMiddleware())
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
