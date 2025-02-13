@@ -14,7 +14,7 @@ import pytest
 import speech_recognition as sr
 import redis.asyncio as aioredis
 
-Mapped
+FSMContext,
 
 from unittest.mock import AsyncMock
 from redis.asyncio import Redis

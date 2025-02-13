@@ -1,4 +1,4 @@
-from dependencies._dependencies import (
+from ._deps import (
     BaseMiddleware,
     logging,
     TelegramObject,
@@ -12,7 +12,7 @@ from dependencies._dependencies import (
 )
 from config import log
 from confredis import RedisService
-from states import CustomerState
+from utils import CustomerState
 
 
 logging.basicConfig(
@@ -34,7 +34,7 @@ class CustomerOuterMiddleware(BaseMiddleware):
     ) -> Any:
 
         fsm_context = data.get("state")
-        state = (
+        state: FSMContext = (
             await fsm_context.get_state()
             if fsm_context
             else await self.rediska.get_state()
@@ -62,6 +62,11 @@ class CustomerOuterMiddleware(BaseMiddleware):
 
 
 class CustomerInnerMiddleware(BaseMiddleware):
+
+    def __init__(self, rediska: RedisService):
+        super().__init__()
+        self.rediska = rediska
+
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
@@ -70,7 +75,12 @@ class CustomerInnerMiddleware(BaseMiddleware):
     ) -> Any:
 
         fsm_context = data.get("state")
-        state = await fsm_context.get_state() if fsm_context else "No state"
+        fsm_context = data.get("state")
+        state: FSMContext = (
+            await fsm_context.get_state()
+            if fsm_context
+            else await self.rediska.get_state()
+        )
 
         log_message = ""
         if isinstance(event, Message):

@@ -1,6 +1,6 @@
 # ------------------------------------------------------- ✺ Start ✺ ------------------------------------------------ #
 
-from dependencies._dependencies import (
+from dependencies import (
     asyncio,
     Message,
     CallbackQuery,
@@ -13,12 +13,11 @@ from dependencies._dependencies import (
 from config import moscow_time, customer_r, customer_fallback, log
 from utils import (
     MessageHandler,
-    CustomerInnerMiddleware,
-    CustomerOuterMiddleware,
     CustomerState,
     kb,
     title,
 )
+from middlewares import CustomerOuterMiddleware, CustomerInnerMiddleware
 from services import customer_data, order_data, assistant, route, recognizer
 from models import OrderStatus
 from confredis import rediska

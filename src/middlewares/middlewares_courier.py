@@ -1,4 +1,4 @@
-from dependencies._dependencies import (
+from ._deps import (
     BaseMiddleware,
     logging,
     TelegramObject,
@@ -8,9 +8,11 @@ from dependencies._dependencies import (
     Dict,
     Any,
     Awaitable,
+    FSMContext,
 )
 from config import log
-from states import CourierState
+from confredis import RedisService
+from utils import CourierState
 
 
 logging.basicConfig(
@@ -18,7 +20,91 @@ logging.basicConfig(
 )
 
 
-async def check_state_and_handle_message(
+class CourierOuterMiddleware(BaseMiddleware):
+
+    def __init__(self, rediska: RedisService):
+        super().__init__()
+        self.rediska = rediska
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
+
+        fsm_context = data.get("state")
+        state: FSMContext = (
+            await fsm_context.get_state()
+            if fsm_context
+            else await self.rediska.get_state()
+        )
+
+        if isinstance(event, Message):
+            user_id = event.from_user.id
+            message_text = event.text
+
+            # Формируем лог-сообщение для OuterMiddleware
+            log_message = f"Couriers - 🚴\nOuter_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
+            log.info(log_message)
+
+            result = await _check_state_and_handle_message(state, event, handler, data)
+            return result
+
+        elif isinstance(event, CallbackQuery):
+            user_id = event.from_user.id
+            callback_data = event.data
+
+            log_message = f"Couriers - 🚴\nOuter_mw\nCallback data: {callback_data}\nCourier ID: {user_id}\nCourier state previous: {state}"
+            log.info(log_message)
+
+            return await handler(event, data)
+
+
+class CourierInnerMiddleware(BaseMiddleware):
+
+    def __init__(self, rediska: RedisService):
+        super().__init__()
+        self.rediska = rediska
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
+    ) -> Any:
+
+        fsm_context = data.get("state")
+        fsm_context = data.get("state")
+        state: FSMContext = (
+            await fsm_context.get_state()
+            if fsm_context
+            else await self.rediska.get_state()
+        )
+
+        log_message = ""
+        if isinstance(event, Message):
+            user_id = event.from_user.id
+            message_text = event.text
+
+            log_message += f"Couriers - 🚴\nInner_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
+
+        elif isinstance(event, CallbackQuery):
+            user_id = event.from_user.id
+            callback_data = event.data
+
+            log_message += f"Couriers - 🚴\nInner_mw\nCallback data: {callback_data}\nCourier ID: {user_id}"
+
+        result = await handler(event, data)
+
+        updated_state = await fsm_context.get_state() if fsm_context else "No state"
+        log_message += f"\nCourier state now: {updated_state}"
+
+        log.info(log_message)
+        return result
+
+
+async def _check_state_and_handle_message(
     state: str, event: Message, handler: Callable, data: Dict[str, Any]
 ) -> Any:
     message_text = event.text
@@ -66,71 +152,6 @@ async def check_state_and_handle_message(
         return
 
     return await handler(event, data)
-
-
-class CourierOuterMiddleware(BaseMiddleware):
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any],
-    ) -> Any:
-
-        fsm_context = data.get("state")
-        state = await fsm_context.get_state() if fsm_context else "No state"
-
-        if isinstance(event, Message):
-            user_id = event.from_user.id
-            message_text = event.text
-
-            # Формируем лог-сообщение для OuterMiddleware
-            log_message = f"Couriers - 🚴\nOuter_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            log.info(log_message)
-
-            result = await check_state_and_handle_message(state, event, handler, data)
-            return result
-
-        elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id
-            callback_data = event.data
-
-            log_message = f"Couriers - 🚴\nOuter_mw\nCallback data: {callback_data}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            log.info(log_message)
-
-            return await handler(event, data)
-
-
-class CourierInnerMiddleware(BaseMiddleware):
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any],
-    ) -> Any:
-
-        fsm_context = data.get("state")
-        state = await fsm_context.get_state() if fsm_context else "No state"
-
-        log_message = ""
-        if isinstance(event, Message):
-            user_id = event.from_user.id
-            message_text = event.text
-
-            log_message += f"Couriers - 🚴\nInner_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
-
-        elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id
-            callback_data = event.data
-
-            log_message += f"Couriers - 🚴\nInner_mw\nCallback data: {callback_data}\nCourier ID: {user_id}"
-
-        result = await handler(event, data)
-
-        updated_state = await fsm_context.get_state() if fsm_context else "No state"
-        log_message += f"\nCourier state now: {updated_state}"
-
-        log.info(log_message)
-        return result
 
 
 __all__ = ["CourierOuterMiddleware", "CourierInnerMiddleware"]
