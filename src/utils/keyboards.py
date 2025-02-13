@@ -1,11 +1,11 @@
-from ._deps import (
+from aiogram.types import (
     Message,
-    Optional,
-    ReplyKeyboardMarkup,
     KeyboardButton,
+    ReplyKeyboardMarkup,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
+from typing import Optional
 
 
 class Keyboard:

@@ -1,11 +1,17 @@
-from clock import *
-from db import *
-from logger import *
-from ai import *
-from geocoder import *
-from payment import *
-from routers import *
-from bots import *
+from .clock import moscow_time, utc_time
+from .db import db_settings
+from .logger import log
+from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY
+from .geocoder import YANDEX_API_KEY
+from .payment import payment_provider
+from .routers import (
+    customer_r,
+    courier_r,
+    customer_fallback,
+    courier_fallback,
+    payment_r,
+)
+from .bots import customer_bot, couriers_bot, customer_dp, courier_dp
 
 
 __all__ = [
@@ -26,5 +32,6 @@ __all__ = [
     "customer_bot",
     "couriers_bot",
     "customer_dp",
-    "couriers_dp",
+    "courier_dp",
+    "payment_r",
 ]

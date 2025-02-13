@@ -1,13 +1,7 @@
-from ._deps import (
-    requests,
-    datetime,
-    urllib3,
-    sqrt,
-    sin,
-    cos,
-    atan2,
-    radians,
-)
+import urllib3
+import requests
+from datetime import datetime
+from math import cos, radians, sin, sqrt, atan2
 from config import YANDEX_API_KEY
 
 

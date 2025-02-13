@@ -1,13 +1,11 @@
-from ._deps import (
-    os,
-    sys,
-    json,
-    fromstring,
-    BasicParser,
-    NetworkManager,
-    FileCache,
-    log,
-)
+import os
+import sys
+import json
+from lxml.html import fromstring
+from parselab.parsing import BasicParser
+from parselab.network import NetworkManager
+from parselab.cache import FileCache
+from config import log
 
 
 class CityParser(BasicParser):

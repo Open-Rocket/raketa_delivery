@@ -1,14 +1,11 @@
-from ._deps import (
-    BaseMiddleware,
-    logging,
-    TelegramObject,
+import logging
+from aiogram import Router, BaseMiddleware, filters, F
+from aiogram.fsm.context import FSMContext
+from typing import Callable, Dict, Any, Awaitable
+from aiogram.types import (
     Message,
+    TelegramObject,
     CallbackQuery,
-    Callable,
-    Dict,
-    Any,
-    Awaitable,
-    FSMContext,
 )
 from config import log
 from confredis import RedisService

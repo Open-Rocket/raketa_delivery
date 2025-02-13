@@ -1,13 +1,9 @@
-from ._deps import (
-    datetime,
-    select,
-    selectinload,
-    and_,
-    func,
-)
-from models import async_session_factory, Customer, Courier, OrderStatus, Order
+from src.models import async_session_factory, Customer, Courier, OrderStatus, Order
+from sqlalchemy import select, and_, func
+from sqlalchemy.orm import selectinload
+from datetime import datetime
 from config import moscow_time
-from router import route
+from .routing import route
 
 
 class CustomerData:

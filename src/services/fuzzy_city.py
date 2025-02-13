@@ -1,4 +1,5 @@
-from ._deps import asyncio, process, fuzz
+import asyncio
+from fuzzywuzzy import process, fuzz
 
 
 async def find_most_compatible_response(response: str, scenarios: list) -> str:

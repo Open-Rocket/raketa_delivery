@@ -3,6 +3,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters, F
+from datetime import datetime
 from middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from services import (
     customer_data,
@@ -42,6 +43,7 @@ __all__ = [
     "ContentType",
     "filters",
     "F",
+    "datetime",
     "CustomerOuterMiddleware",
     "CourierOuterMiddleware",
     "customer_data",

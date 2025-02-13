@@ -11,6 +11,7 @@ from ._deps import (
     MessageHandler,
     CustomerState,
     CustomerOuterMiddleware,
+    datetime,
     moscow_time,
     customer_r,
     customer_fallback,
@@ -28,7 +29,7 @@ from ._deps import (
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
-#                                             ⇣ Initializing Variables ⇣
+#                                                     ⇣ MDW ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
 

@@ -1,7 +1,7 @@
-from ai_assistant import assistant
-from router import route
-from order import formatter, recognizer
-from db_requests import customer_data, courier_data, order_data
+from .ai_assistant import assistant
+from .routing import route
+from .order import formatter, recognizer
+from .db_requests import customer_data, courier_data, order_data
 
 
 __all__ = [

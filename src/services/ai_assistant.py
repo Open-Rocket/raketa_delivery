@@ -1,4 +1,7 @@
-from ._deps import AsyncOpenAI, httpx, re, json
+import re
+import json
+import httpx
+from openai import AsyncOpenAI
 from config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 
 
@@ -11,8 +14,9 @@ class AssistantAi:
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             http_client=httpx.AsyncClient(
-                proxies=self.proxy,
-                transport=httpx.AsyncHTTPTransport(local_address="0.0.0.0"),
+                transport=httpx.AsyncHTTPTransport(
+                    local_address="0.0.0.0", proxy=self.proxy
+                ),
             ),
         )
 

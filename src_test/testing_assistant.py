@@ -1,13 +1,9 @@
-from app import moscow_time
-from app.u_pack import AssistantAi
-from app.common import OrderFormatter
+from config import moscow_time, log
+from src.services import assistant
+from src.services import formatter
+
 import time
 import asyncio
-
-from app.user.services import logger
-
-assistant = AssistantAi()
-formatter = OrderFormatter()
 
 
 messages = [
@@ -31,7 +27,7 @@ async def get_assistant_response():
         messages[0], city="Москва"
     )
 
-    form = await formatter(
+    prepare_dict = await formatter._prepare_data(
         moscow_time,
         city,
         user_name,
@@ -39,16 +35,18 @@ async def get_assistant_response():
         addresses,
         delivery_object,
         description,
-    ).generate_first_order_form()
+    )
+
+    form = await formatter.format_order_form(prepare_dict)
 
     end_time = time.perf_counter()
     execution_time = end_time - start_time
 
-    logger.info(f"Order form:\n\n{form}\n")
-    logger.info(f"Time taken: {execution_time:.4f} seconds\n")
+    log.info(f"Order form:\n\n{form}\n")
+    log.info(f"Time taken: {execution_time:.4f} seconds\n")
 
 
 asyncio.run(get_assistant_response())
 
 # source .venv/bin/activate
-# python -m app.u_pack.testing_assistant
+# python -m src_test.testing_assistant

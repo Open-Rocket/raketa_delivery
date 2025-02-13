@@ -1,19 +1,25 @@
-from ._deps import (
-    os,
-    enum,
-    datetime,
-    Optional,
-    Annotated,
-    load_dotenv,
-    JSONB,
-    ARRAY,
+import os
+import enum
+from datetime import datetime
+from typing import Optional, Annotated
+from dotenv import load_dotenv
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+
+
+from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     async_sessionmaker,
     create_async_engine,
+)
+
+from sqlalchemy.orm import (
     Mapped,
     DeclarativeBase,
     mapped_column,
     relationship,
+)
+
+from sqlalchemy import (
     ForeignKey,
     String,
     BigInteger,
@@ -25,6 +31,7 @@ from ._deps import (
     Integer,
 )
 from config import db_settings, moscow_time, utc_time
+
 
 load_dotenv()
 

@@ -1,4 +1,5 @@
-from dependencies._dependencies import Router
+from aiogram import Router
+
 
 payment_r = Router()
 customer_r = Router()

@@ -1,11 +1,15 @@
-from ._deps import io, sr, AudioSegment, Message, ContentType
+import io
+import speech_recognition as sr
+from pydub import AudioSegment
+from aiogram.types import Message
+from aiogram.enums import ContentType
 from config import log
-from router import route
+from .routing import route
 
 
 class OrderFormatter:
     @staticmethod
-    async def prepare_data(
+    async def _prepare_data(
         time: str,
         city: str,
         customer_name: str,
@@ -50,7 +54,6 @@ class OrderFormatter:
             "city": city,
             "customer_name": customer_name,
             "customer_phone": customer_phone,
-            "formatted_addresses": formatted_addresses,
             "addresses_text": addresses_text,
             "delivery_object": delivery_object,
             "description": description,
@@ -60,18 +63,19 @@ class OrderFormatter:
         }
 
     @staticmethod
-    async def format_order_form(
-        city: str,
-        customer_name: str,
-        customer_phone: str,
-        addresses_text: str,
-        delivery_object: str,
-        distance: int,
-        price: int,
-        description: int,
-        yandex_maps_url: str,
-    ) -> str:
+    async def format_order_form(data: dict) -> str:
         """Форматирует и возвращает текст заказа на основе подготовленных данных."""
+        (
+            city,
+            customer_name,
+            customer_phone,
+            addresses_text,
+            delivery_object,
+            description,
+            yandex_maps_url,
+            distance,
+            price,
+        ) = [data[key] for key in data.keys()]
 
         return (
             f"<b>Ваш заказ</b> ✍︎\n"

@@ -1,4 +1,4 @@
-from ._deps import StatesGroup, State
+from aiogram.fsm.state import StatesGroup, State
 
 
 class CustomerState(StatesGroup):

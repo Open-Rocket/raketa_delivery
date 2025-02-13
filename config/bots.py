@@ -1,4 +1,7 @@
-from dependencies._dependencies import os, Bot, Dispatcher, load_dotenv
+import os
+from aiogram import Bot, Dispatcher
+from dotenv import load_dotenv
+
 
 load_dotenv()
 

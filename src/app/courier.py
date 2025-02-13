@@ -1,48 +1,39 @@
-from dependencies._dependencies import (
-    Router,
+from ._deps import (
     asyncio,
-    Message,
-    CallbackQuery,
     CommandStart,
     FSMContext,
     ContentType,
     filters,
-    LabeledPrice,
-    PreCheckoutQuery,
-    F,
-)
-from config import (
-    customer_bot,
+    Message,
+    CallbackQuery,
+    OrderStatus,
+    MessageHandler,
+    CourierState,
+    CourierOuterMiddleware,
+    datetime,
+    moscow_time,
     courier_r,
     courier_fallback,
-    payment_provider,
-    payment_r,
-    moscow_time,
-)
-from utils import (
-    MessageHandler,
-    CourierInnerMiddleware,
-    CourierOuterMiddleware,
-    CourierState,
-    title,
     kb,
-)
-from services import (
-    courier_data,
+    title,
+    customer_data,
     order_data,
     route,
+    recognizer,
+    rediska,
+    assistant,
+    log,
+    F,
 )
-from models import OrderStatus
 
 
-from datetime import datetime
+# ------------------------------------------------------------------------------------------------------------------- #
+#                                                     ⇣ MDW ⇣
+# ------------------------------------------------------------------------------------------------------------------- #
 
 
 courier_r.message.outer_middleware(CourierOuterMiddleware())
 courier_r.callback_query.outer_middleware(CourierOuterMiddleware())
-
-courier_r.message.middleware(CourierInnerMiddleware())
-courier_r.callback_query.middleware(CourierInnerMiddleware())
 
 
 # ------------------------------------------------------------------------------------------------------------------- #

@@ -1,4 +1,5 @@
-from ._deps import os, FSInputFile
+import os
+from aiogram.types import FSInputFile
 
 
 class Title:
