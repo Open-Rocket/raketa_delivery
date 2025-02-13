@@ -7,6 +7,7 @@ from lxml.html import fromstring
 from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
 from parselab.cache import FileCache
+from config import log
 
 
 class CityParser(BasicParser):
@@ -27,13 +28,13 @@ class CityParser(BasicParser):
                 '//span[contains(@class, "coordinates")]//a[@class="mw-kartographer-maplink"]'
             )
             if not spans:
-                print(f"Координаты не найдены для {url}", file=sys.stderr)
+                log.info(f"Координаты не найдены для {url}", file=sys.stderr)
                 return {"lat": "", "lon": ""}
 
             span = spans[0]
             return {"lat": span.get("data-lat"), "lon": span.get("data-lon")}
         except Exception as e:
-            print(f"Ошибка при получении координат: {e}", file=sys.stderr)
+            log.error(f"Ошибка при получении координат: {e}", file=sys.stderr)
             return {"lat": "", "lon": ""}
 
     def run(self):
@@ -60,7 +61,7 @@ class CityParser(BasicParser):
             city.update({"coords": self.get_coords(f"https://ru.wikipedia.org{url}")})
             self.data.append(city)
 
-            print(f"Обработан город: {name}")
+            log.info(f"Обработан город: {name}")
 
         output = sorted(
             self.data, key=lambda k: f"{k['name']}|{k['subject']}|{k['district']}"
@@ -73,9 +74,11 @@ class CityParser(BasicParser):
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=4)
 
-        print(f"Данные сохранены в {output_path}")
+        log.info(f"Данные сохранены в {output_path}")
 
 
 if __name__ == "__main__":
     parser = CityParser()
     parser.run()
+
+# python parser/_parser.py
