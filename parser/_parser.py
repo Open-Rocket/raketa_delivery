@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import json
@@ -5,11 +7,9 @@ from lxml.html import fromstring
 from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
 from parselab.cache import FileCache
-from config import log
 
 
 class CityParser(BasicParser):
-
     data = []
 
     def __init__(self):
@@ -19,15 +19,21 @@ class CityParser(BasicParser):
         self.net = NetworkManager()
 
     def get_coords(self, url):
+        page = self.get_page(url)
+        html = fromstring(page)
+
         try:
-            page = self.get_page(url)
-            html = fromstring(page)
-            span = html.xpath(
+            spans = html.xpath(
                 '//span[contains(@class, "coordinates")]//a[@class="mw-kartographer-maplink"]'
-            )[0]
+            )
+            if not spans:
+                print(f"Координаты не найдены для {url}", file=sys.stderr)
+                return {"lat": "", "lon": ""}
+
+            span = spans[0]
             return {"lat": span.get("data-lat"), "lon": span.get("data-lon")}
         except Exception as e:
-            log.info(f"Ошибка при получении координат: {e}", file=sys.stderr)
+            print(f"Ошибка при получении координат: {e}", file=sys.stderr)
             return {"lat": "", "lon": ""}
 
     def run(self):
@@ -38,6 +44,7 @@ class CityParser(BasicParser):
             columns = tr.xpath(".//td")
             if len(columns) != 9:
                 continue
+
             name = columns[2].xpath("./a")[0].text_content().strip()
             url = columns[2].xpath("./a")[0].get("href")
             subject = columns[3].text_content().strip()
@@ -50,24 +57,25 @@ class CityParser(BasicParser):
                 "district": district,
                 "population": population,
             }
-            city.update({"coords": self.get_coords("https://ru.wikipedia.org%s" % url)})
+            city.update({"coords": self.get_coords(f"https://ru.wikipedia.org{url}")})
             self.data.append(city)
 
-            log.info(name, file=sys.stderr)
+            print(f"Обработан город: {name}")
 
         output = sorted(
-            self.data,
-            key=lambda k: "%s|%s|%s" % (k["name"], k["subject"], k["district"]),
+            self.data, key=lambda k: f"{k['name']}|{k['subject']}|{k['district']}"
         )
 
         # Сохранение в файл
-        with open("cities.json", "w", encoding="utf-8") as f:
+        output_path = "parser/json/russian-cities.json"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=4)
+
+        print(f"Данные сохранены в {output_path}")
 
 
 if __name__ == "__main__":
-    city_parser = CityParser()
-    city_parser.run()
-
-
-__all__ = ["city_parser"]
+    parser = CityParser()
+    parser.run()

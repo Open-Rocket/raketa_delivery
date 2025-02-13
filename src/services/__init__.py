@@ -12,5 +12,4 @@ __all__ = [
     "customer_data",
     "courier_data",
     "order_data",
-    "city_parser",
 ]

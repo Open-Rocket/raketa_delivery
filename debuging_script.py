@@ -19,7 +19,7 @@ def divide(a, b):
 def main():
     x = 10
     y = 5
-    z = 0
+    z = 1
 
     print("Addition:", add(x, y))
     print("Subtraction:", subtract(x, y))

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from models import drop_create_db
 from confredis import rediska
 from config import (

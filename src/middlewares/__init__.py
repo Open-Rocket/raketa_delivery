@@ -1,5 +1,5 @@
-from .middleware_customer import CustomerOuterMiddleware
-from .middlewares_courier import CourierOuterMiddleware
+from .customer_mdw import CustomerOuterMiddleware
+from .courier_mdw import CourierOuterMiddleware
 
 
 __all__ = [
