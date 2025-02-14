@@ -2,7 +2,7 @@ import re
 import json
 import httpx
 from openai import AsyncOpenAI
-from config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
+from src.config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 
 
 class AssistantAi:

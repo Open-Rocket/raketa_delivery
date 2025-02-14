@@ -2,7 +2,7 @@ import urllib3
 import requests
 from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
-from config import YANDEX_API_KEY
+from src.config import YANDEX_API_KEY
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

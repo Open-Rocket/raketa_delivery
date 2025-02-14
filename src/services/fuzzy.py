@@ -1,9 +1,8 @@
 import os
-import sys
 import asyncio
 import json
-from fuzzywuzzy import process, fuzz
-from config import log
+from fuzzywuzzy import process
+from src.config import log
 
 
 class CityList:

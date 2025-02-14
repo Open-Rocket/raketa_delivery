@@ -1,11 +1,12 @@
 import asyncio
+from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from aiogram import filters, F
 from datetime import datetime
-from middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
-from services import (
+from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
+from src.services import (
     customer_data,
     courier_data,
     order_data,
@@ -13,9 +14,9 @@ from services import (
     route,
     recognizer,
 )
-from models import OrderStatus
-from confredis import rediska
-from config import (
+from src.models import OrderStatus
+from src.confredis import rediska
+from src.config import (
     moscow_time,
     customer_r,
     courier_r,
@@ -27,7 +28,7 @@ from aiogram.types import (
     Message,
     CallbackQuery,
 )
-from utils import (
+from src.utils import (
     MessageHandler,
     CustomerState,
     CourierState,
@@ -67,4 +68,5 @@ __all__ = [
     "CourierState",
     "kb",
     "title",
+    "Router",
 ]

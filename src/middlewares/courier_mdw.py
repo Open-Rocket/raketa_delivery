@@ -7,9 +7,9 @@ from aiogram.types import (
     TelegramObject,
     CallbackQuery,
 )
-from config import log
-from confredis import RedisService
-from utils import CourierState
+from src.config import log
+from src.confredis import RedisService
+from src.utils import CourierState
 
 
 logging.basicConfig(

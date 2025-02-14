@@ -5,18 +5,21 @@ aiohttp==3.11.12
 aiosignal==1.3.2
 annotated-types==0.7.0
 anyio==4.8.0
+asyncpg==0.30.0
 attrs==25.1.0
 certifi==2025.1.31
 charset-normalizer==3.4.1
 distro==1.9.0
 frozenlist==1.5.0
 fuzzywuzzy==0.18.0
+greenlet==3.1.1
 h11==0.14.0
 httpcore==1.0.7
 httpx==0.28.1
 idna==3.10
 iniconfig==2.0.0
 jiter==0.8.2
+Levenshtein==0.26.1
 lxml==5.3.0
 magic-filter==1.0.12
 multidict==6.1.0
@@ -25,7 +28,6 @@ packaging==24.2
 parselab==0.1.8
 pluggy==1.5.0
 propcache==0.2.1
-psycopg2==2.9.10
 pydantic==2.10.6
 pydantic-settings==2.5.0
 pydantic_core==2.27.2
@@ -34,7 +36,9 @@ PySocks==1.7.1
 pytest==8.3.3
 pytest-asyncio==0.25.3
 python-dotenv==1.0.1
+python-Levenshtein==0.26.1
 pytz==2024.2
+RapidFuzz==3.12.1
 redis==5.2.1
 requests==2.32.3
 sniffio==1.3.1
@@ -43,4 +47,4 @@ SQLAlchemy==2.0.34
 tqdm==4.67.1
 typing_extensions==4.12.2
 urllib3==2.2.2
-yarl==1.18.3
+

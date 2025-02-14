@@ -2,7 +2,7 @@ from src.models import async_session_factory, Customer, Courier, OrderStatus, Or
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 from datetime import datetime
-from config import moscow_time
+from src.config import moscow_time
 from .routing import route
 
 

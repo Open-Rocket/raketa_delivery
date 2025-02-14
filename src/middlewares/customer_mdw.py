@@ -8,19 +8,14 @@ from aiogram.types import (
     CallbackQuery,
 )
 
-from config import log
-from confredis import RedisService
-from utils import CustomerState
-
-
-logging.basicConfig(
-    level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
-)
+from src.config import log
+from src.confredis import RedisService
+from src.utils import CustomerState
 
 
 class CustomerOuterMiddleware(BaseMiddleware):
 
-    def __init__(self, rediska: RedisService, state: FSMContext):
+    def __init__(self, rediska: RedisService):
         super().__init__()
         self.rediska = rediska
 
@@ -33,16 +28,18 @@ class CustomerOuterMiddleware(BaseMiddleware):
 
         customer_id = event.from_user.id
         fsm_context: FSMContext = data.get("state")
+        state = await fsm_context.get_state()
 
-        if fsm_context is not None:
-            state = fsm_context.get_state()
-            await self.rediska.set_state(event.bot, customer_id, state)
-        else:
-            state = await self.rediska.get_state(event.bot, customer_id)
+        log.info(f"state: {state}")
+
+        if state is None:
+            state = await self.rediska.get_state(event.bot.id, customer_id)
+            log.info(f"state from redis: {state}")
             if state is None:
                 state = CustomerState.default.state
-                await fsm_context.set_state(state)
-                await self.rediska.set_state(event.bot, customer_id, state)
+                log.info(f"state default: {state}")
+
+            await fsm_context.set_state(state)
 
         if isinstance(event, Message):
             user_id = event.from_user.id

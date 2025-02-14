@@ -2,42 +2,29 @@ import asyncio
 import logging
 from src.models import drop_create_db
 from src.confredis import rediska
+from src.app.customer import customer_r, customer_fallback
 from src.config import (
-    # customer_bot,
-    # couriers_bot,
-    # customer_dp,
-    # courier_dp,
-    customer_r,
+    customer_bot,
+    couriers_bot,
+    customer_dp,
+    courier_dp,
+    # customer_r,
     courier_r,
-    customer_fallback,
+    # customer_fallback,
     courier_fallback,
     payment_r,
     log,
 )
 
-import os
-from aiogram import Bot, Dispatcher, Router
-from dotenv import load_dotenv
+# import os
+# from aiogram import Bot, Dispatcher, Router
+# from dotenv import load_dotenv
 
 
 async def main():
 
     # customer_dp["redis"] = rediska
     # courier_dp["redis"] = rediska
-
-    payment_r = Router()
-    customer_r = Router()
-    courier_r = Router()
-    customer_fallback = Router()
-    courier_fallback = Router()
-
-    load_dotenv()
-
-    customer_bot = Bot(token=os.getenv("CUSTOMER_BOT"))
-    couriers_bot = Bot(token=os.getenv("COURIER_BOT"))
-
-    customer_dp = Dispatcher()
-    courier_dp = Dispatcher()
 
     customer_dp.include_routers(customer_r, customer_fallback)
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)

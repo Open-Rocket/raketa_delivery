@@ -11,6 +11,7 @@ from ._deps import (
     MessageHandler,
     CustomerState,
     CustomerOuterMiddleware,
+    Router,
     datetime,
     moscow_time,
     customer_r,
@@ -26,9 +27,6 @@ from ._deps import (
     log,
     F,
 )
-from aiogram import Router
-
-customer_r = Router()
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -37,8 +35,8 @@ customer_r = Router()
 
 
 # middlewares_Outer
-# customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
-# customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
+customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
+customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
@@ -49,14 +47,16 @@ customer_r = Router()
 # start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
-    await state.set_state(CustomerState.reg_state)
-    await rediska.set_state(message.bot, customer_id, CustomerState.reg_state)
-    handler = MessageHandler(state, message.bot)
     customer_id = message.from_user.id
+    await state.set_state(CustomerState.reg_state)
+    await rediska.set_state(message.bot.id, customer_id, CustomerState.reg_state)
+    handler = MessageHandler(state, message.bot)
     is_reg = await rediska.is_reg(customer_id)
 
     if is_reg:
+        log.info(f"user: {customer_id} is_reg")
         await state.set_state(CustomerState.default)
+        await rediska.set_state(message.bot.id, customer_id, CustomerState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
         new_message = await message.answer(
@@ -65,7 +65,7 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
         await handler.handle_new_message(new_message, message)
         return
     else:
-        await rediska.set_user_info(customer_id)
+        # await rediska.set_user_info(customer_id)
         await handler.delete_previous_message(message.chat.id)
         photo_title = await title.get_title_customer("/start")
         text = (

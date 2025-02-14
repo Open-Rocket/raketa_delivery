@@ -6,7 +6,9 @@ class Title:
 
     @staticmethod
     async def get_title_courier(command: str):
-        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
+        dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "../..", "public"
+        )
 
         paths = {
             "/start": "courier_start.jpg",
@@ -27,10 +29,12 @@ class Title:
 
     @staticmethod
     async def get_title_customer(command: str):
-        dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
+        dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "../..", "public"
+        )
 
         paths = {
-            "/start": "user_start.jpg",
+            "/start": "customer_start.jpg",
             "/order": "order.jpg",
             "/become_courier": "became_a_courier.jpg",
         }

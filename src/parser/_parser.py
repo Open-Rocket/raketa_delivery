@@ -7,7 +7,7 @@ from lxml.html import fromstring
 from parselab.parsing import BasicParser
 from parselab.network import NetworkManager
 from parselab.cache import FileCache
-from config import log
+from src.config import log
 
 
 class CityParser(BasicParser):

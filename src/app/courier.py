@@ -11,6 +11,7 @@ from ._deps import (
     CourierState,
     CourierOuterMiddleware,
     datetime,
+    Router,
     moscow_time,
     courier_r,
     courier_fallback,
