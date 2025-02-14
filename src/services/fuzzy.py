@@ -3,8 +3,6 @@ import sys
 import asyncio
 import json
 from fuzzywuzzy import process, fuzz
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from config import log
 
 

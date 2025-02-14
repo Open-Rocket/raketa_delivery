@@ -30,7 +30,7 @@ from sqlalchemy import (
     Float,
     Integer,
 )
-from config import db_settings, moscow_time, utc_time
+from src.config import db_settings, moscow_time, utc_time
 
 
 load_dotenv()
@@ -90,7 +90,7 @@ class Customer(Base):
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
-    orders = relationship("Order", back_populates="user")
+    orders = relationship("Order", back_populates="customers")
 
 
 class Courier(Base):
@@ -105,7 +105,7 @@ class Courier(Base):
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[stringData]
 
-    orders = relationship("Order", back_populates="courier")
+    orders = relationship("Order", back_populates="couriers")
     subscription = relationship("Subscription", back_populates="couriers")
 
 
@@ -118,7 +118,7 @@ class Order(Base):
         Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING
     )
     customer_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=True
+        Integer, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=True
     )
     courier_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"), nullable=True
@@ -136,10 +136,6 @@ class Order(Base):
     price_rub: Mapped[intData]
     description: Mapped[textData]
     full_rout: Mapped[stringData]
-
-    order_status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, native_enum=False), nullable=False
-    )
 
     courier = relationship("Courier", back_populates="orders")
     customer = relationship("Customer", back_populates="orders")
@@ -179,5 +175,5 @@ __all__ = [
 async def drop_create_db():
     async with engine.begin() as conn:
         # engine.echo = False
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all, checkfirst=True)
         await conn.run_sync(Base.metadata.create_all)

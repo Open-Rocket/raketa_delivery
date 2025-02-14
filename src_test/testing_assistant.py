@@ -1,4 +1,4 @@
-from config import moscow_time, log
+from src.config import moscow_time, log
 from src.services import assistant
 from src.services import formatter
 

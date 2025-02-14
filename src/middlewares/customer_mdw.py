@@ -20,7 +20,7 @@ logging.basicConfig(
 
 class CustomerOuterMiddleware(BaseMiddleware):
 
-    def __init__(self, rediska: RedisService):
+    def __init__(self, rediska: RedisService, state: FSMContext):
         super().__init__()
         self.rediska = rediska
 
@@ -31,12 +31,18 @@ class CustomerOuterMiddleware(BaseMiddleware):
         data: Dict[str, Any],
     ) -> Any:
 
-        fsm_context = data.get("state")
-        state: FSMContext = (
-            await fsm_context.get_state()
-            if fsm_context
-            else await self.rediska.get_state()
-        )
+        customer_id = event.from_user.id
+        fsm_context: FSMContext = data.get("state")
+
+        if fsm_context is not None:
+            state = fsm_context.get_state()
+            await self.rediska.set_state(event.bot, customer_id, state)
+        else:
+            state = await self.rediska.get_state(event.bot, customer_id)
+            if state is None:
+                state = CustomerState.default.state
+                await fsm_context.set_state(state)
+                await self.rediska.set_state(event.bot, customer_id, state)
 
         if isinstance(event, Message):
             user_id = event.from_user.id
@@ -93,7 +99,7 @@ async def _check_state_and_handle_message(
         state == CustomerState.reg_Phone.state
         or state == CustomerState.change_Phone.state
     ):
-        if event.content_type == "contact":  # Если тип контента - контакт
+        if event.content_type == "contact":
             return await handler(event, data)
         else:
             await event.delete()
