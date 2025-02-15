@@ -4,7 +4,6 @@ from .redis_config import RedisConfig
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
-from aiogram import Bot
 from typing import Optional
 
 
@@ -21,7 +20,7 @@ class RedisKey:
     ):
         self.bot_id = bot_id
         self.user_id = user_id
-        self.chat_id = f"{bot_id}:{user_id}"
+        self.chat_id = f"{bot_id}{user_id}"
         self.thread_id = thread_id
         self.business_connection_id = business_connection_id
         self.destiny = destiny
@@ -108,6 +107,13 @@ async def create_redis_service() -> RedisService:
     return RedisService(redis_instance)
 
 
-rediska: RedisService = asyncio.run(create_redis_service())
+async def main():
+
+    rediska: RedisService = await create_redis_service()
+
+    return rediska
+
+
+rediska = asyncio.run(main())
 
 __all__ = ["rediska", "create_redis_service", "RedisService"]

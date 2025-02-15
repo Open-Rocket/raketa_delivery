@@ -30,14 +30,16 @@ class CustomerOuterMiddleware(BaseMiddleware):
         fsm_context: FSMContext = data.get("state")
         state = await fsm_context.get_state()
 
-        log.info(f"state: {state}")
-
         if state is None:
             state = await self.rediska.get_state(event.bot.id, customer_id)
-            log.info(f"state from redis: {state}")
             if state is None:
                 state = CustomerState.default.state
-                log.info(f"state default: {state}")
+                log.info(
+                    f"Customer 🧍\n"
+                    f"- Outer_mw\n"
+                    f"- Customer ID: {customer_id} visited the service for the first time\n"
+                    f"- Customer state: {state}"
+                )
 
             await fsm_context.set_state(state)
 
@@ -45,9 +47,13 @@ class CustomerOuterMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             message_text = event.text
 
-            # Формируем лог-сообщение для OuterMiddleware
-            log_message = f"Customer - 🧍\nOuter_mw\nUser message: {message_text}\Customer ID: {user_id}\Customer state previous: {state}"
-            log.info(log_message)
+            log.info(
+                f"Customer 🧍\n"
+                f"- Outer_mw\n"
+                f"- Customer message: {message_text}\n"
+                f"- Customer ID: {user_id}\n"
+                f"- Customer state previous: {state}"
+            )
 
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result

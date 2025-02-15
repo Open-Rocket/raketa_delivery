@@ -1,9 +1,8 @@
 import asyncio
-from aiogram import Router
+from aiogram import Router, filters, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
-from aiogram import filters, F
 from datetime import datetime
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from src.services import (
@@ -20,14 +19,12 @@ from src.config import (
     moscow_time,
     customer_r,
     courier_r,
+    payment_r,
     customer_fallback,
     courier_fallback,
     log,
 )
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-)
+from aiogram.types import Message, CallbackQuery, PreCheckoutQuery
 from src.utils import (
     MessageHandler,
     CustomerState,
@@ -69,4 +66,6 @@ __all__ = [
     "kb",
     "title",
     "Router",
+    "payment_r",
+    "PreCheckoutQuery",
 ]

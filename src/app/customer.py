@@ -43,20 +43,27 @@ customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 #                                              ⇣ Registration steps ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
+# handlers
+
 
 # start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     customer_id = message.from_user.id
-    await state.set_state(CustomerState.reg_state)
-    await rediska.set_state(message.bot.id, customer_id, CustomerState.reg_state)
+    current_state = CustomerState.reg_state.state
+    await state.set_state(current_state)
+    await rediska.set_state(message.bot.id, customer_id, current_state)
     handler = MessageHandler(state, message.bot)
     is_reg = await rediska.is_reg(customer_id)
+    log.info(
+        f"Customer 🧍\n"
+        f"- Handler /start\n"
+        f"- Customer ID: {customer_id}\n"
+        f"- Customer message: {message.text}\n"
+        f"- Customer state now: {current_state}"
+    )
 
     if is_reg:
-        log.info(f"user: {customer_id} is_reg")
-        await state.set_state(CustomerState.default)
-        await rediska.set_state(message.bot.id, customer_id, CustomerState.default)
         await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
         new_message = await message.answer(
@@ -64,33 +71,31 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
         )
         await handler.handle_new_message(new_message, message)
         return
-    else:
-        # await rediska.set_user_info(customer_id)
-        await handler.delete_previous_message(message.chat.id)
-        photo_title = await title.get_title_customer("/start")
-        text = (
-            f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
-            f"Почему выбирают нас?\n\n"
-            f"◉ Низкие цены:\n"
-            f"Наши пешие курьеры находятся рядом с вами, что снижает стоимость и ускоряет доставку.\n\n"
-            f"◉ Простота и удобство:\n"
-            f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
-        )
-        reply_kb = await kb.get_customer_kb("/start")
 
-        new_message = await message.answer_photo(
-            photo=photo_title,
-            caption=text,
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-            disable_notification=True,
-        )
-        await handler.handle_new_message(new_message, message)
+    await handler.delete_previous_message(message.chat.id)
+    photo_title = await title.get_title_customer("/start")
+    text = (
+        f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
+        f"Почему выбирают нас?\n\n"
+        f"◉ Низкие цены:\n"
+        f"Наши пешие курьеры находятся рядом с вами, что снижает стоимость и ускоряет доставку.\n\n"
+        f"◉ Простота и удобство:\n"
+        f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
+    )
+    reply_kb = await kb.get_customer_kb("/start")
+    new_message = await message.answer_photo(
+        photo=photo_title,
+        caption=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+        disable_notification=True,
+    )
+    await handler.handle_new_message(new_message, message)
 
 
 # registration_Name
 @customer_r.callback_query(F.data == "reg")
-async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
+async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.reg_Name)
     handler = MessageHandler(state, callback_query.bot)
     # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
@@ -108,7 +113,7 @@ async def data_reg_user(callback_query: CallbackQuery, state: FSMContext):
 
 # registration_Phone
 @customer_r.message(filters.StateFilter(CustomerState.reg_Name))
-async def data_name_user(message: Message, state: FSMContext):
+async def data_name_customer(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -137,7 +142,7 @@ async def data_name_user(message: Message, state: FSMContext):
 
 # registration_City
 @customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
-async def data_phone_user(message: Message, state: FSMContext):
+async def data_phone_customer(message: Message, state: FSMContext):
     await state.set_state(CustomerState.reg_City)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
@@ -159,7 +164,7 @@ async def data_phone_user(message: Message, state: FSMContext):
 
 # terms of use
 @customer_r.message(filters.StateFilter(CustomerState.reg_City))
-async def data_city_user(message: Message, state: FSMContext):
+async def data_city_customer(message: Message, state: FSMContext):
     await state.set_state(CustomerState.reg_tou)
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
@@ -185,7 +190,7 @@ async def data_city_user(message: Message, state: FSMContext):
 
 
 @customer_r.callback_query(F.data == "accept_tou")
-async def user_accept_tou(callback_query: CallbackQuery, state: FSMContext):
+async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.default)
     handler = MessageHandler(state, callback_query.bot)
 
@@ -306,6 +311,7 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# order
 @customer_r.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -388,6 +394,7 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+# set_my_name
 @customer_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.change_Name)
@@ -399,6 +406,7 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+# set_my_phone
 @customer_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.change_Phone)
@@ -411,6 +419,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+# set_my_city
 @customer_r.callback_query(F.data == "set_my_city")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.change_City)
@@ -422,6 +431,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
+# change name state
 @customer_r.message(filters.StateFilter(CustomerState.change_Name))
 async def change_name(message: Message, state: FSMContext):
     await state.set_state(CustomerState.default)
@@ -440,6 +450,7 @@ async def change_name(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# change phone state
 @customer_r.message(filters.StateFilter(CustomerState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
     await state.set_state(CustomerState.default)
@@ -458,6 +469,7 @@ async def change_phone(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# change city state
 @customer_r.message(filters.StateFilter(CustomerState.change_City))
 async def change_city(message: Message, state: FSMContext):
     await state.set_state(CustomerState.default)
@@ -481,6 +493,7 @@ async def change_city(message: Message, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
+# handler for /my_orders and back_myOrders
 @customer_r.message(F.text == "/my_orders")
 @customer_r.callback_query(F.data == "back_myOrders")
 async def handle_my_orders(event, state: FSMContext):
@@ -527,6 +540,7 @@ async def handle_my_orders(event, state: FSMContext):
         await event.answer()
 
 
+# customer orders
 @customer_r.callback_query(
     F.data.in_(
         {
@@ -680,6 +694,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# customer statistic
 @customer_r.callback_query(F.data == "my_statistic")
 async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     user_tg_id = callback_query.from_user.id
@@ -738,7 +753,7 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-# Обработчик кнопки "⇥" для перехода вперёд
+# handler for right button "⇥" to move forward
 @customer_r.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -764,7 +779,7 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
     )
 
 
-# Обработчик кнопки "⇤" для перехода назад
+# handler for left button "⇤" to move back
 @customer_r.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -793,6 +808,7 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
+# cancel order from orders
 @customer_r.callback_query(F.data == "cancel_my_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.message.bot)
@@ -830,6 +846,7 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
+# order process
 @customer_r.message(
     filters.StateFilter(CustomerState.ai_voice_order),
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
@@ -1384,6 +1401,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 # ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
 
 
+# fallback
 @customer_fallback.message()
 async def handle_unrecognized_message(message: Message):
     msg = message.text

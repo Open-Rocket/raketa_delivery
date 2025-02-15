@@ -11,10 +11,12 @@ from ._deps import (
     CourierState,
     CourierOuterMiddleware,
     datetime,
+    PreCheckoutQuery,
     Router,
     moscow_time,
     courier_r,
     courier_fallback,
+    payment_r,
     kb,
     title,
     customer_data,
@@ -33,8 +35,8 @@ from ._deps import (
 # ------------------------------------------------------------------------------------------------------------------- #
 
 
-courier_r.message.outer_middleware(CourierOuterMiddleware())
-courier_r.callback_query.outer_middleware(CourierOuterMiddleware())
+courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
+courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
 
 
 # ------------------------------------------------------------------------------------------------------------------- #
