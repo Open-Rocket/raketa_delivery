@@ -49,6 +49,7 @@ customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 # start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
+    # log.info("cmd_start_customer was called with message: %s", message)
     customer_id = message.from_user.id
     current_state = CustomerState.reg_state.state
     await state.set_state(current_state)
@@ -64,15 +65,14 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     )
 
     if is_reg:
-        await handler.delete_previous_message(message.chat.id)
         text = "▼ <b>Выберите действие ...</b>"
+        await handler.delete_previous_message(message.chat.id)
         new_message = await message.answer(
             text, parse_mode="HTML", disable_notification=True
         )
         await handler.handle_new_message(new_message, message)
         return
 
-    await handler.delete_previous_message(message.chat.id)
     photo_title = await title.get_title_customer("/start")
     text = (
         f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
@@ -83,6 +83,7 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
         f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
     )
     reply_kb = await kb.get_customer_kb("/start")
+    await handler.delete_previous_message(message.chat.id)
     new_message = await message.answer_photo(
         photo=photo_title,
         caption=text,

@@ -20,6 +20,7 @@ class MessageHandler:
                 await self.bot.delete_message(
                     chat_id=chat_id, message_id=previous_message_id
                 )
+
             except Exception as e:
                 log.error(f"Failed to delete the previous message: {e}")
 
