@@ -43,24 +43,26 @@ customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 #                                              ⇣ Registration steps ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
 
-# handlers
 
-
-# start
+# /start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     log.info(f"\n- cmd_start_customer was called!")
-    customer_id = message.from_user.id
+
+    bot_id = message.bot.id
+    customer_tg_id = message.from_user.id
     current_state = CustomerState.reg_state.state
+
     await state.set_state(current_state)
-    await rediska.set_state(message.bot.id, customer_id, current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+
     handler = MessageHandler(state, message.bot)
-    is_reg = await rediska.is_reg(customer_id)
+    is_reg = await rediska.is_reg(customer_tg_id)
     log.info(
         f"\n"
         f"- Customer 🧍\n"
         f"- Handler /start\n"
-        f"- Customer ID: {customer_id}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
         f"- Customer message: {message.text}\n"
         f"- Customer state now: {current_state}"
     )
@@ -99,10 +101,25 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
 # registration_Name
 @customer_r.callback_query(F.data == "reg")
 async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.reg_Name)
+    log.info(f"\n- data_reg_customer was called!")
+
+    bot_id = callback_query.message.bot.id
+    customer_tg_id = callback_query.message.from_user.id
+    current_state = CustomerState.reg_Name.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data == reg\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer message: {callback_query.message.text}\n"
+        f"- Customer state now: {current_state}"
+    )
+
     handler = MessageHandler(state, callback_query.bot)
-    # text = "Пройдите небольшую регистрацию, это не займет много времени.\n\n"
-    # await callback_query.answer(text, show_alert=True)
     text = (
         "Пройдите небольшую регистрацию.\n"
         "Это не займет много времени.\n\n"
@@ -112,35 +129,54 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
+    log.info(f"\n- data_reg_customer was successfully done!")
 
 
 # registration_Phone
 @customer_r.message(filters.StateFilter(CustomerState.reg_Name))
 async def data_name_customer(message: Message, state: FSMContext):
+    log.info(f"\n- data_name_customer was called!")
+
     handler = MessageHandler(state, message.bot)
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    customer_tg_id = message.from_user.id
+    customer_name = message.text
+    current_state = CustomerState.reg_Phone.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+    is_name_set = await rediska.set_user_name(bot_id, customer_tg_id, customer_name)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer message: {customer_name}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is name set: {is_name_set}"
+    )
+
+    reply_kb = await kb.get_customer_kb("phone_number")
+    text = (
+        f"Привет, {customer_name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
+        f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
+        f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
+        f"<i>*Отправка номера возможно только по клику на кнопку!</i>\n\n"
+        f"<b>Ваш номер:</b>"
+    )
+
     await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer(
+        text,
+        disable_notification=True,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+    await handler.handle_new_message(new_message, message)
 
-    tg_id = message.from_user.id
-    name = message.text
-    if len(name) > 42:
-        text = f"Слишком длинное имя!\n\n" f"<b>Введите имя еще раз:</b>"
-        msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
-    else:
-        await state.set_state(CustomerState.reg_Phone)
-        await customer_data.set_user_name(tg_id, name)
-        reply_kb = await kb.get_customer_kb(text="phone_number")
-        text = (
-            f"Привет, {name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
-            f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
-            f"<i>*При регистрации с компьютера нажмите на значек команд рядом с полем ввода.</i>\n\n"
-            f"<i>*Отправка номера возможно только по клику на кнопку!</i>\n\n"
-            f"<b>Ваш номер:</b>"
-        )
-
-        msg = await message.answer(
-            text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
-        )
-    await handler.handle_new_message(msg, message)
+    log.info(f"\n- data_name_customer was successfully done!")
 
 
 # registration_City
@@ -192,6 +228,7 @@ async def data_city_customer(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
+# tou Accept
 @customer_r.callback_query(F.data == "accept_tou")
 async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(CustomerState.default)

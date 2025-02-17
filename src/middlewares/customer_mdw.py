@@ -27,11 +27,19 @@ class CustomerOuterMiddleware(BaseMiddleware):
     ) -> Any:
 
         customer_id = event.from_user.id
-        fsm_context: FSMContext = data.get("state")
+        fsm_context = data.get("state")
         state = await fsm_context.get_state()
+
+        log.info(f"fsm_state: {state}")
 
         if state is None:
             state = await self.rediska.get_state(event.bot.id, customer_id)
+            log.info(
+                f"\n"
+                f"- Customer 🧍\n"
+                f"- Outer_mw\n"
+                f"- Customer state from redis: {state}"
+            )
             if state is None:
                 state_previous = state
                 state = CustomerState.default.state
@@ -72,7 +80,7 @@ class CustomerOuterMiddleware(BaseMiddleware):
                 f"- Outer_mw\n"
                 f"- Callback data: {callback_data}\n"
                 f"- Customer ID: {user_id}\n"
-                f"-Customer state previous: {state}"
+                f"- Customer state previous: {state}"
             )
 
             return await handler(event, data)

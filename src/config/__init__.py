@@ -11,7 +11,14 @@ from .routers import (
     courier_fallback,
     payment_r,
 )
-from .bots import customer_bot, couriers_bot, customer_dp, courier_dp
+from .bots import (
+    customer_bot,
+    couriers_bot,
+    customer_dp,
+    courier_dp,
+    fsm_customer_storage,
+    fsm_courier_storage,
+)
 
 
 __all__ = [
@@ -34,4 +41,6 @@ __all__ = [
     "customer_dp",
     "courier_dp",
     "payment_r",
+    "fsm_customer_storage",
+    "fsm_courier_storage",
 ]

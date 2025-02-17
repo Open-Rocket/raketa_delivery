@@ -36,39 +36,43 @@ class RedisService:
         self.redis = redis
         self.fsm_storage = RedisStorage(self.redis)
 
-    async def set_user_info(
+    async def set_user_name(
         self,
-        user_id: Optional[int] = None,
-        name: Optional[str] = None,
-        phone: Optional[str] = None,
-        city: Optional[str] = None,
-        is_reg: bool = False,
+        bot_id: int,
+        user_id: int,
+        name: str,
     ) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
-        await self.redis.hset(
-            f"user:{user_id}",
-            mapping={
-                "name": name,
-                "phone": phone,
-                "city": city,
-                "is_reg": is_reg,
-            },
-        )
+        key = RedisKey(bot_id, user_id)
+        await self.redis.hset(f"user:{key}", mapping={"name": name})
         return True
 
-    async def get_user_info(
-        self, user_id: int
-    ) -> tuple[str | None, str | None, str | None, bool | None]:
+    async def set_user_phone(
+        self,
+        bot_id: int,
+        user_id: int,
+        phone: str,
+    ) -> bool:
+        """Сохраняет имя и телефон пользователя в Redis"""
+        key = RedisKey(bot_id, user_id)
+        await self.redis.hset(f"user:{key}", mapping={"phone": phone})
+        return True
+
+    async def get_user_name(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
-        user_data = await self.redis.hgetall(f"user:{user_id}")
+        key = RedisKey(bot_id, user_id)
+        user_data = await self.redis.hgetall(f"user:{key}")
         if not user_data:
-            return None, None, None, None
-        return (
-            user_data.get(b"name", b"").decode("utf-8"),
-            user_data.get(b"phone", b"").decode("utf-8"),
-            user_data.get(b"city", b"").decode("utf-8"),
-            bool(int(user_data.get(b"is_reg", b"0").decode("utf-8"))),
-        )
+            return None
+        return (user_data.get(b"name", b"").decode("utf-8"),)
+
+    async def get_user_phone(self, bot_id: int, user_id: int) -> str | None:
+        """Получает имя и телефон пользователя из Redis"""
+        key = RedisKey(bot_id, user_id)
+        user_data = await self.redis.hgetall(f"user:{key}")
+        if not user_data:
+            return None
+        return (user_data.get(b"phone", b"").decode("utf-8"),)
 
     async def is_reg(self, user_id: int) -> bool:
         """Получает статус регистрации пользователя из Redis"""
@@ -82,7 +86,7 @@ class RedisService:
     async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
         """Сохраняет состояние FSM пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
-        await self._reset_state(bot_id, user_id)
+        # await self._reset_state(bot_id, user_id)
         await self.fsm_storage.set_state(key=key, state=state)
 
     async def get_state(self, bot_id: int, user_id: int) -> str | None:
