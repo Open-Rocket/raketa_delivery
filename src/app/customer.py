@@ -49,7 +49,7 @@ customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 # start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
-    # log.info("cmd_start_customer was called with message: %s", message)
+    log.info(f"\n- cmd_start_customer was called!")
     customer_id = message.from_user.id
     current_state = CustomerState.reg_state.state
     await state.set_state(current_state)
@@ -57,7 +57,8 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     handler = MessageHandler(state, message.bot)
     is_reg = await rediska.is_reg(customer_id)
     log.info(
-        f"Customer 🧍\n"
+        f"\n"
+        f"- Customer 🧍\n"
         f"- Handler /start\n"
         f"- Customer ID: {customer_id}\n"
         f"- Customer message: {message.text}\n"
@@ -92,6 +93,7 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
         disable_notification=True,
     )
     await handler.handle_new_message(new_message, message)
+    log.info(f"\n- cmd_start_customer was successfully done!")
 
 
 # registration_Name

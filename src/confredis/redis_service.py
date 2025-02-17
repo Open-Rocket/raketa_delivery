@@ -82,6 +82,7 @@ class RedisService:
     async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
         """Сохраняет состояние FSM пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
+        await self._reset_state(bot_id, user_id)
         await self.fsm_storage.set_state(key=key, state=state)
 
     async def get_state(self, bot_id: int, user_id: int) -> str | None:
@@ -89,7 +90,7 @@ class RedisService:
         key = RedisKey(bot_id, user_id)
         return await self.fsm_storage.get_state(key=key)
 
-    async def reset_state(self, bot_id: int, user_id: int) -> None:
+    async def _reset_state(self, bot_id: int, user_id: int) -> None:
         """Удаляет текущее состояние FSM пользователя"""
         key = RedisKey(bot_id, user_id)
         await self.fsm_storage.set_state(key=key, state=None)

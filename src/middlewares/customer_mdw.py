@@ -33,11 +33,14 @@ class CustomerOuterMiddleware(BaseMiddleware):
         if state is None:
             state = await self.rediska.get_state(event.bot.id, customer_id)
             if state is None:
+                state_previous = state
                 state = CustomerState.default.state
                 log.info(
-                    f"Customer 🧍\n"
+                    f"\n"
+                    f"- Customer 🧍\n"
                     f"- Outer_mw\n"
                     f"- Customer ID: {customer_id} visited the service for the first time\n"
+                    f"- Customer state previous: {state_previous}\n"
                     f"- Customer state: {state}"
                 )
 
@@ -48,7 +51,8 @@ class CustomerOuterMiddleware(BaseMiddleware):
             message_text = event.text
 
             log.info(
-                f"Customer 🧍\n"
+                f"\n"
+                f"- Customer 🧍\n"
                 f"- Outer_mw\n"
                 f"- Customer message: {message_text}\n"
                 f"- Customer ID: {user_id}\n"
@@ -62,8 +66,14 @@ class CustomerOuterMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             callback_data = event.data
 
-            log_message = f"Customer - 🧍\nOuter_mw\nCallback data: {callback_data}\Customer ID: {user_id}\Customer state previous: {state}"
-            log.info(log_message)
+            log.info(
+                f"\n"
+                f"- Customer - 🧍\n"
+                f"- Outer_mw\n"
+                f"- Callback data: {callback_data}\n"
+                f"- Customer ID: {user_id}\n"
+                f"-Customer state previous: {state}"
+            )
 
             return await handler(event, data)
 
