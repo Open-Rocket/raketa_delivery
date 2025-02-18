@@ -57,7 +57,7 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     await rediska.set_state(bot_id, customer_tg_id, current_state)
 
     handler = MessageHandler(state, message.bot)
-    is_reg = await rediska.is_reg(customer_tg_id)
+    is_reg = await rediska.is_reg(bot_id, customer_tg_id)
     log.info(
         f"\n"
         f"- Customer 🧍\n"
@@ -68,6 +68,9 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     )
 
     if is_reg:
+        default_state = CustomerState.default.state
+        await state.set_state(default_state)
+        await rediska.set_state(bot_id, customer_tg_id, default_state)
         text = "▼ <b>Выберите действие ...</b>"
         await handler.delete_previous_message(message.chat.id)
         new_message = await message.answer(
@@ -103,8 +106,8 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
 async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"\n- data_reg_customer was called!")
 
-    bot_id = callback_query.message.bot.id
-    customer_tg_id = callback_query.message.from_user.id
+    bot_id = callback_query.bot.id
+    customer_tg_id = callback_query.from_user.id
     current_state = CustomerState.reg_Name.state
 
     await state.set_state(current_state)
@@ -113,7 +116,7 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     log.info(
         f"\n"
         f"- Customer 🧍\n"
-        f"- Handler F.data == reg\n"
+        f"- Handler F.data: {F.data}\n"
         f"- Customer telegram ID: {customer_tg_id}\n"
         f"- Customer message: {callback_query.message.text}\n"
         f"- Customer state now: {current_state}"
@@ -182,14 +185,29 @@ async def data_name_customer(message: Message, state: FSMContext):
 # registration_City
 @customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
 async def data_phone_customer(message: Message, state: FSMContext):
-    await state.set_state(CustomerState.reg_City)
+    log.info(f"\n- data_phone_customer was called!")
+
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    customer_tg_id = message.from_user.id
+    customer_phone = message.contact.phone_number
+    current_state = CustomerState.reg_City.state
 
-    tg_id = message.from_user.id
-    phone = message.contact.phone_number
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+    is_phone_set = await rediska.set_user_phone(bot_id, customer_tg_id, customer_phone)
 
-    await customer_data.set_user_phone(tg_id, phone)
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer message: {customer_phone}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is phone set: {is_phone_set}"
+    )
+
     text = (
         f"Последний шаг!\n\n"
         f"Для того чтобы каждый раз не указывать город доставки, "
@@ -197,22 +215,43 @@ async def data_phone_customer(message: Message, state: FSMContext):
         f"и он автоматически будет подставляться.\n\n"
         f"<b>Ваш город:</b>"
     )
-    msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
-    await handler.handle_new_message(msg, message)
+
+    await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+    await handler.handle_new_message(new_message, message)
+
+    log.info(f"\n- data_phone_customer was successfully done!")
 
 
 # terms of use
 @customer_r.message(filters.StateFilter(CustomerState.reg_City))
 async def data_city_customer(message: Message, state: FSMContext):
-    await state.set_state(CustomerState.reg_tou)
+    log.info(f"\n- data_city_customer was called!")
+
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    customer_tg_id = message.from_user.id
+    customer_city = message.text
+    current_state = CustomerState.reg_tou.state
 
-    tg_id = message.from_user.id
-    city = message.text
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+    is_city_set = await rediska.set_user_city(bot_id, customer_tg_id, customer_city)
 
-    await customer_data.set_user_city(tg_id, city)
-    reply_kb = await kb.get_customer_kb(text="accept_tou")
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer message: {customer_city}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is city set: {is_city_set}"
+    )
+
+    reply_kb = await kb.get_customer_kb("accept_tou")
     text = (
         f"Начиная использование сервиса, вы соглашаетесь с "
         f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
@@ -222,29 +261,57 @@ async def data_city_customer(message: Message, state: FSMContext):
         f"отправкой или получением посылок, должны соответствовать законодательству "
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
+    await handler.delete_previous_message(message.chat.id)
     new_message = await message.answer(
         text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
+    log.info(f"\n- data_city_customer was successfully done!")
 
-# tou Accept
+
+# tou Accept registration was done
 @customer_r.callback_query(F.data == "accept_tou")
 async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.default)
-    handler = MessageHandler(state, callback_query.bot)
+    log.info(f"\n- customer_accept_tou was called!")
 
-    tg_id = callback_query.from_user.id
+    handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    customer_tg_id = callback_query.from_user.id
+    current_state = CustomerState.default.state
+
     accept_tou = (
         "Пользовательское соглашение и правила использования сервиса - Принимаю"
     )
-    await customer_data.set_user_accept_tou(tg_id, accept_tou)
-    name, phone_number, city = await customer_data.get_user_info(tg_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, customer_tg_id, current_state)
+    await rediska.set_user_tou(bot_id, customer_tg_id, accept_tou)
+    await rediska.set_reg(bot_id, customer_tg_id, True)
+
+    customer_name, customer_phone, customer_city, tou = await rediska.get_user_info(
+        bot_id, customer_tg_id
+    )
+
+    is_new_customer_add = await customer_data.set_customer(
+        customer_tg_id, customer_name, customer_phone, customer_city, tou
+    )
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer click: {accept_tou}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is new customer add: {is_new_customer_add}"
+    )
+
     text = (
         "Вы успешно зарегистрировались! 🎉\n\n"
-        f"Имя: {name}\n"
-        f"Номер: {phone_number}\n"
-        f"Город: {city}\n\n"
+        f"Имя: {customer_name}\n"
+        f"Номер: {customer_phone}\n"
+        f"Город: {customer_city}\n\n"
         f"▼ <b>Выберите действие ...</b>"
     )
     new_message = await callback_query.message.answer(
@@ -252,10 +319,61 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(f"\n- customer_accept_tou was successfully done!")
+
 
 # ------------------------------------------------------------------------------------------------------------------- #
 #                                                    ⇣ Bot functions ⇣
 # ------------------------------------------------------------------------------------------------------------------- #
+
+
+# order
+@customer_r.message(F.text == "/order")
+async def cmd_order(message: Message, state: FSMContext):
+    data = await state.get_data()
+    read_info = data.get(
+        "read_info", False
+    )  # Извлекаем флаг или устанавливаем False по умолчанию
+
+    handler = MessageHandler(state, message.bot)
+    await handler.delete_previous_message(message.chat.id)
+
+    if not read_info:
+        await state.set_state(CustomerState.default)
+        # Отправляем инструкцию пользователю
+        photo_title = await get_title_customer(message.text)
+        text = (
+            "◉ Вы можете сделать заказ с помощью текста или голоса, "
+            "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
+            "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
+            "ассистент создаст заявку для вашего заказа.</i>"
+        )
+        reply_kb = await kb.get_customer_kb(message)
+
+        new_message = await message.answer_photo(
+            photo=photo_title,
+            caption=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        await state.update_data(read_info=True)
+        await state.set_state(CustomerState.ai_voice_order)
+        text = (
+            "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
+            "заказ будет оформлен в считанные секунды.</i>"
+        )
+
+        new_message = await message.answer(
+            text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    # Обрабатываем новое сообщение
+    await handler.handle_new_message(new_message, message)
 
 
 # commands_Profile
@@ -348,55 +466,6 @@ async def cmd_become_courier(message: Message, state: FSMContext):
         disable_notification=True,
     )
 
-    await handler.handle_new_message(new_message, message)
-
-
-# order
-@customer_r.message(F.text == "/order")
-async def cmd_order(message: Message, state: FSMContext):
-    data = await state.get_data()
-    read_info = data.get(
-        "read_info", False
-    )  # Извлекаем флаг или устанавливаем False по умолчанию
-
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
-    if not read_info:
-        await state.set_state(CustomerState.default)
-        # Отправляем инструкцию пользователю
-        photo_title = await get_title_customer(message.text)
-        text = (
-            "◉ Вы можете сделать заказ с помощью текста или голоса, "
-            "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
-            "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
-            "ассистент создаст заявку для вашего заказа.</i>"
-        )
-        reply_kb = await kb.get_customer_kb(message)
-
-        new_message = await message.answer_photo(
-            photo=photo_title,
-            caption=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    else:
-        await state.update_data(read_info=True)
-        await state.set_state(CustomerState.ai_voice_order)
-        text = (
-            "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
-            "заказ будет оформлен в считанные секунды.</i>"
-        )
-
-        new_message = await message.answer(
-            text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, message)
 
 

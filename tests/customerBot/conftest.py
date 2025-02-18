@@ -5,7 +5,7 @@ from aiogram.types import Message, CallbackQuery, User
 from src.app.customer import FSMContext
 from src.config import moscow_time
 from src.app.customer import customer_r
-from src.config import fsm_customer_storage
+from src.config import fsm_customer_storage, customer_bot
 from aiogram.fsm.storage.base import StorageKey
 
 
@@ -25,7 +25,7 @@ async def dp():
 
 @pytest_asyncio.fixture(scope="function")
 async def message():
-    async def _message(text="/start", user_id=56782547):
+    async def _message(text=None, user_id=56782547, contact=None):
 
         user = User(id=user_id, is_bot=False, first_name="Ruslan")
 
@@ -34,6 +34,7 @@ async def message():
             from_user=user,
             chat={"id": 1846124, "type": "private"},
             text=text,
+            contact=contact,
             date=moscow_time,
         )
 

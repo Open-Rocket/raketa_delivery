@@ -137,8 +137,8 @@ class Order(Base):
     description: Mapped[textData]
     full_rout: Mapped[stringData]
 
-    courier = relationship("Courier", back_populates="orders")
-    customer = relationship("Customer", back_populates="orders")
+    couriers = relationship("Courier", back_populates="orders")
+    customers = relationship("Customer", back_populates="orders")
 
 
 class Subscription(Base):

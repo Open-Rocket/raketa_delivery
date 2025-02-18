@@ -2,7 +2,7 @@ from src.models import async_session_factory, Customer, Courier, OrderStatus, Or
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 from datetime import datetime
-from src.config import moscow_time
+from src.config import moscow_time, log
 from .routing import route
 
 
@@ -12,49 +12,40 @@ class CustomerData:
 
     async def get_customer_tg_id_by_phone(self, phone_number: str) -> int:
         async with self.async_session_factory() as session:
-            user = await session.scalar(
-                select(User).where(User.user_phone_number == phone_number)
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_phone == phone_number)
             )
-            if user:
-                return user.user_tg_id
+            if customer:
+                return customer.customer_tg_id
             else:
                 raise ValueError("Пользователь не найден")
 
-    async def set_customer(self, tg_id: int):
+    async def set_customer(
+        self,
+        tg_id: int,
+        name: str,
+        phone: str,
+        city: str,
+        tou: str,
+    ):
         async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if not user:
-                new_user = User(user_tg_id=tg_id)
-                session.add(new_user)
+            try:
+                new_customer = Customer(
+                    customer_tg_id=tg_id,
+                    customer_name=name,
+                    customer_phone=phone,
+                    customer_city=city,
+                    customer_accept_terms_of_use=tou,
+                    customer_registration_date=moscow_time,
+                )
+                session.add(new_customer)
+                await session.flush()
                 await session.commit()
-
-    async def set_customer_name(self, tg_id: int, name: str):
-        async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
-                user.user_name = name
-                await session.commit()
-
-    async def set_customer_phone(self, tg_id: int, phone: str):
-        async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
-                user.user_phone_number = phone
-                await session.commit()
-
-    async def set_customer_city(self, tg_id: int, city: str):
-        async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
-                user.user_default_city = city
-                await session.commit()
-
-    async def set_customer_accept_tou(self, tg_id: int, accepted: str):
-        async with self.async_session_factory() as session:
-            user = await session.scalar(select(User).where(User.user_tg_id == tg_id))
-            if user:
-                user.user_accept_terms_of_use = accepted
-                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении пользователя: {e}")
+                return False
 
     async def get_customer_info(self, tg_id: int):
         async with self.async_session_factory() as session:

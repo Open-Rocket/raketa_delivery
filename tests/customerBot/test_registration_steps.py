@@ -1,5 +1,5 @@
 import pytest
-from aiogram.types import Update
+from aiogram.types import Update, Contact
 from src.utils import CustomerState
 
 
@@ -29,15 +29,40 @@ async def test_data_name_customer(bot, dp, message, state):
 
 @pytest.mark.asyncio
 async def test_data_phone_customer(bot, dp, message, state):
-    test_message = await message(text="89993501515", user_id=56782547)
+    test_message = await message(
+        text=None,
+        contact=Contact(
+            phone_number="89993501515", first_name="Ruslan_*", user_id=56782547
+        ),
+    )
     await state(state_value=CustomerState.reg_Phone)
     update = Update(update_id=1, message=test_message)
     await dp.feed_update(bot, update)
 
 
-# pytest tests/customerBot/test_registration_steps.py -s -v
+@pytest.mark.asyncio
+async def test_data_city_customer(bot, dp, message, state):
+    test_message = await message(text="Москва", user_id=56782547)
+    await state(state_value=CustomerState.reg_City)
+    update = Update(update_id=1, message=test_message)
+    await dp.feed_update(bot, update)
 
-# pytest tests/customerBot/test_registration_steps.py -s -v -k test_cmd_start
-# pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_reg_customer
-# pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_name_customer
-# pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_phone_customer
+
+@pytest.mark.asyncio
+async def test_customer_accept_tou(bot, dp, callback_query, state):
+    test_cq = await callback_query(data="accept_tou", user_id=56782547)
+    await state(state_value=CustomerState.reg_City)
+    update = Update(update_id=1, callback_query=test_cq)
+    await dp.feed_update(bot, update)
+
+
+"""
+
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_cmd_start
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_reg_customer
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_name_customer
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_phone_customer
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_data_city_customer
+pytest tests/customerBot/test_registration_steps.py -s -v -k test_customer_accept_tou
+
+"""
