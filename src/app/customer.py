@@ -330,25 +330,33 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 # order
 @customer_r.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
-    data = await state.get_data()
-    read_info = data.get(
-        "read_info", False
-    )  # Извлекаем флаг или устанавливаем False по умолчанию
+    log.info(f"\n- cmd_order was called!")
 
     handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
+    customer_tg_id = message.from_user.id
+    current_state = None
+
+    is_read_info = await rediska.is_read_info(bot_id, customer_tg_id)
+
     await handler.delete_previous_message(message.chat.id)
 
-    if not read_info:
-        await state.set_state(CustomerState.default)
-        # Отправляем инструкцию пользователю
-        photo_title = await get_title_customer(message.text)
+    if not is_read_info:
+        current_state = CustomerState.default.state
+        await state.set_state(current_state)
+        await rediska.set_state(bot_id, customer_tg_id, current_state)
+        is_set = await rediska.set_read_info(bot_id, customer_tg_id, True)
+
+        log.info(f"\n" f"- Customer 🧍\n" f"- Is read info set: {is_set}")
+
+        photo_title = await title.get_title_customer(message.text)
         text = (
             "◉ Вы можете сделать заказ с помощью текста или голоса, "
             "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
             "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
             "ассистент создаст заявку для вашего заказа.</i>"
         )
-        reply_kb = await kb.get_customer_kb(message)
+        reply_kb = await kb.get_customer_kb(message.text)
 
         new_message = await message.answer_photo(
             photo=photo_title,
@@ -359,8 +367,10 @@ async def cmd_order(message: Message, state: FSMContext):
         )
 
     else:
-        await state.update_data(read_info=True)
-        await state.set_state(CustomerState.ai_voice_order)
+        current_state = CustomerState.ai_voice_order.state
+        await state.set_state(current_state)
+        await rediska.set_state(bot_id, customer_tg_id, current_state)
+
         text = (
             "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             "заказ будет оформлен в считанные секунды.</i>"
@@ -372,8 +382,18 @@ async def cmd_order(message: Message, state: FSMContext):
             parse_mode="HTML",
         )
 
-    # Обрабатываем новое сообщение
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.text: {F.text}\n"
+        f"- Customer telegram ID: {customer_tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is read info order: {is_read_info}"
+    )
+
     await handler.handle_new_message(new_message, message)
+
+    log.info(f"\n- cmd_order was successfully done!")
 
 
 # commands_Profile

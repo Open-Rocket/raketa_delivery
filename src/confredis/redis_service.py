@@ -36,48 +36,34 @@ class RedisService:
         self.redis = redis
         self.fsm_storage = RedisStorage(self.redis)
 
-    async def set_user_name(
-        self,
-        bot_id: int,
-        user_id: int,
-        name: str,
-    ) -> bool:
+    async def set_user_name(self, bot_id: int, user_id: int, name: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user:{key}", mapping={"name": name})
         return True
 
-    async def set_user_phone(
-        self,
-        bot_id: int,
-        user_id: int,
-        phone: str,
-    ) -> bool:
+    async def set_user_phone(self, bot_id: int, user_id: int, phone: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user:{key}", mapping={"phone": phone})
         return True
 
-    async def set_user_city(
-        self,
-        bot_id: int,
-        user_id: int,
-        city: str,
-    ) -> bool:
+    async def set_user_city(self, bot_id: int, user_id: int, city: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user:{key}", mapping={"city": city})
         return True
 
-    async def set_user_tou(
-        self,
-        bot_id: int,
-        user_id: int,
-        tou: str,
-    ) -> bool:
+    async def set_user_tou(self, bot_id: int, user_id: int, tou: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user:{key}", mapping={"tou": tou})
+        return True
+
+    async def set_read_info(self, bot_id: int, user_id: int, is_read: int) -> bool:
+        """Сохраняет имя и телефон пользователя в Redis"""
+        key = RedisKey(bot_id, user_id)
+        await self.redis.hset(f"user:{key}", mapping={"read_info": is_read})
         return True
 
     async def get_user_name(self, bot_id: int, user_id: int) -> str | None:
@@ -130,10 +116,17 @@ class RedisService:
             user_data.get(b"tou", b"").decode("utf-8"),
         )
 
-    async def set_reg(self, bot_id: int, user_id: int, value: bool) -> None:
+    async def set_reg(self, bot_id: int, user_id: int, value: bool) -> bool:
         """Устанавливает статус регистрации пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user:{key}", "is_reg", int(value))
+        return True
+
+    async def set_read_info(self, bot_id: int, user_id: int, value: bool) -> bool:
+        """Устанавливает статус ознакомления пользователя с оформлением заказа"""
+        key = RedisKey(bot_id, user_id)
+        await self.redis.hset(f"user:{key}", "read_info", int(value))
+        return True
 
     async def is_reg(self, bot_id: int, user_id: int) -> bool:
         """Получает статус регистрации пользователя из Redis"""
@@ -142,6 +135,16 @@ class RedisService:
 
         if is_reg is not None:
             return bool(int(is_reg.decode("utf-8")))
+        else:
+            return False
+
+    async def is_read_info(self, bot_id: int, user_id: int) -> bool:
+        """Получает значение is_read из Redis"""
+        key = RedisKey(bot_id, user_id)
+        is_read = await self.redis.hget(f"user:{key}", "read_info")
+
+        if is_read is not None:
+            return bool(int(is_read.decode("utf-8")))
         else:
             return False
 
