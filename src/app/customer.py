@@ -348,9 +348,6 @@ async def cmd_order(message: Message, state: FSMContext):
         current_state = CustomerState.default.state
         await state.set_state(current_state)
         await rediska.set_state(bot_id, tg_id, current_state)
-        is_set = await rediska.set_read_info(bot_id, tg_id, True)
-
-        log.info(f"\n" f"- Customer 🧍\n" f"- Is read info set: {is_set}")
 
         photo_title = await title.get_title_customer(message.text)
         reply_kb = await kb.get_customer_kb(message.text)
@@ -570,12 +567,19 @@ async def cmd_become_courier(message: Message, state: FSMContext):
 # read_Info
 @customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
-    # Устанавливаем нужный стейт
-    await state.set_state(CustomerState.ai_voice_order)
-    # Устанавливаем флаг прочитанной информации
-    await state.update_data(read_info=True)
+    log.info(f"data_ai was called!")
 
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.ai_voice_order.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    is_set = await rediska.set_read_info(bot_id, tg_id, True)
+
+    log.info(f"\n" f"- Customer 🧍\n" f"- Is read info set: {is_set}")
+
     text = (
         "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
         "заказ будет оформлен в считанные секунды.</i>"
@@ -588,111 +592,248 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- Is set read info order: {is_set}"
+    )
+
+    log.info(f"data_ai was successfully done!")
+
 
 # cancel_Order
 @customer_r.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.default)
+    log.info(f"cancel_order was called!")
+
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.default.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
     text = "▼ <b>Выберите действие ...</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"cancel_order was successfully done!")
+
 
 # set_my_name
 @customer_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.change_Name)
+    log.info(f"set_name was called!")
+
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.change_Name.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"set_name was successfully done!")
+
 
 # set_my_phone
 @customer_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.change_Phone)
+    log.info(f"set_phone was called!")
+
     handler = MessageHandler(state, callback_query.bot)
-    reply_kb = await kb.get_customer_kb(text="phone_number")
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.change_Phone.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    reply_kb = await kb.get_customer_kb("phone_number")
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш Телефон:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"set_phone was successfully done!")
+
 
 # set_my_city
 @customer_r.callback_query(F.data == "set_my_city")
-async def set_phone(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(CustomerState.change_City)
+async def set_city(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"set_city was called!")
+
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.change_City.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"set_city was successfully done!")
+
 
 # change name state
 @customer_r.message(filters.StateFilter(CustomerState.change_Name))
 async def change_name(message: Message, state: FSMContext):
-    await state.set_state(CustomerState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    log.info(f"change_name was called!")
 
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
     tg_id = message.from_user.id
     name = message.text
+    current_state = CustomerState.default.state
 
-    await customer_data.set_user_name(tg_id, name)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    new_name_was_set = await customer_data.set_customer_name(tg_id, name)
+
     text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer message: {message.text}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- new_name_was_set: {new_name_was_set}\n"
+    )
+
+    log.info(f"change_name was successfully done!")
 
 
 # change phone state
 @customer_r.message(filters.StateFilter(CustomerState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
-    await state.set_state(CustomerState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    log.info(f"change_phone was called!")
 
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
     tg_id = message.from_user.id
     phone = message.contact.phone_number
+    current_state = CustomerState.default.state
 
-    await customer_data.set_user_phone(tg_id, phone)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    new_phone_was_set = await customer_data.set_customer_phone(tg_id, phone)
+
     text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer message: {message.text}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- new_phone_was_set: {new_phone_was_set}\n"
+    )
+
+    log.info(f"change_phone was successfully done!")
 
 
 # change city state
 @customer_r.message(filters.StateFilter(CustomerState.change_City))
 async def change_city(message: Message, state: FSMContext):
-    await state.set_state(CustomerState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    log.info(f"change_city was called!")
 
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
     tg_id = message.from_user.id
     city = message.text
+    current_state = CustomerState.default.state
 
-    await customer_data.set_user_city(tg_id, city)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    new_city_was_set = await customer_data.set_customer_city(tg_id, city)
+
     text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer message: {message.text}\n"
+        f"- Customer state now: {current_state}\n"
+        f"- new_city_was_set: {new_city_was_set}\n"
+    )
+
+    log.info(f"change_city was successfully done!")
 
 
 # ------------------------------------------------------------------------------------------------------------------- #

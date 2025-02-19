@@ -47,6 +47,66 @@ class CustomerData:
                 log.error(f"Ошибка при добавлении пользователя: {e}")
                 return False
 
+    async def set_customer_name(
+        self,
+        tg_id: int,
+        name: str,
+    ):
+        async with self.async_session_factory() as session:
+            try:
+                new_customer = Customer(
+                    customer_tg_id=tg_id,
+                    customer_name=name,
+                )
+                session.add(new_customer)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при изменении имени пользователя: {e}")
+                return False
+
+    async def set_customer_phone(
+        self,
+        tg_id: int,
+        phone: str,
+    ):
+        async with self.async_session_factory() as session:
+            try:
+                new_customer = Customer(
+                    customer_tg_id=tg_id,
+                    customer_phone=phone,
+                )
+                session.add(new_customer)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при изменении номера пользователя: {e}")
+                return False
+
+    async def set_customer_city(
+        self,
+        tg_id: int,
+        city: str,
+    ):
+        async with self.async_session_factory() as session:
+            try:
+                new_customer = Customer(
+                    customer_tg_id=tg_id,
+                    customer_city=city,
+                )
+                session.add(new_customer)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при изменении города пользователя: {e}")
+                return False
+
     async def get_customer_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             customer = await session.scalar(

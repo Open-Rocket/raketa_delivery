@@ -10,6 +10,12 @@ from aiogram.fsm.storage.base import StorageKey
 
 
 @pytest_asyncio.fixture(scope="function")
+async def user_id():
+    user_id = 77
+    return user_id
+
+
+@pytest_asyncio.fixture(scope="function")
 async def bot():
     bot = AsyncMock(spec=Bot)
     bot.id = 88888888
@@ -24,8 +30,8 @@ async def dp():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def message():
-    async def _message(text=None, user_id=56782547, contact=None):
+async def message(user_id):
+    async def _message(text=None, user_id=user_id, contact=None):
 
         user = User(id=user_id, is_bot=False, first_name="Ruslan")
 
@@ -82,12 +88,12 @@ async def mock_state():
 
 # Фикстура для состояния
 @pytest_asyncio.fixture(scope="function")
-async def state():
+async def state(user_id):
 
     storage = fsm_customer_storage
 
     async def _state(state_value=None):
-        key = StorageKey(bot_id=88888888, chat_id=1846124, user_id=56782547)
+        key = StorageKey(bot_id=88888888, chat_id=1846124, user_id=user_id)
         fsm_context = FSMContext(storage=storage, key=key)
 
         # Устанавливаем состояние, если оно передано
