@@ -23,9 +23,14 @@ async def get_assistant_response():
 
     start_time = time.perf_counter()
 
-    city, addresses, delivery_object, description = await assistant.process_order(
-        messages[0], city="Москва"
-    )
+    try:
+        city, addresses, delivery_object, description = await assistant.process_order(
+            messages[1], city="Москва"
+        )
+
+        log.info("request was successfully done")
+    except Exception as e:
+        log.error(f"exception: {e}")
 
     prepare_dict = await formatter._prepare_data(
         moscow_time,
