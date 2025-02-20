@@ -269,6 +269,8 @@ class OrderData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
+    # ---
+
     async def get_order_customer_phone(self, order_id: int) -> str:
         async with self.async_session_factory() as session:
             # Предполагается, что есть таблица Order и связанная таблица User
@@ -295,6 +297,8 @@ class OrderData:
                 order.customer_tg_id
             )  # предполагаем, что у объекта `order` есть поле `customer_tg_id`
             return customer_tg_id
+
+    # ---
 
     async def create_order(self, user_tg_id: int, data: dict):
         async with self.async_session_factory() as session:
@@ -384,76 +388,67 @@ class OrderData:
                 order.courier_id = courier_id
                 await session.commit()
 
-    async def get_pending_orders(self, user_tg_id: int):
+    # ---
+
+    async def get_pending_orders(self, tg_id: int) -> list:
         async with self.async_session_factory() as session:
-            user_query = await session.execute(
-                select(User.user_id).where(User.user_tg_id == user_tg_id)
-            )
-            user_id = user_query.scalar()
-            if user_id is None:
-                return []
-            orders_query = await session.execute(
-                select(Order).where(
-                    and_(
-                        Order.user_id == user_id,
-                        Order.order_status == OrderStatus.PENDING,
-                    )
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Customer,
+                    Customer.customer_id == Order.customer_id,
+                )
+                .where(
+                    Customer.customer_tg_id == tg_id,
+                    Order.order_status == OrderStatus.PENDING,
                 )
             )
-            pending_orders = orders_query.scalars().all()
-            return pending_orders
+            return query.scalars().all()
 
-    async def get_active_orders(self, user_tg_id: int):
+    async def get_active_orders(self, tg_id: int) -> list:
         async with self.async_session_factory() as session:
-            user_query = await session.execute(
-                select(User.user_id).where(User.user_tg_id == user_tg_id)
-            )
-            user_id = user_query.scalar()
-            if user_id is None:
-                return []
-            orders_query = await session.execute(
-                select(Order).where(
-                    and_(
-                        Order.user_id == user_id,
-                        Order.order_status == OrderStatus.IN_PROGRESS,
-                    )
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Customer,
+                    Customer.customer_id == Order.customer_id,
+                )
+                .where(
+                    Customer.customer_tg_id == tg_id,
+                    Order.order_status == OrderStatus.IN_PROGRESS,
                 )
             )
-            active_orders = orders_query.scalars().all()
-            return active_orders
+            return query.scalars().all()
 
-    async def get_canceled_orders(self, user_tg_id: int):
+    async def get_canceled_orders(self, tg_id: int) -> list:
         async with self.async_session_factory() as session:
-            orders_query = await session.execute(
-                select(Order).where(
-                    and_(
-                        User.user_tg_id == user_tg_id,
-                        Order.order_status == OrderStatus.CANCELLED,
-                    )
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Customer,
+                    Customer.customer_id == Order.customer_id,
+                )
+                .where(
+                    Customer.customer_tg_id == tg_id,
+                    Order.order_status == OrderStatus.CANCELLED,
                 )
             )
+            return query.scalars().all()
 
-            canceled_orders = orders_query.scalars().all()
-            return canceled_orders
-
-    async def get_completed_orders(self, user_tg_id: int):
+    async def get_completed_orders(self, tg_id: int) -> list:
         async with self.async_session_factory() as session:
-            user_query = await session.execute(
-                select(User.user_id).where(User.user_tg_id == user_tg_id)
-            )
-            user_id = user_query.scalar()
-            if user_id is None:
-                return []
-            orders_query = await session.execute(
-                select(Order).where(
-                    and_(
-                        Order.user_id == user_id,
-                        Order.order_status == OrderStatus.COMPLETED,
-                    )
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Customer,
+                    Customer.customer_id == Order.customer_id,
+                )
+                .where(
+                    Customer.customer_tg_id == tg_id,
+                    Order.order_status == OrderStatus.COMPLETED,
                 )
             )
-            completed_orders = orders_query.scalars().all()
-            return completed_orders
+            return query.scalars().all()
 
     async def get_available_orders(
         self,
@@ -483,6 +478,8 @@ class OrderData:
                     available_orders.append(order)
 
             return available_orders
+
+    # ---
 
     async def get_user_orders(self, user_tg_id: int):
         async with async_session_factory() as session:

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import redis.asyncio as aioredis
 from .redis_config import RedisConfig
 from aiogram.fsm.storage.redis import RedisStorage
@@ -36,6 +37,32 @@ class RedisService:
         self.redis = redis
         self.fsm_storage = RedisStorage(self.redis)
 
+    # ---
+
+    async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
+        """Сохраняет состояние FSM пользователя в Redis"""
+        key = RedisKey(bot_id, user_id)
+        # await self._reset_state(bot_id, user_id)
+        await self.fsm_storage.set_state(key=key, state=state)
+
+    async def get_state(self, bot_id: int, user_id: int) -> str | None:
+        """Получает текущее состояние FSM пользователя из Redis"""
+        key = RedisKey(bot_id, user_id)
+        return await self.fsm_storage.get_state(key=key)
+
+    async def _reset_state(self, bot_id: int, user_id: int) -> None:
+        """Удаляет текущее состояние FSM пользователя"""
+        key = RedisKey(bot_id, user_id)
+        await self.fsm_storage.set_state(key=key, state=None)
+
+    async def restore_state(self, bot_id: int, user_id: int, state: FSMContext) -> None:
+        """Восстанавливает состояние FSM из Redis в FSMContext"""
+        saved_state = await self.get_state(bot_id, user_id)
+        if saved_state:
+            await state.set_state(saved_state)
+
+    # ---
+
     async def set_user_name(self, bot_id: int, user_id: int, name: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
@@ -60,11 +87,42 @@ class RedisService:
         await self.redis.hset(f"user:{key}", mapping={"tou": tou})
         return True
 
-    async def set_read_info(self, bot_id: int, user_id: int, is_read: int) -> bool:
-        """Сохраняет имя и телефон пользователя в Redis"""
+    async def set_reg(self, bot_id: int, user_id: int, value: bool) -> bool:
+        """Устанавливает статус регистрации пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user:{key}", mapping={"read_info": is_read})
+        await self.redis.hset(f"user:{key}", "is_reg", int(value))
         return True
+
+    async def set_read_info(self, bot_id: int, user_id: int, value: bool) -> bool:
+        """Устанавливает статус ознакомления пользователя с оформлением заказа"""
+        key = RedisKey(bot_id, user_id)
+        await self.redis.hset(f"user:{key}", "read_info", int(value))
+        return True
+
+    # ---
+
+    async def save_fsm_state(
+        self, state: FSMContext, bot_id: int, user_id: int
+    ) -> None:
+        """Сохраняет состояние FSM в Redis"""
+        data = await state.get_data()
+        key = RedisKey(bot_id, user_id)
+        await self.redis.set(key, json.dumps(data))
+
+    async def load_fsm_state(self, bot_id: int, user_id: int) -> dict:
+        """Загружает состояние FSM из Redis"""
+        key = RedisKey(bot_id, user_id)
+        raw_data = await self.redis.get(key)
+        return json.loads(raw_data) if raw_data else {}
+
+    async def restore_fsm_state(
+        self, state: FSMContext, bot_id: int, user_id: int
+    ) -> None:
+        """Восстанавливает состояние FSM из Redis"""
+        data = await self.load_fsm_state(bot_id, user_id)
+        await state.set_data(data)
+
+    # ---
 
     async def get_user_name(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
@@ -116,17 +174,7 @@ class RedisService:
             user_data.get(b"tou", b"").decode("utf-8"),
         )
 
-    async def set_reg(self, bot_id: int, user_id: int, value: bool) -> bool:
-        """Устанавливает статус регистрации пользователя в Redis"""
-        key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user:{key}", "is_reg", int(value))
-        return True
-
-    async def set_read_info(self, bot_id: int, user_id: int, value: bool) -> bool:
-        """Устанавливает статус ознакомления пользователя с оформлением заказа"""
-        key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user:{key}", "read_info", int(value))
-        return True
+    # ---
 
     async def is_reg(self, bot_id: int, user_id: int) -> bool:
         """Получает статус регистрации пользователя из Redis"""
@@ -148,27 +196,7 @@ class RedisService:
         else:
             return False
 
-    async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
-        """Сохраняет состояние FSM пользователя в Redis"""
-        key = RedisKey(bot_id, user_id)
-        # await self._reset_state(bot_id, user_id)
-        await self.fsm_storage.set_state(key=key, state=state)
-
-    async def get_state(self, bot_id: int, user_id: int) -> str | None:
-        """Получает текущее состояние FSM пользователя из Redis"""
-        key = RedisKey(bot_id, user_id)
-        return await self.fsm_storage.get_state(key=key)
-
-    async def _reset_state(self, bot_id: int, user_id: int) -> None:
-        """Удаляет текущее состояние FSM пользователя"""
-        key = RedisKey(bot_id, user_id)
-        await self.fsm_storage.set_state(key=key, state=None)
-
-    async def restore_state(self, bot_id: int, user_id: int, state: FSMContext) -> None:
-        """Восстанавливает состояние FSM из Redis в FSMContext"""
-        saved_state = await self.get_state(bot_id, user_id)
-        if saved_state:
-            await state.set_state(saved_state)
+    # ---
 
 
 async def create_redis_service() -> RedisService:

@@ -13,6 +13,7 @@ from ._deps import (
     CustomerOuterMiddleware,
     Router,
     datetime,
+    time,
     moscow_time,
     customer_r,
     customer_fallback,
@@ -845,21 +846,26 @@ async def change_city(message: Message, state: FSMContext):
 @customer_r.message(F.text == "/my_orders")
 @customer_r.callback_query(F.data == "back_myOrders")
 async def handle_my_orders(event, state: FSMContext):
+    log.info(f"handle_my_orders was called!")
+
     is_callback = isinstance(event, CallbackQuery)
-    user_tg_id = event.from_user.id
+    tg_id = event.from_user.id
     chat_id = event.message.chat.id if is_callback else event.chat.id
-    bot = event.message.bot if is_callback else event.bot
+    bot = event.bot
+    bot_id = event.bot.id
+    current_state = CustomerState.myOrders.state
 
     if not is_callback:
         handler = MessageHandler(state, bot)
         await handler.delete_previous_message(chat_id)
 
-    await state.set_state(CustomerState.myOrders)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
-    pending_count = len(await order_data.get_pending_orders(user_tg_id))
-    active_count = len(await order_data.get_active_orders(user_tg_id))
-    canceled_count = len(await order_data.get_canceled_orders(user_tg_id))
-    completed_count = len(await order_data.get_completed_orders(user_tg_id))
+    pending_count = len(await order_data.get_pending_orders(tg_id))
+    active_count = len(await order_data.get_active_orders(tg_id))
+    canceled_count = len(await order_data.get_canceled_orders(tg_id))
+    completed_count = len(await order_data.get_completed_orders(tg_id))
 
     reply_kb = await kb.get_customer_orders_kb(
         pending_count, active_count, canceled_count, completed_count
@@ -880,12 +886,21 @@ async def handle_my_orders(event, state: FSMContext):
             text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
 
-    # Если это сообщение, вызываем delete
     if not is_callback:
         handler = MessageHandler(state, bot)
         await handler.handle_new_message(new_message, event)
     else:
         await event.answer()
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer event info: {event.data if is_callback else event.text}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"handle_my_orders was successfully done!")
 
 
 # customer orders
@@ -923,7 +938,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
         await callback_query.message.edit_text(
             orders_text[counter],
-            reply_markup=await kb.get_customer_kb(text="one_my_order"),
+            reply_markup=await kb.get_customer_kb("one_my_order"),
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -961,20 +976,26 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         return
 
     # Получение заказов пользователя
-    user_tg_id = callback_query.from_user.id
-    user_orders = await get_orders_func(user_tg_id)
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
+    current_status = state_status if state_status else CustomerState.default.state
+    customer_orders = await get_orders_func(tg_id)
 
     await state.set_state(state_status)
-    await state.update_data(orders={order.order_id: order for order in user_orders})
+    await rediska.set_state(bot_id, tg_id, current_status)
+    await state.update_data(orders={order.order_id: order for order in customer_orders})
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
+    # continue from this point
 
     def format_address(number, address, url):
         return f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
 
     # Формирование текста для каждого заказа
     orders_text = []
-    for index, order in enumerate(user_orders, start=1):
+    for index, order in enumerate(customer_orders, start=1):
         base_info = (
-            f"<b>{index}/{len(user_orders)}</b>\n"
+            f"<b>{index}/{len(customer_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
             f"---------------------------------------------\n\n"
             f"<b>Город:</b> {order.order_city}\n\n"
@@ -998,7 +1019,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
             if point:
                 base_info += format_address(i, point, url)
 
-        # Информация о курьере
         courier_name, courier_phone = await order_data.get_order_courier_info(
             order.order_id
         )
@@ -1106,7 +1126,7 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     orders_text = data.get("orders_text")
-    orders = data.get("orders")  # Словарь с заказами
+    orders = data.get("orders")
     counter = data.get("counter", 0)
 
     # Увеличиваем счетчик и зацикливаем его

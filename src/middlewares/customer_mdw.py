@@ -26,14 +26,21 @@ class CustomerOuterMiddleware(BaseMiddleware):
         data: Dict[str, Any],
     ) -> Any:
 
-        customer_id = event.from_user.id
+        tg_id = event.from_user.id
+        bot_id = event.bot.id
         fsm_context = data.get("state")
         state = await fsm_context.get_state()
+        state_data = fsm_context.get_data()
 
-        log.info(f"fsm_state: {state}")
+        log.info(f"fsm_state: {state}" f"fsm_state_data: {state_data}")
+
+        if state_data is None:
+            self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
+            state_data = fsm_context.get_data()
+            log.info(f"fsm_restore_data: {state_data}")
 
         if state == None:
-            state = await self.rediska.get_state(event.bot.id, customer_id)
+            state = await self.rediska.get_state(bot_id, tg_id)
             log.info(
                 f"\n"
                 f"- Customer 🧍\n"
@@ -47,7 +54,7 @@ class CustomerOuterMiddleware(BaseMiddleware):
                     f"\n"
                     f"- Customer 🧍\n"
                     f"- Outer_mw\n"
-                    f"- Customer ID: {customer_id} visited the service for the first time\n"
+                    f"- Customer ID: {tg_id} visited the service for the first time\n"
                     f"- Customer state previous: {state_previous}\n"
                     f"- Customer state: {state}"
                 )
