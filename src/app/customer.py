@@ -986,7 +986,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     await state.update_data(orders={order.order_id: order for order in customer_orders})
     await rediska.save_fsm_state(state, bot_id, tg_id)
 
-    # continue from this point
+    # --- continue from this point
 
     def format_address(number, address, url):
         return f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"

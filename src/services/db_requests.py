@@ -247,25 +247,26 @@ class OrderData:
 
     # ---
 
-    async def create_order(self, user_tg_id: int, data: dict):
+    async def create_order(self, tg_id: int, data: dict, order_forma: str):
         async with self.async_session_factory() as session:
             async with session.begin():
 
-                user = await session.scalar(
-                    select(User).where(User.user_tg_id == user_tg_id)
+                customer = await session.scalar(
+                    select(Customer).where(Customer.customer_tg_id == tg_id)
                 )
 
                 new_order = Order(
-                    user_id=user.user_id,
+                    customer_id=customer.customer_id,
                     order_city=data.get("city"),
                     delivery_object=data.get("delivery_object"),
                     customer_name=data.get("customer_name"),
                     customer_phone=data.get("customer_phone"),
                     description=data.get("description"),
-                    distance_km=data.get("distance_km"),
-                    price_rub=data.get("price_rub"),
+                    distance_km=data.get("distance"),
+                    price_rub=data.get("price"),
                     created_at_moscow_time=data.get("order_time"),
                     full_rout=data.get("yandex_maps_url"),
+                    order_forma=order_forma,
                     order_status=OrderStatus.PENDING,
                 )
 
@@ -308,6 +309,8 @@ class OrderData:
             if order:
                 order.courier_id = courier_id
                 await session.commit()
+
+    # ---
 
     # ---
 

@@ -3,7 +3,7 @@ import speech_recognition as sr
 from pydub import AudioSegment
 from aiogram.types import Message
 from aiogram.enums import ContentType
-from src.config import log
+from src.config import log, moscow_time
 from .routing import route
 
 
@@ -77,9 +77,7 @@ class OrderFormatter:
             price,
         ) = [data[key] for key in data.keys()]
 
-        return (
-            f"<b>Ваш заказ</b> ✍︎\n"
-            f"---------------------------------------------\n\n"
+        order_forma = (
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name}\n"
             f"<b>Телефон:</b> {customer_phone}\n\n"
@@ -94,6 +92,8 @@ class OrderFormatter:
             f"• Оплачивайте курьеру наличными или переводом.\n\n"
             f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
         )
+
+        return order_forma
 
 
 class MessageRecognizer:

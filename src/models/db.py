@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, Annotated
 from dotenv import load_dotenv
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
+from sqlalchemy import LargeBinary
 
 
 from sqlalchemy.ext.asyncio import (
@@ -130,12 +131,13 @@ class Order(Base):
     order_city: Mapped[stringData]
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
-    order_addresses_data: Mapped[full_address_data]
     delivery_object: Mapped[stringData]
     distance_km: Mapped[floatData]
     price_rub: Mapped[intData]
     description: Mapped[textData]
     full_rout: Mapped[stringData]
+
+    order_forma: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     couriers = relationship("Courier", back_populates="orders")
     customers = relationship("Customer", back_populates="orders")
