@@ -149,18 +149,6 @@ class Keyboard:
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
                 ]
             ),
-            "overprice": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Не оформлять 🆇", callback_data="cancel_order"
-                        ),
-                        InlineKeyboardButton(
-                            text="Хорошо", callback_data="accept_notification"
-                        ),
-                    ]
-                ]
-            ),
             "rerecord": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [

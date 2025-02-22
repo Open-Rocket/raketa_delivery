@@ -1,5 +1,6 @@
 import asyncio
 import time
+import zlib
 from aiogram import Router, filters, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -11,6 +12,7 @@ from src.services import (
     courier_data,
     order_data,
     assistant,
+    formatter,
     route,
     recognizer,
 )
@@ -36,6 +38,7 @@ from src.utils import (
 
 
 __all__ = [
+    "zlib",
     "asyncio",
     "CommandStart",
     "FSMContext",
@@ -69,4 +72,5 @@ __all__ = [
     "Router",
     "payment_r",
     "PreCheckoutQuery",
+    "formatter",
 ]

@@ -1,4 +1,3 @@
-# ------------------------------------------------------- ✺ Start ✺ ------------------------------------------------ #
 from ._deps import (
     asyncio,
     CommandStart,
@@ -14,6 +13,7 @@ from ._deps import (
     Router,
     datetime,
     time,
+    zlib,
     moscow_time,
     customer_r,
     customer_fallback,
@@ -25,27 +25,22 @@ from ._deps import (
     recognizer,
     rediska,
     assistant,
+    formatter,
     log,
     F,
 )
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                     ⇣ MDW ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# middlewares_Outer
 customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
 customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                              ⇣ Registration steps ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# /start
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     log.info(f"cmd_start_customer was called!")
@@ -104,7 +99,6 @@ async def cmd_start_customer(message: Message, state: FSMContext) -> None:
     log.info(f"cmd_start_customer was successfully done!")
 
 
-# registration_Name
 @customer_r.callback_query(F.data == "reg")
 async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_reg_customer was called!")
@@ -139,7 +133,6 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_reg_customer was successfully done!")
 
 
-# registration_Phone
 @customer_r.message(filters.StateFilter(CustomerState.reg_Name))
 async def data_name_customer(message: Message, state: FSMContext):
     log.info(f"data_name_customer was called!")
@@ -186,7 +179,6 @@ async def data_name_customer(message: Message, state: FSMContext):
     log.info(f"data_name_customer was successfully done!")
 
 
-# registration_City
 @customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
 async def data_phone_customer(message: Message, state: FSMContext):
     log.info(f"data_phone_customer was called!")
@@ -229,7 +221,6 @@ async def data_phone_customer(message: Message, state: FSMContext):
     log.info(f"data_phone_customer was successfully done!")
 
 
-# terms of use
 @customer_r.message(filters.StateFilter(CustomerState.reg_City))
 async def data_city_customer(message: Message, state: FSMContext):
     log.info(f"data_city_customer was called!")
@@ -274,7 +265,6 @@ async def data_city_customer(message: Message, state: FSMContext):
     log.info(f"data_city_customer was successfully done!")
 
 
-# tou Accept registration was done
 @customer_r.callback_query(F.data == "accept_tou")
 async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"customer_accept_tou was called!")
@@ -326,12 +316,9 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"customer_accept_tou was successfully done!")
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Bot functions ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# order
 @customer_r.message(F.text == "/order")
 async def cmd_order(message: Message, state: FSMContext):
     log.info(f"cmd_order was called!")
@@ -397,7 +384,6 @@ async def cmd_order(message: Message, state: FSMContext):
     log.info(f"cmd_order was successfully done!")
 
 
-# commands_Profile
 @customer_r.message(F.text == "/profile")
 async def cmd_profile(message: Message, state: FSMContext):
     log.info(f"cmd_profile was called!")
@@ -443,7 +429,6 @@ async def cmd_profile(message: Message, state: FSMContext):
     log.info(f"cmd_profile was successfully done!")
 
 
-# faq
 @customer_r.message(F.text == "/faq")
 async def cmd_faq(message: Message, state: FSMContext):
     log.info(f"cmd_faq was called!")
@@ -480,7 +465,6 @@ async def cmd_faq(message: Message, state: FSMContext):
     log.info(f"cmd_faq was successfully done!")
 
 
-# rules
 @customer_r.message(F.text == "/rules")
 async def cmd_rules(message: Message, state: FSMContext):
     log.info(f"cmd_rules was called!")
@@ -522,7 +506,6 @@ async def cmd_rules(message: Message, state: FSMContext):
     log.info(f"cmd_rules was successfully done!")
 
 
-# commands_BecomeCourier
 @customer_r.message(F.text == "/become_courier")
 async def cmd_become_courier(message: Message, state: FSMContext):
     log.info(f"cmd_become_courier was called!")
@@ -565,7 +548,6 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     log.info(f"cmd_become_courier was successfully done!")
 
 
-# read_Info
 @customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_ai was called!")
@@ -605,37 +587,6 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_ai was successfully done!")
 
 
-# cancel_Order
-@customer_r.callback_query(F.data == "cancel_order")
-async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
-    log.info(f"cancel_order was called!")
-
-    handler = MessageHandler(state, callback_query.bot)
-    bot_id = callback_query.bot.id
-    tg_id = callback_query.from_user.id
-    current_state = CustomerState.default.state
-
-    await state.set_state(current_state)
-    await rediska.set_state(bot_id, tg_id, current_state)
-
-    text = "▼ <b>Выберите действие ...</b>"
-    new_message = await callback_query.message.answer(
-        text, disable_notification=True, parse_mode="HTML"
-    )
-    await handler.handle_new_message(new_message, callback_query.message)
-
-    log.info(
-        f"\n"
-        f"- Customer 🧍\n"
-        f"- Handler F.data: {F.data}\n"
-        f"- Customer telegram ID: {tg_id}\n"
-        f"- Customer state now: {current_state}\n"
-    )
-
-    log.info(f"cancel_order was successfully done!")
-
-
-# set_my_name
 @customer_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_name was called!")
@@ -665,7 +616,6 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_name was successfully done!")
 
 
-# set_my_phone
 @customer_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_phone was called!")
@@ -696,7 +646,6 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_phone was successfully done!")
 
 
-# set_my_city
 @customer_r.callback_query(F.data == "set_my_city")
 async def set_city(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_city was called!")
@@ -726,7 +675,6 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_city was successfully done!")
 
 
-# change name state
 @customer_r.message(filters.StateFilter(CustomerState.change_Name))
 async def change_name(message: Message, state: FSMContext):
     log.info(f"change_name was called!")
@@ -763,7 +711,6 @@ async def change_name(message: Message, state: FSMContext):
     log.info(f"change_name was successfully done!")
 
 
-# change phone state
 @customer_r.message(filters.StateFilter(CustomerState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
     log.info(f"change_phone was called!")
@@ -800,7 +747,6 @@ async def change_phone(message: Message, state: FSMContext):
     log.info(f"change_phone was successfully done!")
 
 
-# change city state
 @customer_r.message(filters.StateFilter(CustomerState.change_City))
 async def change_city(message: Message, state: FSMContext):
     log.info(f"change_city was called!")
@@ -837,12 +783,9 @@ async def change_city(message: Message, state: FSMContext):
     log.info(f"change_city was successfully done!")
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                   ⇣ User orders ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# handler for /my_orders and back_myOrders
 @customer_r.message(F.text == "/my_orders")
 @customer_r.callback_query(F.data == "back_myOrders")
 async def handle_my_orders(event, state: FSMContext):
@@ -903,7 +846,6 @@ async def handle_my_orders(event, state: FSMContext):
     log.info(f"handle_my_orders was successfully done!")
 
 
-# customer orders
 @customer_r.callback_query(
     F.data.in_(
         {
@@ -1062,7 +1004,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-# customer statistic
 @customer_r.callback_query(F.data == "my_statistic")
 async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     user_tg_id = callback_query.from_user.id
@@ -1121,7 +1062,6 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-# handler for right button "⇥" to move forward
 @customer_r.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -1147,7 +1087,6 @@ async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMCont
     )
 
 
-# handler for left button "⇤" to move back
 @customer_r.callback_query(F.data == "back_left_mo")
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -1171,12 +1110,9 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
     )
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                   ⇣ Cancel order ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# cancel order from orders
 @customer_r.callback_query(F.data == "cancel_my_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.message.bot)
@@ -1209,527 +1145,165 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                               ⇣ Formation of an order ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
-# order process
 @customer_r.message(
     filters.StateFilter(CustomerState.ai_voice_order),
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
 )
-async def process_message(message: Message, state: FSMContext):
+async def process_order(message: Message, state: FSMContext):
+    log.info(f"process_message was called!")
+
     handler = MessageHandler(state, message.bot)
     wait_message = await message.answer(
         f"Заказ обрабатывается, подождите ...", disable_notification=True
     )
 
+    error_messages = [
+        "⚠ Ошибка при обработке заказа.\nПопробуйте снова",
+        "Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
+        "⚠ Время обработки заказа превышено. Попробуйте снова.",
+    ]
+
+    text_msg = None
+
+    if message.content_type == ContentType.VOICE:
+        log.info(f"content_type is Voice!\nProcess to recognition voice start.")
+
+        recognized_text = await recognizer.get_recognition_text(message)
+        if not recognized_text:
+            rerecord_kb = await kb.get_customer_kb("rerecord")
+            new_message = await message.answer(
+                text=error_messages[1],
+                reply_markup=rerecord_kb,
+                disable_notification=True,
+            )
+            await wait_message.delete()
+            await handler.handle_new_message(new_message, message)
+
+            log.warning(f"Can't recognize voice!")
+
+            return
+        else:
+            log.info(f"Voice was recognized")
+
+            text_msg = recognized_text
+    else:
+        log.info(f"content_type is Text")
+
+        text_msg = message.text
+
     try:
+        log.info(f"Tying to process_order_logic.")
         await asyncio.wait_for(
-            process_order_logic(message, state, handler, wait_message), timeout=120
+            process_order_logic(
+                text_msg,
+                message,
+                state,
+                handler,
+                wait_message,
+                error_messages,
+            ),
+            timeout=120,
         )
     except asyncio.TimeoutError:
-        await wait_message.delete()
         new_message = await message.answer(
-            "⚠ Время обработки заказа превышено. Попробуйте снова.",
-            reply_markup=await kb.get_customer_kb(text="rerecord"),
+            error_messages[2],
+            reply_markup=await kb.get_customer_kb("rerecord"),
             disable_notification=True,
         )
+        await wait_message.delete()
         await handler.handle_new_message(new_message, message)
+
+        log.error(f"Error: asyncio.TimeoutError")
+
     except Exception as e:
-        await wait_message.delete()
         new_message = await message.answer(
-            f"⚠ Ошибка при обработке заказа: {str(e)}",
+            error_messages[0],
             reply_markup=await kb.get_customer_kb(text="rerecord"),
             disable_notification=True,
         )
+        await wait_message.delete()
         await handler.handle_new_message(new_message, message)
 
+        log.error(f"Error: {e}")
 
-# form_Order
+
 async def process_order_logic(
-    message: Message, state: FSMContext, handler, wait_message
+    text_msg: str,
+    message: Message,
+    state: FSMContext,
+    handler: MessageHandler,
+    wait_message: Message,
+    error_messages: list,
 ):
-    await state.set_state(CustomerState.waiting_Courier)
-    await handler.delete_previous_message(message.chat.id)
 
-    # Инициализация переменных
-    reply_kb = await kb.get_customer_kb(text="voice_order_accept")
-    rerecord_kb = await kb.get_customer_kb(text="rerecord")
+    log.info(f"process_order_logic was called!")
+
+    bot_id = message.bot.id
     tg_id = message.from_user.id
-    user_city = await customer_data.get_user_city(tg_id)
-    customer_name, customer_phone = await customer_data.get_username_userphone(tg_id)
-    new_message = "Ошибка распознавания. Попробуйте снова."
+    chat_id = message.chat.id
+    current_state = CustomerState.waiting_Courier.state
+    customer_name = rediska.get_user_name(bot_id, tg_id)
+    customer_phone = rediska.get_user_phone(bot_id, tg_id)
+    customer_city = await rediska.get_user_city(bot_id, tg_id)
 
-    recognized_text = await recognizer.get_recognition_text(message)
+    await state.set_state(current_state)
+    await rediska.set_state(current_state)
 
-    # Если распознавание не удалось
-    if not recognized_text:
-        recognized_text = new_message
+    await handler.delete_previous_message(chat_id)
+
+    try:
+        city, addresses, delivery_object, description = await assistant.process_order(
+            text_msg, customer_city
+        )
+
+        log.info("request was successfully done")
+    except Exception as e:
         new_message = await message.answer(
-            text="Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
-            reply_markup=rerecord_kb,
+            error_messages[0],
+            reply_markup=await kb.get_customer_kb("rerecord"),
             disable_notification=True,
         )
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
+
+        log.error(f"Error: {e}")
+
         return
 
-    # Обработка для разрешенных заказов (обычные товары)
-    addresses = await get_parsed_addresses(recognized_text, user_city)
+    prepare_dict = await formatter._prepare_data(
+        moscow_time,
+        city,
+        customer_name,
+        customer_phone,
+        addresses,
+        delivery_object,
+        description,
+    )
 
-    if len(addresses) == 2:
-        pickup_address, delivery_address = addresses
-        pickup_coords = await route.get_coordinates(pickup_address)
-        delivery_coords = await route.get_coordinates(delivery_address)
-        all_coordinates = [pickup_coords, delivery_coords]
+    add_order_info = (
+        f"<b>Ваш заказ</b> ✍︎\n---------------------------------------------\n\n"
+    )
+    order_info = await formatter.format_order_form(prepare_dict)
 
-        if all(pickup_coords) and all(delivery_coords):
+    order_forma = add_order_info + order_info
 
-            # Формирование координат
-            yandex_maps_url, pickup_point, delivery_point = await route.get_rout(
-                pickup_coords, [delivery_coords]
-            )
+    new_message = await message.answer(
+        order_info,
+        reply_markup=await kb.get_customer_kb("voice_order_accept"),
+        disable_notification=True,
+    )
 
-            distance, duration = await route.calculate_total_distance(all_coordinates)
-            distance = round(distance, 2)
-            price = await route.get_price(distance, moscow_time)
+    log.info(f"Order form:\n\n{order_forma}\n")
 
-            # Структурирование данных заказа
-            structured_data = await process_order_text(recognized_text)
-            city = structured_data.get("City")
-
-            if not city:
-                city = user_city
-
-            starting_point_a = structured_data.get("Starting point A")
-            destination_point_b = structured_data.get("Destination point B")
-            delivery_object = structured_data.get("Delivery object")
-            description = structured_data.get("Description", None)
-
-            # Сохранение данных в состоянии
-            await state.update_data(
-                city=city,
-                starting_point_a=starting_point_a,
-                a_latitude=float(pickup_coords[0]),
-                a_longitude=float(pickup_coords[1]),
-                a_coordinates=pickup_coords,
-                a_url=pickup_point,
-                destination_point_b=destination_point_b,
-                b_latitude=float(delivery_coords[0]),
-                b_longitude=float(delivery_coords[1]),
-                b_coordinates=delivery_coords,
-                b_url=delivery_point,
-                delivery_object=delivery_object,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                description=description,
-                distance_km=distance,
-                duration_min=duration,
-                price_rub=price,
-                order_text=recognized_text,
-                order_time=moscow_time,
-                yandex_maps_url=yandex_maps_url,
-                pickup_point=pickup_point,
-                delivery_point=delivery_point,
-            )
-
-            # Отправка ответа пользователю
-            order_forma = (
-                f"<b>Ваш заказ</b> ✍︎\n"
-                f"---------------------------------------------\n\n"
-                f"<b>Город:</b> {city}\n\n"
-                f"<b>Заказчик:</b> {customer_name}\n"
-                f"<b>Телефон:</b> {customer_phone}\n\n"
-                f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                f"⦿ <b>Адрес 2:</b> <a href='{delivery_point}'>{destination_point_b}</a>\n\n"
-                f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
-                f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
-                f"<b>Описание:</b> {description if description else '...'}\n\n"
-                f"---------------------------------------------\n"
-                f"• Проверьте ваш заказ и если все верно, то разместите.\n"
-                f"• Курьер может связаться с вами для уточнения деталей!\n"
-                f"• Оплачивайте курьеру наличными или переводом.\n\n"
-                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
-            )
-            new_message = await message.answer(
-                text=order_forma,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-
-        else:
-            new_message = await message.answer(
-                text=f"Не удалось получить координаты для заказа. Проверьте заказ и попробуйте снова.",
-                reply_markup=reply_kb,
-                disable_notification=True,
-            )
-    elif len(addresses) == 3:
-        pickup_address, delivery_address_1, delivery_address_2 = addresses
-        pickup_coords = await route.get_coordinates(pickup_address)
-        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
-        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
-        all_coordinates = [pickup_coords, delivery_coords_1, delivery_coords_2]
-
-        if all(pickup_coords) and all(delivery_coords_1) and (delivery_coords_2):
-
-            # Формирование координат
-            yandex_maps_url, pickup_point, delivery_point_1, delivery_point_2 = (
-                await route.get_rout(
-                    pickup_coords, [delivery_coords_1, delivery_coords_2]
-                )
-            )
-
-            distance, duration = await route.calculate_total_distance(all_coordinates)
-            distance = round(distance, 2)
-            price = await route.get_price(distance, moscow_time, over_price=70)
-
-            # Структурирование данных заказа
-            structured_data = await process_order_text(recognized_text)
-            city = structured_data.get("City")
-
-            if not city:
-                city = user_city
-
-            starting_point_a = structured_data.get("Starting point A")
-            destination_point_b = structured_data.get("Destination point B")
-            destination_point_c = structured_data.get("Destination point C")
-            delivery_object = structured_data.get("Delivery object")
-            description = structured_data.get("Description", None)
-
-            # Сохранение данных в состоянии
-            await state.update_data(
-                city=city,
-                starting_point_a=starting_point_a,
-                a_latitude=float(pickup_coords[0]),
-                a_longitude=float(pickup_coords[1]),
-                a_coordinates=pickup_coords,
-                a_url=pickup_point,
-                destination_point_b=destination_point_b,
-                b_latitude=float(delivery_coords_1[0]),
-                b_longitude=float(delivery_coords_1[1]),
-                b_coordinates=delivery_coords_1,
-                b_url=delivery_point_1,
-                destination_point_c=destination_point_c,
-                c_latitude=float(delivery_coords_2[0]),
-                c_longitude=float(delivery_coords_2[1]),
-                c_coordinates=delivery_coords_2,
-                c_url=delivery_point_2,
-                delivery_object=delivery_object,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                distance_km=distance,
-                duration_min=duration,
-                price_rub=price,
-                order_text=recognized_text,
-                order_time=moscow_time,
-                yandex_maps_url=yandex_maps_url,
-                pickup_point=pickup_point,
-                delivery_point=delivery_point_1,
-            )
-
-            # Отправка ответа пользователю
-            order_forma = (
-                f"<b>Ваш заказ</b> ✍︎\n"
-                f"---------------------------------------------\n\n"
-                f"<b>Город:</b> {city}\n\n"
-                f"<b>Заказчик:</b> {customer_name}\n"
-                f"<b>Телефон:</b> {customer_phone}\n\n"
-                f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
-                f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n\n"
-                f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
-                f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
-                f"<b>Описание:</b> {description if description else '...'}\n\n"
-                f"---------------------------------------------\n"
-                f"• Проверьте ваш заказ и если все верно, то разместите.\n"
-                f"• Курьер может связаться с вами для уточнения деталей!\n"
-                f"• Оплачивайте курьеру наличными или переводом.\n\n"
-                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
-            )
-            new_message = await message.answer(
-                text=order_forma,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-    elif len(addresses) == 4:
-        pickup_address, delivery_address_1, delivery_address_2, delivery_address_3 = (
-            addresses
-        )
-        pickup_coords = await route.get_coordinates(pickup_address)
-        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
-        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
-        delivery_coords_3 = await route.get_coordinates(delivery_address_3)
-        all_coordinates = [
-            pickup_coords,
-            delivery_coords_1,
-            delivery_coords_2,
-            delivery_coords_3,
-        ]
-
-        if (
-            all(pickup_coords)
-            and all(delivery_coords_1)
-            and all(delivery_coords_2)
-            and all(delivery_coords_3)
-        ):
-
-            # Формирование координат
-            (
-                yandex_maps_url,
-                pickup_point,
-                delivery_point_1,
-                delivery_point_2,
-                delivery_point_3,
-            ) = await route.get_rout(
-                pickup_coords, [delivery_coords_1, delivery_coords_2, delivery_coords_3]
-            )
-
-            # Рассчет дистанции и продолжительности
-            distance, duration = await route.calculate_total_distance(all_coordinates)
-            distance = round(distance, 2)
-            price = await route.get_price(distance, moscow_time, over_price=90)
-
-            # Структурирование данных заказа
-            structured_data = await process_order_text(recognized_text)
-            city = structured_data.get("City")
-
-            if not city:
-                city = user_city
-
-            starting_point_a = structured_data.get("Starting point A")
-            destination_point_b = structured_data.get("Destination point B")
-            destination_point_c = structured_data.get("Destination point C")
-            destination_point_d = structured_data.get("Destination point D")
-            delivery_object = structured_data.get("Delivery object")
-            description = structured_data.get("Description", None)
-
-            # Сохранение данных в состоянии
-            await state.update_data(
-                city=city,
-                starting_point_a=starting_point_a,
-                a_latitude=float(pickup_coords[0]),
-                a_longitude=float(pickup_coords[1]),
-                a_coordinates=pickup_coords,
-                a_url=pickup_point,
-                destination_point_b=destination_point_b,
-                b_latitude=float(delivery_coords_1[0]),
-                b_longitude=float(delivery_coords_1[1]),
-                b_coordinates=delivery_coords_1,
-                b_url=delivery_point_1,
-                destination_point_c=destination_point_c,
-                c_latitude=float(delivery_coords_2[0]),
-                c_longitude=float(delivery_coords_2[1]),
-                c_coordinates=delivery_coords_2,
-                c_url=delivery_point_2,
-                destination_point_d=destination_point_d,
-                d_latitude=float(delivery_coords_3[0]),
-                d_longitude=float(delivery_coords_3[1]),
-                d_coordinates=delivery_coords_3,
-                d_url=delivery_point_3,
-                delivery_object=delivery_object,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                distance_km=distance,
-                duration_min=duration,
-                price_rub=price,
-                order_text=recognized_text,
-                order_time=moscow_time,
-                yandex_maps_url=yandex_maps_url,
-                pickup_point=pickup_point,
-                delivery_point=delivery_point_1,
-            )
-
-            # Формирование ответа пользователю
-            order_forma = (
-                f"<b>Ваш заказ</b> ✍︎\n"
-                f"---------------------------------------------\n\n"
-                f"<b>Город:</b> {city}\n\n"
-                f"<b>Заказчик:</b> {customer_name}\n"
-                f"<b>Телефон:</b> {customer_phone}\n\n"
-                f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
-                f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
-                f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n\n"
-                f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
-                f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
-                f"<b>Описание:</b> {description if description else '...'}\n\n"
-                f"---------------------------------------------\n"
-                f"• Проверьте ваш заказ и если все верно, то разместите.\n"
-                f"• Курьер может связаться с вами для уточнения деталей!\n"
-                f"• Оплачивайте курьеру наличными или переводом.\n\n"
-                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
-            )
-            new_message = await message.answer(
-                text=order_forma,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-    elif len(addresses) == 5:
-        (
-            pickup_address,
-            delivery_address_1,
-            delivery_address_2,
-            delivery_address_3,
-            delivery_address_4,
-        ) = addresses
-
-        pickup_coords = await route.get_coordinates(pickup_address)
-        delivery_coords_1 = await route.get_coordinates(delivery_address_1)
-        delivery_coords_2 = await route.get_coordinates(delivery_address_2)
-        delivery_coords_3 = await route.get_coordinates(delivery_address_3)
-        delivery_coords_4 = await route.get_coordinates(delivery_address_4)
-
-        all_coordinates = [
-            pickup_coords,
-            delivery_coords_1,
-            delivery_coords_2,
-            delivery_coords_3,
-            delivery_coords_4,
-        ]
-
-        if (
-            all(pickup_coords)
-            and all(delivery_coords_1)
-            and all(delivery_coords_2)
-            and all(delivery_coords_3)
-            and all(delivery_coords_4)
-        ):
-            # Формирование координат
-            (
-                yandex_maps_url,
-                pickup_point,
-                delivery_point_1,
-                delivery_point_2,
-                delivery_point_3,
-                delivery_point_4,
-            ) = await route.get_rout(
-                pickup_coords,
-                [
-                    delivery_coords_1,
-                    delivery_coords_2,
-                    delivery_coords_3,
-                    delivery_coords_4,
-                ],
-            )
-            # Рассчет дистанции и продолжительности
-            distance, duration = await route.calculate_total_distance(all_coordinates)
-            distance = round(distance, 2)
-            price = await route.get_price(distance, moscow_time, over_price=120)
-
-            # Структурирование данных заказа
-            structured_data = await process_order_text(recognized_text)
-            city = structured_data.get("City")
-
-            if not city:
-                city = user_city
-
-            starting_point_a = structured_data.get("Starting point A")
-            destination_point_b = structured_data.get("Destination point B")
-            destination_point_c = structured_data.get("Destination point C")
-            destination_point_d = structured_data.get("Destination point D")
-            destination_point_e = structured_data.get("Destination point E")
-            delivery_object = structured_data.get("Delivery object")
-            description = structured_data.get("Description", None)
-
-            # Сохранение данных в состоянии
-            await state.update_data(
-                city=city,
-                starting_point_a=starting_point_a,
-                a_latitude=float(pickup_coords[0]),
-                a_longitude=float(pickup_coords[1]),
-                a_coordinates=pickup_coords,
-                a_url=pickup_point,
-                destination_point_b=destination_point_b,
-                b_latitude=float(delivery_coords_1[0]),
-                b_longitude=float(delivery_coords_1[1]),
-                b_coordinates=delivery_coords_1,
-                b_url=delivery_point_1,
-                destination_point_c=destination_point_c,
-                c_latitude=float(delivery_coords_2[0]),
-                c_longitude=float(delivery_coords_2[1]),
-                c_coordinates=delivery_coords_2,
-                c_url=delivery_point_2,
-                destination_point_d=destination_point_d,
-                d_latitude=float(delivery_coords_3[0]),
-                d_longitude=float(delivery_coords_3[1]),
-                d_coordinates=delivery_coords_3,
-                d_url=delivery_point_3,
-                destination_point_e=destination_point_e,
-                e_latitude=float(delivery_coords_4[0]),
-                e_longitude=float(delivery_coords_4[1]),
-                e_coordinates=delivery_coords_4,
-                e_url=delivery_point_4,
-                delivery_object=delivery_object,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                distance_km=distance,
-                duration_min=duration,
-                price_rub=price,
-                order_text=recognized_text,
-                order_time=moscow_time,
-                yandex_maps_url=yandex_maps_url,
-                pickup_point=pickup_point,
-                delivery_point=delivery_point_1,
-            )
-
-            # Формирование ответа пользователю
-            order_forma = (
-                f"<b>Ваш заказ</b> ✍︎\n"
-                f"---------------------------------------------\n\n"
-                f"<b>Город:</b> {city}\n\n"
-                f"<b>Заказчик:</b> {customer_name}\n"
-                f"<b>Телефон:</b> {customer_phone}\n\n"
-                f"⦿ <b>Адрес 1:</b> <a href='{pickup_point}'>{starting_point_a}</a>\n"
-                f"⦿ <b>Адрес 2:</b> <a href='{delivery_point_1}'>{destination_point_b}</a>\n"
-                f"⦿ <b>Адрес 3:</b> <a href='{delivery_point_2}'>{destination_point_c}</a>\n"
-                f"⦿ <b>Адрес 4:</b> <a href='{delivery_point_3}'>{destination_point_d}</a>\n"
-                f"⦿ <b>Адрес 5:</b> <a href='{delivery_point_4}'>{destination_point_e}</a>\n\n"
-                f"<b>Доставляем:</b> {delivery_object if delivery_object else '...'}\n"
-                f"<b>Расстояние:</b> {distance} км\n"
-                f"<b>Стоимость доставки:</b> {price}₽\n\n"
-                f"<b>Описание:</b> {description if description else '...'}\n\n"
-                f"---------------------------------------------\n"
-                f"• Проверьте ваш заказ и если все верно, то разместите.\n"
-                f"• Курьер может связаться с вами для уточнения деталей!\n"
-                f"• Оплачивайте курьеру наличными или переводом.\n\n"
-                f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
-            )
-
-            new_message = await message.answer(
-                text=order_forma,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-    elif len(addresses) > 5:
-        new_message = await message.answer(
-            text=f"<b>Слишком много пунктов</b> 𐒀 \n\nМы не оформляем доставки с более чем 5 адресами, "
-            "так как курьер может запутаться и не выполнить ваш заказ!",
-            reply_markup=rerecord_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-    else:
-        new_message = await message.answer(
-            text="Мы не смогли определить ваш заказ.\n Попробуйте переформулировать заказ более четко и повторить попытку.",
-            reply_markup=rerecord_kb,
-            disable_notification=True,
-        )
-
-    # Завершение обработки
     await wait_message.delete()
     await handler.handle_new_message(new_message, message)
 
+    log.info(f"process_order_logic was successfully done!")
 
-# send_Order
+
 @customer_r.callback_query(F.data == "order_sent")
 async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     # Устанавливаем состояние
@@ -1766,10 +1340,38 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# ---------------------------------------------✺ The end (u_rout) ✺ ------------------------------------------------- #
+@customer_r.callback_query(F.data == "cancel_order")
+async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"cancel_order was called!")
+
+    handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CustomerState.default.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    text = "▼ <b>Выберите действие ...</b>"
+    new_message = await callback_query.message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+    await handler.handle_new_message(new_message, callback_query.message)
+
+    log.info(
+        f"\n"
+        f"- Customer 🧍\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Customer telegram ID: {tg_id}\n"
+        f"- Customer state now: {current_state}\n"
+    )
+
+    log.info(f"cancel_order was successfully done!")
 
 
-# fallback
+# ---
+
+
 @customer_fallback.message()
 async def handle_unrecognized_message(message: Message):
     log.info(message.text)
