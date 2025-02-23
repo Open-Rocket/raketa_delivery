@@ -1,7 +1,7 @@
 import re
 import json
 import httpx
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIError, RateLimitError, APIConnectionError
 from src.config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 
 
@@ -14,16 +14,19 @@ class AssistantAi:
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             http_client=httpx.AsyncClient(
-                transport=httpx.AsyncHTTPTransport(
-                    local_address="0.0.0.0", proxy=self.proxy
-                ),
+                transport=httpx.AsyncHTTPTransport(proxy=self.proxy),
             ),
         )
 
     async def _get_gpt_text(self, request: str, model="gpt-4o-mini"):
+
+        log.info(f"Начало выполнения _get_gpt_text:\nmodel={model}\nrequest={request}")
+
         try:
 
-            # logger.info(f"Sending request to GPT: {request}")
+            log.debug(
+                f"Отправка запроса в OpenAI API: messages=[{{'role': 'system', 'content': 'Ты — ассистент по обработке заказов.'}}, {{'role': 'user', 'content': '{request}'}}], model={model}"
+            )
 
             completion = await self.client.chat.completions.create(
                 messages=[
@@ -35,12 +38,34 @@ class AssistantAi:
                 ],
                 model=model,
             )
+
             response_text = completion.choices[0].message.content
-            # logger.info(f"\n-----\nGPT response: {response_text}\n-----")
+
+            log.info(f"Успешно получен ответ от GPT: response_text={response_text}")
+
             return response_text
-        except Exception as e:
-            log.error(f"Error in getting response from GPT: {e}")
+
+        except RateLimitError as e:
+            log.error(f"Превышен лимит запросов к OpenAI API: {str(e)}", exc_info=True)
             return None
+
+        except APIConnectionError as e:
+            log.error(f"Ошибка соединения с OpenAI API: {str(e)}", exc_info=True)
+            return None
+
+        except APIError as e:
+            log.error(f"Ошибка API OpenAI: {str(e)}", exc_info=True)
+            return None
+
+        except Exception as e:
+            log.error(
+                f"Неизвестная ошибка при получении ответа от GPT: exception={str(e)}, type={type(e).__name__}",
+                exc_info=True,
+            )
+            return None
+
+        finally:
+            log.debug(f"Завершение выполнения _get_gpt_text")
 
     async def _get_parsed_addresses(self, response) -> list:
         address_pattern = re.compile(r"\((.*?)\)")

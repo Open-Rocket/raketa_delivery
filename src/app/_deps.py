@@ -39,6 +39,7 @@ from src.utils import (
 
 __all__ = [
     "zlib",
+    "time",
     "asyncio",
     "CommandStart",
     "FSMContext",

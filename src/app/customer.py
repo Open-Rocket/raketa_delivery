@@ -1168,10 +1168,13 @@ async def process_order(message: Message, state: FSMContext):
 
     text_msg = None
 
+    start_time = time.perf_counter()
+
     if message.content_type == ContentType.VOICE:
         log.info(f"content_type is Voice!\nProcess to recognition voice start.")
 
         recognized_text = await recognizer.get_recognition_text(message)
+
         if not recognized_text:
             rerecord_kb = await kb.get_customer_kb("rerecord")
             new_message = await message.answer(
@@ -1216,18 +1219,25 @@ async def process_order(message: Message, state: FSMContext):
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
 
+        log.info(f"Output error message: {new_message}")
         log.error(f"Error: asyncio.TimeoutError")
 
     except Exception as e:
         new_message = await message.answer(
             error_messages[0],
-            reply_markup=await kb.get_customer_kb(text="rerecord"),
+            reply_markup=await kb.get_customer_kb("rerecord"),
             disable_notification=True,
         )
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
 
+        log.info(f"Output error message: {new_message}")
         log.error(f"Error: {e}")
+
+    end_time = time.perf_counter()
+    execution_time = end_time - start_time
+
+    log.info(f"Execution time process_message: {execution_time:.4f} sec")
 
 
 async def process_order_logic(
@@ -1245,12 +1255,12 @@ async def process_order_logic(
     tg_id = message.from_user.id
     chat_id = message.chat.id
     current_state = CustomerState.waiting_Courier.state
-    customer_name = rediska.get_user_name(bot_id, tg_id)
-    customer_phone = rediska.get_user_phone(bot_id, tg_id)
+    customer_name = await rediska.get_user_name(bot_id, tg_id)
+    customer_phone = await rediska.get_user_phone(bot_id, tg_id)
     customer_city = await rediska.get_user_city(bot_id, tg_id)
 
     await state.set_state(current_state)
-    await rediska.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
     await handler.delete_previous_message(chat_id)
 
@@ -1269,6 +1279,7 @@ async def process_order_logic(
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
 
+        log.info(f"Output error message: {new_message}")
         log.error(f"Error: {e}")
 
         return
@@ -1288,6 +1299,22 @@ async def process_order_logic(
     )
     order_info = await formatter.format_order_form(prepare_dict)
 
+    moscow_time_str = moscow_time.isoformat()
+
+    data = [
+        moscow_time_str,
+        city,
+        customer_name,
+        customer_phone,
+        addresses,
+        delivery_object,
+        description,
+        order_info,
+    ]
+
+    await state.update_data(current_order_info=(data, order_info))
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
     order_forma = add_order_info + order_info
 
     new_message = await message.answer(
@@ -1306,10 +1333,9 @@ async def process_order_logic(
 
 @customer_r.callback_query(F.data == "order_sent")
 async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
-    # Устанавливаем состояние
-    # await state.set_state(CustomerState.default)
 
-    # Создаем обработчик сообщений
+    log.info(f"set_order_to_db was called!")
+
     handler = MessageHandler(state, callback_query.bot)
 
     # Получаем ID пользователя

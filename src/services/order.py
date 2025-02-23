@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 import speech_recognition as sr
 from pydub import AudioSegment
 from aiogram.types import Message
@@ -10,7 +11,7 @@ from .routing import route
 class OrderFormatter:
     @staticmethod
     async def _prepare_data(
-        time: str,
+        time: datetime,
         city: str,
         customer_name: str,
         customer_phone: str,
@@ -105,8 +106,8 @@ class MessageRecognizer:
             voice = message.voice
             file_info = await message.bot.get_file(voice.file_id)
             file = await message.bot.download_file(file_info.file_path)
-            audio_data = io.BytesIO(file.read())  # Приведение к io.BytesIO
-            return await self._process_audio_data(audio_data)  # Вызов через cls
+            audio_data = io.BytesIO(file.read())
+            return await self._process_audio_data(audio_data)
         return message.text
 
     async def _process_audio_data(self, audio_data: bytes) -> str:
@@ -128,7 +129,7 @@ class MessageRecognizer:
                 sr.UnknownValueError,
                 sr.RequestError,
             ) as e:
-                log.error(f"ERROR: {e}")
+                log.error(f"_process_audio_data ERROR: {e}")
                 return f"Не удалось распознать речь"
 
 
