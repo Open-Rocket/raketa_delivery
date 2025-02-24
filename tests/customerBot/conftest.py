@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Message, CallbackQuery, User
 from src.app.customer import FSMContext
 from src.config import moscow_time
-from src.app.customer import customer_r
+from src.app.customer import customer_r, customer_fallback
 from src.config import fsm_customer_storage, customer_bot
 from aiogram.fsm.storage.base import StorageKey
 

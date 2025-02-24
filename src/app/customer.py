@@ -863,14 +863,17 @@ async def handle_my_orders(event, state: FSMContext):
     )
 )
 async def get_orders(callback_query: CallbackQuery, state: FSMContext):
+
+    log.info(f"handle_my_orders was called!")
+
     data = await state.get_data()
 
-    # Переключение между заказами (если нажали "следующий" или "предыдущий")
     if callback_query.data in {"next_order", "prev_order"}:
         counter = data.get("counter", 0)
         orders_text = data.get("orders_text", [])
 
         if not orders_text:
+            log.warning("Нет доступных заказов для переключения")
             await callback_query.answer("Нет доступных заказов.", show_alert=True)
             return
 
@@ -882,15 +885,18 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         )
         await state.update_data(counter=counter)
 
+        log.info(f"Переключение заказа: counter={counter}, total_orders={total_orders}")
         await callback_query.message.edit_text(
             orders_text[counter],
             reply_markup=await kb.get_customer_kb("one_my_order"),
             disable_notification=True,
             parse_mode="HTML",
         )
+        log.info(
+            f"Конец выполнения get_orders: успешно переключен заказ #{counter + 1}"
+        )
         return
 
-    # Определение типа заказа
     order_status_mapping = {
         "pending_orders": (
             order_data.get_pending_orders,
@@ -918,94 +924,82 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         callback_query.data, (None, None, "")
     )
     if not get_orders_func:
+        log.error(f"Неизвестный тип заказа: {callback_query.data}")
         await callback_query.answer("Ошибка запроса заказов.", show_alert=True)
         return
 
-    # Получение заказов пользователя
     tg_id = callback_query.from_user.id
     bot_id = callback_query.bot.id
     current_status = state_status if state_status else CustomerState.default.state
     customer_orders = await get_orders_func(tg_id)
 
+    orders_dict = {
+        order.order_id: {
+            "order_id": order.order_id,
+            "order_status": order.order_status.value,
+            "created_at_moscow_time": str(moscow_time),
+            "order_city": order.order_city,
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "delivery_object": order.delivery_object,
+            "distance_km": order.distance_km,
+            "price_rub": order.price_rub,
+            "description": order.description,
+            "order_forma": (
+                zlib.decompress(order.order_forma).decode("utf-8")
+                if order.order_forma
+                else "-"
+            ),
+        }
+        for order in customer_orders
+    }
+
     await state.set_state(state_status)
     await rediska.set_state(bot_id, tg_id, current_status)
-    await state.update_data(orders={order.order_id: order for order in customer_orders})
+    await state.update_data(orders=orders_dict)
     await rediska.save_fsm_state(state, bot_id, tg_id)
 
-    # --- continue from this point
-
-    def format_address(number, address, url):
-        return f"⦿ <b>Адрес {number}:</b> <a href='{url}'>{address}</a>\n"
-
-    # Формирование текста для каждого заказа
     orders_text = []
     for index, order in enumerate(customer_orders, start=1):
+        order_forma = (
+            zlib.decompress(order.order_forma).decode("utf-8")
+            if order.order_forma
+            else "-"
+        )
+        log.info(f"Формирование заказа #{order.order_id}: order_forma={order_forma}")
+
         base_info = (
             f"<b>{index}/{len(customer_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
-            f"---------------------------------------------\n\n"
-            f"<b>Город:</b> {order.order_city}\n\n"
-            f"<b>Заказ №{order.order_id}</b>\n"
-            f"<b>Дата оформления:</b> {order.created_at_moscow_time}\n"
-            f"<b>Статус заказа:</b> {order.order_status.value}\n\n"
-            f"<b>Заказчик:</b> {order.customer_name if order.customer_name else '-'}\n"
-            f"<b>Телефон:</b> {order.customer_phone if order.customer_phone else '-'}\n\n"
-        )
-
-        base_info += format_address(1, order.starting_point_a, order.a_url)
-
-        delivery_points = [
-            (order.destination_point_b, order.b_url),
-            (order.destination_point_c, order.c_url),
-            (order.destination_point_d, order.d_url),
-            (order.destination_point_e, order.e_url),
-        ]
-
-        for i, (point, url) in enumerate(delivery_points, start=2):
-            if point:
-                base_info += format_address(i, point, url)
-
-        courier_name, courier_phone = await order_data.get_order_courier_info(
-            order.order_id
-        )
-
-        base_info += (
-            f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '-'}\n"
-            f"<b>Расстояние:</b> {order.distance_km} км\n"
-            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-            f"<b>Курьер:</b> {courier_name if courier_name else '-'}\n"
-            f"<b>Телефон курьера:</b> {courier_phone if courier_phone else '-'}\n\n"
-            f"<b>Описание:</b> <i>{order.description if order.description else '...'}</i>\n\n"
             f"---------------------------------------------\n"
-            f"• Проверьте ваш заказ и если всё верно, то разместите.\n"
-            f"• Курьер может связаться с вами для уточнения деталей!\n"
-            f"• Оплачивайте курьеру наличными или переводом.\n\n"
-            f"⦿⌁⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n\n"
+            f"{order_forma}"
         )
-
         orders_text.append(base_info)
 
-    # Если заказов нет
     if not orders_text:
+        log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
         await callback_query.message.edit_text(
             f"У вас нет {status_text} заказов.",
-            reply_markup=await kb.get_customer_kb(text="one_my_order"),
+            reply_markup=await kb.get_customer_kb("one_my_order"),
             disable_notification=True,
         )
+        log.info(f"Конец выполнения get_orders: заказов не найдено")
         return
 
-    # Сохранение данных и отправка первого заказа
     await state.update_data(orders_text=orders_text, counter=0)
     reply_kb = await kb.get_customer_kb(
-        text="one_my_order" if len(orders_text) == 1 else callback_query.data
+        "one_my_order" if len(orders_text) == 1 else callback_query.data
     )
 
+    log.info(f"Отображение первого заказа: total_orders={len(orders_text)}")
     await callback_query.message.edit_text(
         orders_text[0],
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    log.info(f"get_orders was successfully done!")
 
 
 @customer_r.callback_query(F.data == "my_statistic")
@@ -1068,50 +1062,86 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_r.callback_query(F.data == "next_right_mo")
 async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    log.info("Начало выполнения on_button_next_my_orders")
+
+    # Получаем текущие данные состояния
     data = await state.get_data()
-    orders_text = data.get("orders_text")
-    orders = data.get("orders")
+    orders = data.get("orders", {})  # Словарь заказов
     counter = data.get("counter", 0)
+
+    # Получаем список всех заказов
+    order_list = list(orders.values())
+    total_orders = len(order_list)
 
     # Увеличиваем счетчик и зацикливаем его
-    counter = (counter + 1) % len(orders_text)
+    counter = (counter + 1) % total_orders
 
-    # Обновляем состояние с новым значением счетчика и ID текущего заказа
-    current_order_id = list(orders.keys())[
-        counter
-    ]  # Получаем ID нового активного заказа
+    # Получаем текущий заказ
+    current_order = order_list[counter]
+    current_order_id = current_order["order_id"]
+    new_order_info = current_order["order_forma"]  # Текст заказа из поля order_forma
+    log.info(
+        f"Переключение на следующий заказ: counter={counter}, order_id={current_order_id}, total_orders={total_orders}"
+    )
+
+    # Обновляем состояние
     await state.update_data(counter=counter, current_order_id=current_order_id)
 
     # Обновляем сообщение с новым заказом
-    new_order_info = orders_text[counter]
+    reply_kb = await kb.get_customer_kb(
+        "my_orders"
+    )  # Клавиатура для нескольких заказов
     await callback_query.message.edit_text(
         new_order_info,
-        reply_markup=callback_query.message.reply_markup,
+        reply_markup=reply_kb,
+        disable_notification=True,
         parse_mode="HTML",
     )
 
+    log.info("Конец выполнения on_button_next_my_orders: успешно переключено")
 
-@customer_r.callback_query(F.data == "back_left_mo")
+
+@customer_r.callback_query(
+    F.data == "back_left_mo"
+)  # Исправлено на "prev_order" для соответствия get_orders
 async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
+    log.info("Начало выполнения on_button_back_my_orders")
+
+    # Получаем текущие данные состояния
     data = await state.get_data()
-    orders_text = data.get("orders_text")
-    orders = data.get("orders")
+    orders = data.get("orders", {})  # Словарь заказов
     counter = data.get("counter", 0)
 
-    # Уменьшаем счетчик и зацикливаем его
-    counter = (counter - 1) % len(orders_text)
+    # Получаем список всех заказов
+    order_list = list(orders.values())
+    total_orders = len(order_list)
 
-    # Обновляем состояние с новым значением счетчика
-    current_order_id = list(orders.keys())[counter]
+    # Уменьшаем счетчик и зацикливаем его
+    counter = (counter - 1) % total_orders
+
+    # Получаем текущий заказ
+    current_order = order_list[counter]
+    current_order_id = current_order["order_id"]
+    new_order_info = current_order["order_forma"]  # Текст заказа из поля order_forma
+    log.info(
+        f"Переключение на предыдущий заказ: counter={counter}, order_id={current_order_id}, total_orders={total_orders}"
+    )
+
+    # Обновляем состояние
     await state.update_data(counter=counter, current_order_id=current_order_id)
 
     # Обновляем сообщение с новым заказом
-    new_order_info = orders_text[counter]
+    reply_kb = await kb.get_customer_kb(
+        "my_orders"
+    )  # Клавиатура для нескольких заказов
     await callback_query.message.edit_text(
         new_order_info,
-        reply_markup=callback_query.message.reply_markup,
+        reply_markup=reply_kb,
+        disable_notification=True,
         parse_mode="HTML",
     )
+
+    log.info("Конец выполнения on_button_back_my_orders: успешно переключено")
 
 
 # ---
@@ -1298,6 +1328,10 @@ async def process_order_logic(
         description,
     )
 
+    full_rout = prepare_dict.get("yandex_maps_url")
+    distance = prepare_dict.get("distance")
+    price = prepare_dict.get("price")
+
     add_order_info = (
         f"<b>Ваш заказ</b> ✍︎\n---------------------------------------------\n\n"
     )
@@ -1314,6 +1348,9 @@ async def process_order_logic(
         "delivery_object": delivery_object,
         "description": description,
         "order_info": order_info,
+        "yandex_maps_url": full_rout,
+        "distance": distance,
+        "price": price,
     }
 
     await state.update_data(current_order_info=(state_data, order_info))
@@ -1321,10 +1358,10 @@ async def process_order_logic(
 
     order_forma = add_order_info + order_info
 
+    reply_kb = await kb.get_customer_kb("voice_order_accept")
+
     new_message = await message.answer(
-        order_info,
-        reply_markup=await kb.get_customer_kb("voice_order_accept"),
-        disable_notification=True,
+        order_info, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
 
     log.info(f"Order form:\n\n{order_forma}\n")
@@ -1418,5 +1455,5 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_fallback.message()
 async def handle_unrecognized_message(message: Message):
-    log.info(message.text)
+    log.info(f"Data to delete: {message.text}")
     await message.delete()
