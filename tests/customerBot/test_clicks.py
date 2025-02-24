@@ -101,7 +101,7 @@ async def test_cmd_rules(bot, dp, message, state, user_id):
 @pytest.mark.asyncio
 async def test_cmd_become_courier(bot, dp, message, state, user_id):
 
-    test_message = await message(text="/rules", user_id=user_id)
+    test_message = await message(text="/become_courier", user_id=user_id)
     await state(state_value=CustomerState.default)
     update = Update(update_id=1, message=test_message)
     await dp.feed_update(bot, update)
@@ -222,6 +222,15 @@ async def test_process_order(bot, dp, message, state, user_id):
     await dp.feed_update(bot, update)
 
 
+@pytest.mark.asyncio
+async def test_set_order_to_db(bot, dp, callback_query, state, user_id):
+
+    test_cq = await callback_query(data="order_sent", user_id=user_id)
+    await state(state_value=CustomerState.waiting_Courier)
+    update = Update(update_id=1, callback_query=test_cq)
+    await dp.feed_update(bot, update)
+
+
 """
 
 pytest tests/customerBot/test_clicks.py -s -v -k test_cmd_start
@@ -253,6 +262,7 @@ pytest tests/customerBot/test_clicks.py -s -v -k test_handle_my_orders_message
 pytest tests/customerBot/test_clicks.py -s -v -k test_handle_my_orders_callback
 
 pytest tests/customerBot/test_clicks.py -s -v -k test_process_order
+pytest tests/customerBot/test_clicks.py -s -v -k test_set_order_to_db
 
 
 

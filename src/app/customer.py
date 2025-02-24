@@ -330,9 +330,29 @@ async def cmd_order(message: Message, state: FSMContext):
 
     is_read_info = await rediska.is_read_info(bot_id, tg_id)
 
+    log.info(f"is_read: {is_read_info}")
+
     await handler.delete_previous_message(message.chat.id)
 
-    if not is_read_info:
+    if is_read_info:
+
+        current_state = CustomerState.ai_voice_order.state
+        await state.set_state(current_state)
+        await rediska.set_state(bot_id, tg_id, current_state)
+
+        text = (
+            "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
+            "заказ будет оформлен в считанные секунды.</i>"
+        )
+
+        new_message = await message.answer(
+            text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+
         current_state = CustomerState.default.state
         await state.set_state(current_state)
         await rediska.set_state(bot_id, tg_id, current_state)
@@ -350,22 +370,6 @@ async def cmd_order(message: Message, state: FSMContext):
             photo=photo_title,
             caption=text,
             reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    else:
-        current_state = CustomerState.ai_voice_order.state
-        await state.set_state(current_state)
-        await rediska.set_state(bot_id, tg_id, current_state)
-
-        text = (
-            "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
-            "заказ будет оформлен в считанные секунды.</i>"
-        )
-
-        new_message = await message.answer(
-            text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -518,13 +522,13 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
-    photo_title = await title.get_title_customer(message.text)
+    photo_title = await title.get_title_customer("/become_courier")
     text = (
         "⦿ Стать курьером у нас — это отличный способ заработать без комиссии!\n\n"
         "⦿ Работайте в удобное время, выбирайте заказы рядом и получайте бонусы за быструю доставку.\n\n"
         "⦿ Зарабатывайте до 7000₽ в день уже сегодня!"
     )
-    reply_kb = await kb.get_customer_kb(message)
+    reply_kb = await kb.get_customer_kb("/become_courier")
 
     await handler.delete_previous_message(message.chat.id)
 
@@ -1301,18 +1305,18 @@ async def process_order_logic(
 
     moscow_time_str = moscow_time.isoformat()
 
-    data = [
-        moscow_time_str,
-        city,
-        customer_name,
-        customer_phone,
-        addresses,
-        delivery_object,
-        description,
-        order_info,
-    ]
+    state_data = {
+        "moscow_time_str": moscow_time_str,
+        "city": city,
+        "customer_name": customer_name,
+        "customer_phone": customer_phone,
+        "addresses": addresses,
+        "delivery_object": delivery_object,
+        "description": description,
+        "order_info": order_info,
+    }
 
-    await state.update_data(current_order_info=(data, order_info))
+    await state.update_data(current_order_info=(state_data, order_info))
     await rediska.save_fsm_state(state, bot_id, tg_id)
 
     order_forma = add_order_info + order_info
@@ -1336,16 +1340,31 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 
     log.info(f"set_order_to_db was called!")
 
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
     handler = MessageHandler(state, callback_query.bot)
 
-    # Получаем ID пользователя
-    tg_id = callback_query.from_user.id
-    data = await state.get_data()
-    await state.set_state(CustomerState.default)
+    state_data = await state.get_data()
+    current_order_info = state_data.get("current_order_info")
+
+    current_state = CustomerState.default.state
+
+    if current_order_info:
+        data, order_forma = [*current_order_info]
+        order_forma = zlib.compress(order_forma.encode("utf-8"))
+    else:
+        log.error("Ключ 'current_order_info' отсутствует в состоянии FSM")
+        await callback_query.message.answer(
+            "Ошибка: данные заказа не найдены.", disable_notification=True
+        )
+        return
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
     try:
-        # Асинхронно создаем заказ
-        order_number = await order_data.create_order(tg_id, data)
+
+        order_number = await order_data.create_order(tg_id, data, order_forma)
         text = (
             f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
             f"Мы ищем курьера для вашего заказа 🔎\n\n"
@@ -1353,17 +1372,16 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
             f"▼ <b>Выберите действие ...</b>"
         )
     except Exception as e:
-        # Обработка возможных ошибок
-        print(f"Ошибка при создании заказа: {str(e)}")
-
+        log.error(f"Ошибка при создании заказа: {str(e)}")
         text = "Ошибка при создании заказа.\n" "Попробуйте повторить заказ."
 
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
-    # Обрабатываем новое сообщение
     await handler.handle_new_message(new_message, callback_query.message)
+
+    log.info(f"set_order_to_db was successfully done!")
 
 
 @customer_r.callback_query(F.data == "cancel_order")

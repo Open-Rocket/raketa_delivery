@@ -6,6 +6,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from typing import Optional
+from src.config import log
 
 
 class RedisKey:
@@ -108,21 +109,12 @@ class RedisService:
         """Сохраняет состояние FSM в Redis"""
         data = await state.get_data()
         key = RedisKey(bot_id, user_id)
-        await self.redis.set(f"state_data:" + str(key), json.dumps(data))
-
-    async def reset_fsm_state(
-        self, state: FSMContext, bot_id: int, user_id: int
-    ) -> bool:
-        """Очищает данные в state"""
-        await state.clear()
-        key = RedisKey(bot_id, user_id)
-        await self.redis.set(f"state_data:" + str(key), json.dumps({}))
-        return True
+        await self.redis.set(f"state_data: {str(key)}", json.dumps(data))
 
     async def load_fsm_state(self, bot_id: int, user_id: int) -> dict:
         """Загружает состояние FSM из Redis"""
         key = RedisKey(bot_id, user_id)
-        raw_data = await self.redis.get(key)
+        raw_data = await self.redis.get(f"state_data: {str(key)}")
         return json.loads(raw_data) if raw_data else {}
 
     async def restore_fsm_state(
@@ -131,6 +123,15 @@ class RedisService:
         """Восстанавливает состояние FSM из Redis"""
         data = await self.load_fsm_state(bot_id, user_id)
         await state.set_data(data)
+
+    async def reset_fsm_state(
+        self, state: FSMContext, bot_id: int, user_id: int
+    ) -> bool:
+        """Очищает данные в state"""
+        await state.clear()
+        key = RedisKey(bot_id, user_id)
+        await self.redis.set(f"state_data: {str(key)}", json.dumps({}))
+        return True
 
     # ---
 
@@ -199,7 +200,7 @@ class RedisService:
     async def is_read_info(self, bot_id: int, user_id: int) -> bool:
         """Получает значение is_read из Redis"""
         key = RedisKey(bot_id, user_id)
-        is_read = await self.redis.hget(f"user:{key}", "read_info")
+        is_read = await self.redis.hget(f"user_info:{key}", "read_info")
 
         if is_read is not None:
             return bool(int(is_read.decode("utf-8")))

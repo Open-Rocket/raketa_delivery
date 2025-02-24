@@ -247,7 +247,7 @@ class OrderData:
 
     # ---
 
-    async def create_order(self, tg_id: int, data: dict, order_forma: str):
+    async def create_order(self, tg_id: int, data: dict, order_forma: str) -> int:
         async with self.async_session_factory() as session:
             async with session.begin():
 
