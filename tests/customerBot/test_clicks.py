@@ -218,7 +218,7 @@ async def test_process_order(bot, dp, message, state, user_id):
         "Забрать заказ нужно в Москве, на проспекте Вернадского, дом 76, корпус 2. Отправить на улицу Академика Анохина, дом 20. В коробке находится одежда. Получателем будет Иван, его номер — 89991234567. Очень важно, чтобы курьер доставил заказ до 18:00  Спасибо!",
     ]
 
-    test_message = await message(text=order_text[0], user_id=user_id)
+    test_message = await message(text=order_text[1], user_id=user_id)
     await state(state_value=CustomerState.ai_voice_order)
     update = Update(update_id=1, message=test_message)
     await dp.feed_update(bot, update)
@@ -241,14 +241,21 @@ async def test_get_orders(bot, dp, callback_query, state, user_id):
         "active_orders",
         "canceled_orders",
         "completed_orders",
-        "prev_order",
-        "next_order",
         "next_right_mo",
         "back_left_mo",
     ]
 
     test_cq = await callback_query(data=callback_data_list[6], user_id=user_id)
     await state(state_value=CustomerState.myOrders_pending)
+    update = Update(update_id=1, callback_query=test_cq)
+    await dp.feed_update(bot, update)
+
+
+@pytest.mark.asyncio
+async def test_cancel_my_order(bot, dp, callback_query, state, user_id):
+
+    test_cq = await callback_query(data="cancel_my_order", user_id=user_id)
+    await state(state_value=CustomerState.default)
     update = Update(update_id=1, callback_query=test_cq)
     await dp.feed_update(bot, update)
 

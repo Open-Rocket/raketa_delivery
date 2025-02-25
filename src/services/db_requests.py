@@ -1,6 +1,7 @@
 from src.models import async_session_factory, Customer, Courier, OrderStatus, Order
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 from src.config import moscow_time, log
 from .routing import route
@@ -393,16 +394,37 @@ class OrderData:
 
     # ---
 
-    async def assign_courier_to_order(self, order_id: int, courier_id: int):
+    async def assign_courier_to_order(self, order_id: int, courier_id: int) -> bool:
+        """Назначить курьера на заказ и вернуть результат операции."""
         async with self.async_session_factory() as session:
-            order = await session.scalar(
-                select(Order).where(Order.order_id == order_id)
-            )
-            if order:
-                order.courier_id = courier_id
-                await session.commit()
+            order = await session.get(Order, order_id)
+            if not order:
+                return False
+
+            order.courier_id = courier_id
+            await session.commit()
+            return True
 
     # ---
+    async def get_order_by_id(self, order_id: int):
+        """Получить заказ по его ID."""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order).where(Order.order_id == order_id)
+            )
+            return query.scalar_one_or_none()
+
+    # ---
+    async def update_order_status(self, order_id: int, new_status: OrderStatus) -> bool:
+        """Обновить статус заказа и вернуть True/False в зависимости от успеха."""
+        async with self.async_session_factory() as session:
+            order = await session.get(Order, order_id)
+            if not order or order.order_status == new_status:
+                return False
+
+            order.order_status = new_status
+            await session.commit()
+            return True
 
     # ---
 

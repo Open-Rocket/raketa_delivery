@@ -299,8 +299,8 @@ class Keyboard:
             "available_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
-                        InlineKeyboardButton(text="⇤", callback_data="back_left"),
-                        InlineKeyboardButton(text="⇥", callback_data="next_right"),
+                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
                     ],
                     [
                         InlineKeyboardButton(
