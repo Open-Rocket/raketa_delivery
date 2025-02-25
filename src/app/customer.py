@@ -552,6 +552,9 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     log.info(f"cmd_become_courier was successfully done!")
 
 
+# ---
+
+
 @customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_ai was called!")
@@ -589,6 +592,9 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     )
 
     log.info(f"data_ai was successfully done!")
+
+
+# ---
 
 
 @customer_r.callback_query(F.data == "set_my_name")
@@ -679,6 +685,9 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_city was successfully done!")
 
 
+# ---
+
+
 @customer_r.message(filters.StateFilter(CustomerState.change_Name))
 async def change_name(message: Message, state: FSMContext):
     log.info(f"change_name was called!")
@@ -689,10 +698,12 @@ async def change_name(message: Message, state: FSMContext):
     name = message.text
     current_state = CustomerState.default.state
 
+    new_name_was_set_redis = await rediska.set_user_name(bot_id, tg_id, name)
+    new_name_was_set = await customer_data.update_customer_name(tg_id, name)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
-    new_name_was_set = await customer_data.set_customer_name(tg_id, name)
 
+    log.info(f"new_name_was_set_redis: {new_name_was_set_redis}")
     text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
     await handler.delete_previous_message(message.chat.id)
@@ -725,9 +736,12 @@ async def change_phone(message: Message, state: FSMContext):
     phone = message.contact.phone_number
     current_state = CustomerState.default.state
 
+    new_phone_was_set_redis = await rediska.set_user_phone(bot_id, tg_id, phone)
+    new_phone_was_set = await customer_data.update_customer_phone(tg_id, phone)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
-    new_phone_was_set = await customer_data.set_customer_phone(tg_id, phone)
+
+    log.info(f"new_phone_was_set_redis: {new_phone_was_set_redis}")
 
     text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
@@ -761,9 +775,12 @@ async def change_city(message: Message, state: FSMContext):
     city = message.text
     current_state = CustomerState.default.state
 
+    new_city_was_set_redis = await rediska.set_user_city(bot_id, tg_id, city)
+    new_city_was_set = await customer_data.update_customer_city(tg_id, city)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
-    new_city_was_set = await customer_data.set_customer_city(tg_id, city)
+
+    log.info(f"new_phone_was_set_redis: {new_city_was_set_redis}")
 
     text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
@@ -966,6 +983,7 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
             if order.order_forma
             else "-"
         )
+
         log.info(f"Формирование заказа #{order.order_id}: order_forma={order_forma}")
 
         base_info = (
@@ -1000,6 +1018,66 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     )
 
     log.info(f"get_orders was successfully done!")
+
+
+@customer_r.callback_query(F.data.in_({"next_right_mo", "back_left_mo"}))
+async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"Начало выполнения handle_order_navigation для {callback_query.data}")
+
+    # Получаем данные из состояния
+    data = await state.get_data()
+    orders_dict = data.get("orders", {})  # Словарь заказов
+    counter = data.get("counter", 0)  # Текущий индекс заказа
+
+    # Проверяем, есть ли заказы для переключения
+    if not orders_dict:
+        log.warning("Нет доступных заказов для переключения")
+        await callback_query.answer("Нет доступных заказов.", show_alert=True)
+        return
+
+    # Получаем список ключей (order_id) из словаря
+    order_ids = list(orders_dict.keys())
+    total_orders = len(order_ids)
+
+    # Определяем направление переключения
+    if callback_query.data == "next_right_mo":
+        counter = (counter + 1) % total_orders  # Переход к следующему заказу
+        log_action = "Переключение на следующий заказ"
+    else:
+        counter = (counter - 1) % total_orders  # Переход к предыдущему заказу
+        log_action = "Переключение на предыдущий заказ"
+
+    # Получаем текущий заказ по индексу
+    current_order_id = order_ids[counter]
+    current_order = orders_dict[current_order_id]
+
+    # Формируем текст заказа
+    order_forma = current_order.get("order_forma", "-")
+    new_order_info = (
+        f"<b>{counter + 1}/{total_orders}</b>\n"
+        f"<b>Заказ: №{current_order_id}</b>\n"
+        f"---------------------------------------------\n"
+        f"{order_forma}"
+    )
+
+    # Обновляем состояние
+    await state.update_data(counter=counter, current_order_id=current_order_id)
+
+    # Логируем переключение
+    log.info(
+        f"{log_action}: counter={counter}, order_id={current_order_id}, total_orders={total_orders}"
+    )
+
+    # Обновляем сообщение с новым заказом
+    await callback_query.message.edit_text(
+        new_order_info,
+        reply_markup=callback_query.message.reply_markup,
+        parse_mode="HTML",
+    )
+
+    log.info(
+        f"Конец выполнения handle_order_navigation: успешно переключен заказ #{counter + 1}"
+    )
 
 
 @customer_r.callback_query(F.data == "my_statistic")
@@ -1060,95 +1138,11 @@ async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-@customer_r.callback_query(F.data == "next_right_mo")
-async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    log.info("Начало выполнения on_button_next_my_orders")
-
-    # Получаем текущие данные состояния
-    data = await state.get_data()
-    orders = data.get("orders", {})  # Словарь заказов
-    counter = data.get("counter", 0)
-
-    # Получаем список всех заказов
-    order_list = list(orders.values())
-    total_orders = len(order_list)
-
-    # Увеличиваем счетчик и зацикливаем его
-    counter = (counter + 1) % total_orders
-
-    # Получаем текущий заказ
-    current_order = order_list[counter]
-    current_order_id = current_order["order_id"]
-    new_order_info = current_order["order_forma"]  # Текст заказа из поля order_forma
-    log.info(
-        f"Переключение на следующий заказ: counter={counter}, order_id={current_order_id}, total_orders={total_orders}"
-    )
-
-    # Обновляем состояние
-    await state.update_data(counter=counter, current_order_id=current_order_id)
-
-    # Обновляем сообщение с новым заказом
-    reply_kb = await kb.get_customer_kb(
-        "my_orders"
-    )  # Клавиатура для нескольких заказов
-    await callback_query.message.edit_text(
-        new_order_info,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    log.info("Конец выполнения on_button_next_my_orders: успешно переключено")
-
-
-@customer_r.callback_query(
-    F.data == "back_left_mo"
-)  # Исправлено на "prev_order" для соответствия get_orders
-async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    log.info("Начало выполнения on_button_back_my_orders")
-
-    # Получаем текущие данные состояния
-    data = await state.get_data()
-    orders = data.get("orders", {})  # Словарь заказов
-    counter = data.get("counter", 0)
-
-    # Получаем список всех заказов
-    order_list = list(orders.values())
-    total_orders = len(order_list)
-
-    # Уменьшаем счетчик и зацикливаем его
-    counter = (counter - 1) % total_orders
-
-    # Получаем текущий заказ
-    current_order = order_list[counter]
-    current_order_id = current_order["order_id"]
-    new_order_info = current_order["order_forma"]  # Текст заказа из поля order_forma
-    log.info(
-        f"Переключение на предыдущий заказ: counter={counter}, order_id={current_order_id}, total_orders={total_orders}"
-    )
-
-    # Обновляем состояние
-    await state.update_data(counter=counter, current_order_id=current_order_id)
-
-    # Обновляем сообщение с новым заказом
-    reply_kb = await kb.get_customer_kb(
-        "my_orders"
-    )  # Клавиатура для нескольких заказов
-    await callback_query.message.edit_text(
-        new_order_info,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    log.info("Конец выполнения on_button_back_my_orders: успешно переключено")
-
-
 # ---
 
 
 @customer_r.callback_query(F.data == "cancel_my_order")
-async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
+async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
     handler = MessageHandler(state, callback_query.message.bot)
     data = await state.get_data()
     current_order_id = data.get("current_order_id")  # Получаем ID текущего заказа
@@ -1372,6 +1366,9 @@ async def process_order_logic(
     log.info(f"process_order_logic was successfully done!")
 
 
+# ---
+
+
 @customer_r.callback_query(F.data == "order_sent")
 async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 
@@ -1419,6 +1416,9 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(f"set_order_to_db was successfully done!")
+
+
+# ---
 
 
 @customer_r.callback_query(F.data == "cancel_order")

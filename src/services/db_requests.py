@@ -101,6 +101,98 @@ class CustomerData:
 
     # ---
 
+    async def update_customer_name(
+        self,
+        tg_id: int,
+        new_name: str,
+    ) -> bool:
+
+        async with self.async_session_factory() as session:
+            try:
+                # Находим пользователя по tg_id
+                result = await session.execute(
+                    select(Customer).where(Customer.customer_tg_id == tg_id)
+                )
+                customer = result.scalar_one_or_none()
+
+                if not customer:
+                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем имя
+                customer.customer_name = new_name
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Имя успешно обновлено для пользователя {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении имени: {e}")
+                return False
+
+    async def update_customer_phone(
+        self,
+        tg_id: int,
+        new_phone: str,
+    ) -> bool:
+
+        async with self.async_session_factory() as session:
+            try:
+                # Находим пользователя по tg_id
+                result = await session.execute(
+                    select(Customer).where(Customer.customer_tg_id == tg_id)
+                )
+                customer = result.scalar_one_or_none()
+
+                if not customer:
+                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем телефон
+                customer.customer_phone = new_phone
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Телефон успешно обновлен для пользователя {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении телефона: {e}")
+                return False
+
+    async def update_customer_city(
+        self,
+        tg_id: int,
+        new_city: str,
+    ) -> bool:
+
+        async with self.async_session_factory() as session:
+            try:
+                # Находим пользователя по tg_id
+                result = await session.execute(
+                    select(Customer).where(Customer.customer_tg_id == tg_id)
+                )
+                customer = result.scalar_one_or_none()
+
+                if not customer:
+                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем город
+                customer.customer_city = new_city
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Город успешно обновлен для пользователя {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении города: {e}")
+                return False
+
+    # ---
+
     async def get_customer_info(self, tg_id: int):
         async with self.async_session_factory() as session:
             customer = await session.scalar(

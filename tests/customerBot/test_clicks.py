@@ -241,11 +241,13 @@ async def test_get_orders(bot, dp, callback_query, state, user_id):
         "active_orders",
         "canceled_orders",
         "completed_orders",
-        "next_order",
         "prev_order",
+        "next_order",
+        "next_right_mo",
+        "back_left_mo",
     ]
 
-    test_cq = await callback_query(data="next_right_mo", user_id=user_id)
+    test_cq = await callback_query(data=callback_data_list[6], user_id=user_id)
     await state(state_value=CustomerState.myOrders_pending)
     update = Update(update_id=1, callback_query=test_cq)
     await dp.feed_update(bot, update)
