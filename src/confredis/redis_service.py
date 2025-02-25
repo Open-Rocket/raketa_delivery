@@ -190,7 +190,7 @@ class RedisService:
     async def is_reg(self, bot_id: int, user_id: int) -> bool:
         """Получает статус регистрации пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
-        is_reg = await self.redis.hget(f"user:{key}", "is_reg")
+        is_reg = await self.redis.hget(f"user_info:{key}", "is_reg")
 
         if is_reg is not None:
             return bool(int(is_reg.decode("utf-8")))

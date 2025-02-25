@@ -332,8 +332,6 @@ async def cmd_order(message: Message, state: FSMContext):
 
     log.info(f"is_read: {is_read_info}")
 
-    await handler.delete_previous_message(message.chat.id)
-
     if is_read_info:
 
         current_state = CustomerState.ai_voice_order.state
@@ -374,6 +372,7 @@ async def cmd_order(message: Message, state: FSMContext):
             parse_mode="HTML",
         )
 
+    await handler.delete_previous_message(message.chat.id)
     await handler.handle_new_message(new_message, message)
 
     log.info(
@@ -698,8 +697,8 @@ async def change_name(message: Message, state: FSMContext):
     name = message.text
     current_state = CustomerState.default.state
 
-    new_name_was_set_redis = await rediska.set_user_name(bot_id, tg_id, name)
     new_name_was_set = await customer_data.update_customer_name(tg_id, name)
+    new_name_was_set_redis = await rediska.set_user_name(bot_id, tg_id, name)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
@@ -736,8 +735,8 @@ async def change_phone(message: Message, state: FSMContext):
     phone = message.contact.phone_number
     current_state = CustomerState.default.state
 
-    new_phone_was_set_redis = await rediska.set_user_phone(bot_id, tg_id, phone)
     new_phone_was_set = await customer_data.update_customer_phone(tg_id, phone)
+    new_phone_was_set_redis = await rediska.set_user_phone(bot_id, tg_id, phone)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
@@ -775,8 +774,8 @@ async def change_city(message: Message, state: FSMContext):
     city = message.text
     current_state = CustomerState.default.state
 
-    new_city_was_set_redis = await rediska.set_user_city(bot_id, tg_id, city)
     new_city_was_set = await customer_data.update_customer_city(tg_id, city)
+    new_city_was_set_redis = await rediska.set_user_city(bot_id, tg_id, city)
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
@@ -828,11 +827,10 @@ async def handle_my_orders(event, state: FSMContext):
 
     pending_count = len(await order_data.get_pending_orders(tg_id))
     active_count = len(await order_data.get_active_orders(tg_id))
-    canceled_count = len(await order_data.get_canceled_orders(tg_id))
     completed_count = len(await order_data.get_completed_orders(tg_id))
 
     reply_kb = await kb.get_customer_orders_kb(
-        pending_count, active_count, canceled_count, completed_count
+        pending_count, active_count, completed_count
     )
     text = (
         f"✎ <b>Мои заказы</b>\n\n"
@@ -1066,64 +1064,6 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
 
     log.info(f"order {current_order_id} is_canceled: {is_canceled}")
     log.info(f"cancel_my_order was successfully done!")
-
-
-@customer_r.callback_query(F.data == "my_statistic")
-async def get_my_statistic(callback_query: CallbackQuery, state: FSMContext):
-    user_tg_id = callback_query.from_user.id
-
-    # Получение статистики пользователя
-    total_orders = await order_data.get_total_orders(user_tg_id) or 0
-    completed_orders = await order_data.get_completed_orders_count(user_tg_id) or 0
-    canceled_orders = await order_data.get_canceled_orders_count(user_tg_id) or 0
-    avg_speed = await order_data.get_avg_order_speed(user_tg_id) or 0
-    avg_distance = await order_data.get_avg_order_distance(user_tg_id) or 0
-    fastest_order_speed = await order_data.get_fastest_order_speed(user_tg_id) or 0
-    slowest_order_speed = await order_data.get_slowest_order_speed(user_tg_id) or 0
-    avg_time = await order_data.get_avg_order_time(user_tg_id) or 0
-    fastest_order_time = await order_data.get_fastest_order_time(user_tg_id) or 0
-    longest_order_time = await order_data.get_longest_order_time(user_tg_id) or 0
-    shortest_order_distance = (
-        await order_data.get_shortest_order_distance(user_tg_id) or 0
-    )
-    longest_order_distance = (
-        await order_data.get_longest_order_distance(user_tg_id) or 0
-    )
-
-    # Если заказов нет, то процент успешных заказов будет 0
-    success_rate = (completed_orders / total_orders) * 100 if total_orders > 0 else 0
-
-    avg_price = await order_data.get_avg_order_price(user_tg_id) or 0
-    max_price = await order_data.get_max_order_price(user_tg_id) or 0
-    min_price = await order_data.get_min_order_price(user_tg_id) or 0
-
-    # Формирование текста для сообщения
-    text = (
-        f"☈ <b>Статистика заказов</b>\n\n"
-        f"Всего заказов: {total_orders}\n"
-        f"Выполненные: {completed_orders}\n"
-        f"Отмененные: {canceled_orders}\n\n"
-        f"Самый медленный (по скорости): {slowest_order_speed:.2f} км/ч\n"
-        f"Самый быстрый (по скорости): {fastest_order_speed:.2f} км/ч\n"
-        f"Средняя скорость выполнения: {avg_speed:.2f} км/ч\n\n"
-        f"Самый долгий: {longest_order_time:.2f} мин\n"
-        f"Самый быстрый (по времени): {fastest_order_time:.2f} мин\n"
-        f"Среднее время выполнения: {avg_time:.2f} мин\n\n"
-        f"Самое короткое расстояние: {shortest_order_distance:.2f} км\n"
-        f"Самое большое расстояние: {longest_order_distance:.2f} км\n"
-        f"Среднее расстояние: {avg_distance:.2f} км\n\n"
-        f"Наименьшая стоимость: {min_price:.2f} руб.\n"
-        f"Наибольшая стоимость: {max_price:.2f} руб.\n"
-        f"Средняя стоимость: {avg_price:.2f} руб.\n\n"
-        f"Процент успешных: {success_rate:.2f}%\n"
-    )
-
-    reply_kb = await kb.get_customer_kb(text="one_my_order")
-
-    # Отправка сообщения пользователю
-    await callback_query.message.edit_text(
-        text, reply_markup=reply_kb, parse_mode="HTML"
-    )
 
 
 # ---

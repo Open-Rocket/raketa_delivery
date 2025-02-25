@@ -3,7 +3,7 @@ import json
 
 def open_rc():
 
-    with open("src/json/russian-cities.json", "r", encoding="utf-8") as f:
+    with open("src/parser/json/russian-cities.json", "r", encoding="utf-8") as f:
         data: dict = json.load(f)
 
     population = []

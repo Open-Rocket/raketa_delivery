@@ -173,7 +173,7 @@ class Keyboard:
 
     @staticmethod
     async def get_customer_orders_kb(
-        pending_count: int, active_count: int, canceled_count: int, completed_count: int
+        pending_count: int, active_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
         my_orders_kb = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -181,21 +181,18 @@ class Keyboard:
                     InlineKeyboardButton(
                         text=f"Ожидают {pending_count}", callback_data="pending_orders"
                     ),
+                ],
+                [
                     InlineKeyboardButton(
                         text=f"Активные {active_count}", callback_data="active_orders"
                     ),
                 ],
                 [
                     InlineKeyboardButton(
-                        text=f"Отмененные {canceled_count}",
-                        callback_data="canceled_orders",
-                    ),
-                    InlineKeyboardButton(
                         text=f"Доставленные {completed_count}",
                         callback_data="completed_orders",
                     ),
                 ],
-                [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")],
             ]
         )
 

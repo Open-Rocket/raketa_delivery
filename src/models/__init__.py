@@ -4,7 +4,8 @@ from .db import (
     Courier,
     OrderStatus,
     Order,
-    drop_create_db,
+    engine,
+    Base,
 )
 
 
@@ -15,5 +16,6 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Subscription",
-    "drop_create_db",
+    "engine",
+    "Base",
 ]

@@ -169,13 +169,6 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Subscription",
-    "drop_create_db",
+    "engine",
+    "Base",
 ]
-
-
-# Функция
-async def drop_create_db():
-    async with engine.begin() as conn:
-        # engine.echo = False
-        await conn.run_sync(Base.metadata.drop_all, checkfirst=True)
-        await conn.run_sync(Base.metadata.create_all)
