@@ -35,6 +35,7 @@ from src.utils import (
     kb,
     title,
 )
+from src.services import cities, find_closest_city
 
 
 __all__ = [
@@ -74,4 +75,6 @@ __all__ = [
     "payment_r",
     "PreCheckoutQuery",
     "formatter",
+    "cities",
+    "find_closest_city",
 ]

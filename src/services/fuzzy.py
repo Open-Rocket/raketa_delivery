@@ -1,19 +1,19 @@
 import os
-import asyncio
 import json
 from fuzzywuzzy import process
 from src.config import log
 
 
-class CityList:
+class Cities:
     _cities = []
-    _cache_path = "parser/json/russian-cities-list.json"
-    _json_path = "parser/json/russian-cities.json"
+    _cache_path = "src/parser/json/russian-cities-list.json"
+    _json_path = "src/parser/json/russian-cities.json"
 
     @classmethod
     async def _load_cities_from_json(cls):
         """Загружает города из JSON и сохраняет в список и кэш."""
         if not os.path.exists(cls._json_path):
+            log.error(f"Файл {cls._json_path} не найден")
             raise FileNotFoundError(f"Файл {cls._json_path} не найден")
 
         with open(cls._json_path, "r", encoding="utf-8") as f:
@@ -24,48 +24,49 @@ class CityList:
         with open(cls._cache_path, "w", encoding="utf-8") as f:
             json.dump(cls._cities, f, ensure_ascii=False, indent=4)
 
-        log.info("Города загружены из JSON и сохранены в кеш")
+        log.info("Города загружены из JSON и сохранены в кэш")
 
     @classmethod
     async def get_cities(cls):
-        """Возвращает список городов. Загружает из кеша, если данные уже есть."""
-        if not cls._cities:  # Если города не загружены в память
+        """Возвращает список городов, загружая из кеша или JSON при необходимости."""
+        if not cls._cities:
             if os.path.exists(cls._cache_path):
-                with open(cls._cache_path, "r", encoding="utf-8") as f:
-                    cls._cities = json.load(f)
+                try:
+                    with open(cls._cache_path, "r", encoding="utf-8") as f:
+                        cls._cities = json.load(f)
+                    log.info("Города загружены из кэша")
+                except Exception as e:
+                    log.error(f"Ошибка при загрузке из кэша: {e}")
+                    await cls._load_cities_from_json()
             else:
-                cls.load_cities_from_json()
-
+                await cls._load_cities_from_json()
         return cls._cities
 
 
-async def find_closest_city(city_name: str, russian_cities: list):
-    """Поиск наилучшего совпадения с учётом опечаток"""
-    result = process.extractOne(city_name, russian_cities, score_cutoff=73)
-    return result
+async def find_closest_city(city_name: str, cities: list):
+    """Поиск наилучшего совпадения с учётом опечаток."""
+    if not city_name or not city_name.strip():
+        log.warning("Пустой текст для поиска города")
+        return None, 0
 
+    city_name = city_name.lower()
+    if city_name == "питер":
+        city_name = "Санкт-Петербург"
+    elif city_name == "екб":
+        city_name = "Екатеринбург"
 
-async def main():
+    result = process.extractOne(city_name, cities, score_cutoff=73)
 
-    # await CityList._load_cities_from_json()
-    russian_cities = await CityList.get_cities()
-
-    user_input = "Яркутск"
-    if user_input.lower() == "питер":
-        user_input = "Санкт-Петербург"
-    elif user_input.lower() == "екб":
-        user_input = "Екатеринбург"
-    closest_city = await find_closest_city(user_input, russian_cities)
-    # closest_city = await find_most_compatible_response(user_input, russian_cities)
-
-    if closest_city:
-        match, score = closest_city
-        log.info(f"Самое близкое совпадение: {match}, коэффициент: {score}")
+    if result:
+        matched_city, score = result
+        log.info(f"Найден город: {matched_city}, score={score}")
+        return matched_city, score
     else:
-        log.info("Город не найден.")
+        log.warning(f"Город не найден для текста: {city_name}")
+        return None, 0
 
 
-asyncio.run(main())
+cities = Cities()
 
 
-# python -m src.services.fuzzy
+__all__ = ["cities", "find_closest_city"]

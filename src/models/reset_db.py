@@ -5,9 +5,7 @@ from src.models import engine, Base
 async def reset_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)  # Удаляет все таблицы
-        await conn.run_sync(
-            Base.metadata.create_all, checkfirst=True
-        )  # Создаёт, если их нет
+        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
 
 
 if __name__ == "__main__":
@@ -21,3 +19,4 @@ __all__ = ["reset_db"]
 
 
 # python -m src.models.reset_db
+# redis-cli flushdb

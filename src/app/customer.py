@@ -28,6 +28,8 @@ from ._deps import (
     formatter,
     log,
     F,
+    cities,
+    find_closest_city,
 )
 
 
@@ -229,7 +231,25 @@ async def data_city_customer(message: Message, state: FSMContext):
     handle_state = await state.get_state()
     bot_id = message.bot.id
     tg_id = message.from_user.id
-    customer_city = message.text
+    russian_cities = await cities.get_cities()
+    customer_city, score = await find_closest_city(message.text, russian_cities)
+
+    if not customer_city:
+        text = f"Введите корректное название города!\n<b>Ваш город:</b>"
+
+        new_message = await message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
+
+        log.info(
+            f"city name was uncorrectable: {customer_city}\n" f"text message: {text}\n"
+        )
+
+        await handler.delete_previous_message(message.chat.id)
+        await handler.handle_new_message(new_message, message)
+
+        return
+
     current_state = CustomerState.reg_tou.state
 
     await state.set_state(current_state)
@@ -257,7 +277,7 @@ async def data_city_customer(message: Message, state: FSMContext):
         f"- Customer 🧍\n"
         f"- Handler StateFilter: {handle_state}\n"
         f"- Customer telegram ID: {tg_id}\n"
-        f"- Customer message: {customer_city}\n"
+        f"- Customer city: {customer_city}, score: {score}\n"
         f"- Customer state now: {current_state}\n"
         f"- Is city set: {is_city_set}"
     )

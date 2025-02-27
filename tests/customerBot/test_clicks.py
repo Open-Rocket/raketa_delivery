@@ -45,7 +45,7 @@ async def test_data_phone_customer(bot, dp, message, state, user_id):
 
 @pytest.mark.asyncio
 async def test_data_city_customer(bot, dp, message, state, user_id):
-    test_message = await message(text="Москва", user_id=user_id)
+    test_message = await message(text="челяба", user_id=user_id)
     await state(state_value=CustomerState.reg_City)
     update = Update(update_id=1, message=test_message)
     await dp.feed_update(bot, update)
