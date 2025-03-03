@@ -584,6 +584,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_name was called!")
 
+    handler = MessageHandler(state, callback_query.bot)
     bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
     current_state = CustomerState.change_Name.state
@@ -592,9 +593,10 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_state(bot_id, tg_id, current_state)
 
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
-    await callback_query.message.answer(
+    new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
+    await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(
         f"\n"
@@ -641,6 +643,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
 async def set_city(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_city was called!")
 
+    handler = MessageHandler(state, callback_query.bot)
     bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
     current_state = CustomerState.change_City.state
@@ -649,9 +652,10 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_state(bot_id, tg_id, current_state)
 
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
-    await callback_query.message.answer(
+    new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
+    await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(
         f"\n"
@@ -671,6 +675,7 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
 async def change_name(message: Message, state: FSMContext):
     log.info(f"change_name was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     name = message.text
@@ -684,7 +689,13 @@ async def change_name(message: Message, state: FSMContext):
     log.info(f"new_name_was_set_redis: {new_name_was_set_redis}")
     text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
-    await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -741,6 +752,7 @@ async def change_phone(message: Message, state: FSMContext):
 async def change_city(message: Message, state: FSMContext):
     log.info(f"change_city was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
 
@@ -772,7 +784,13 @@ async def change_city(message: Message, state: FSMContext):
 
     text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
-    await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -780,7 +798,7 @@ async def change_city(message: Message, state: FSMContext):
         f"- Customer telegram ID: {tg_id}\n"
         f"- Customer message: {message.text}\n"
         f"- Customer state now: {current_state}\n"
-        f"- new_city_was_set: {new_city_was_set}, score: {score}\n"
+        f"- new_city_was_set: {new_city_was_set}\n"
     )
 
     log.info(f"change_city was successfully done!")
