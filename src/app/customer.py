@@ -51,6 +51,7 @@ async def cmd_start_customer(message: Message, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
+    handler = MessageHandler(state, message.bot)
     is_reg = await rediska.is_reg(bot_id, tg_id)
 
     if is_reg:
@@ -58,9 +59,11 @@ async def cmd_start_customer(message: Message, state: FSMContext):
         await state.set_state(default_state)
         await rediska.set_state(bot_id, tg_id, default_state)
         text = "▼ <b>Выберите действие ...</b>"
-
-        await message.answer(text, parse_mode="HTML", disable_notification=True)
-
+        await handler.delete_previous_message(message.chat.id)
+        new_message = await message.answer(
+            text, parse_mode="HTML", disable_notification=True
+        )
+        await handler.handle_new_message(new_message, message)
         return
 
     photo_title = await title.get_title_customer("/start")
@@ -73,14 +76,15 @@ async def cmd_start_customer(message: Message, state: FSMContext):
         f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
     )
     reply_kb = await kb.get_customer_kb("/start")
-
-    await message.answer_photo(
+    await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer_photo(
         photo=photo_title,
         caption=text,
         reply_markup=reply_kb,
         parse_mode="HTML",
         disable_notification=True,
     )
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -268,7 +272,7 @@ async def data_city_customer(message: Message, state: FSMContext):
         f"- Customer 🧍\n"
         f"- Handler StateFilter: {handle_state}\n"
         f"- Customer telegram ID: {tg_id}\n"
-        f"- Customer city: {city}, score: {score}\n"
+        f"- Customer city: {customer_city}, score: {score}\n"
         f"- Customer state now: {current_state}\n"
         f"- Is city set: {is_city_set}"
     )
@@ -334,6 +338,7 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 async def cmd_order(message: Message, state: FSMContext):
     log.info(f"cmd_order was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     current_state = None
@@ -353,7 +358,7 @@ async def cmd_order(message: Message, state: FSMContext):
             "заказ будет оформлен в считанные секунды.</i>"
         )
 
-        await message.answer(
+        new_message = await message.answer(
             text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
             disable_notification=True,
             parse_mode="HTML",
@@ -374,13 +379,16 @@ async def cmd_order(message: Message, state: FSMContext):
             "ассистент создаст заявку для вашего заказа.</i>"
         )
 
-        await message.answer_photo(
+        new_message = await message.answer_photo(
             photo=photo_title,
             caption=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+    await handler.delete_previous_message(message.chat.id)
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -398,6 +406,7 @@ async def cmd_order(message: Message, state: FSMContext):
 async def cmd_profile(message: Message, state: FSMContext):
     log.info(f"cmd_profile was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     current_state = CustomerState.default.state
@@ -420,9 +429,12 @@ async def cmd_profile(message: Message, state: FSMContext):
         f"<b>Город:</b> {city}"
     )
 
-    await message.answer(
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
         text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -439,6 +451,7 @@ async def cmd_profile(message: Message, state: FSMContext):
 async def cmd_faq(message: Message, state: FSMContext):
     log.info(f"cmd_faq was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     current_state = CustomerState.default.state
@@ -452,7 +465,12 @@ async def cmd_faq(message: Message, state: FSMContext):
         f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>"
     )
 
-    await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -469,6 +487,7 @@ async def cmd_faq(message: Message, state: FSMContext):
 async def cmd_rules(message: Message, state: FSMContext):
     log.info(f"cmd_rules was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     current_state = CustomerState.default.state
@@ -487,7 +506,12 @@ async def cmd_rules(message: Message, state: FSMContext):
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
-    await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -504,6 +528,7 @@ async def cmd_rules(message: Message, state: FSMContext):
 async def cmd_become_courier(message: Message, state: FSMContext):
     log.info(f"cmd_become_courier was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     current_state = CustomerState.default.state
@@ -519,12 +544,16 @@ async def cmd_become_courier(message: Message, state: FSMContext):
     )
     reply_kb = await kb.get_customer_kb("/become_courier")
 
-    await message.answer_photo(
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer_photo(
         photo=photo_title,
         caption=text,
         reply_markup=reply_kb,
         disable_notification=True,
     )
+
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -544,6 +573,7 @@ async def cmd_become_courier(message: Message, state: FSMContext):
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_ai was called!")
 
+    handler = MessageHandler(state, callback_query.bot)
     bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
     current_state = CustomerState.ai_voice_order.state
@@ -559,11 +589,12 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
         "заказ будет оформлен в считанные секунды.</i>"
     )
 
-    await callback_query.message.answer(
+    new_message = await callback_query.message.answer(
         text=f"{text}\n\nゞ <b>Опишите ваш заказ ...</b>",
         disable_notification=True,
         parse_mode="HTML",
     )
+    await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(
         f"\n"
@@ -841,13 +872,19 @@ async def handle_my_orders(event, state: FSMContext):
     )
 
     if is_callback:
-        await event.message.edit_text(
+        new_message = await event.message.edit_text(
             text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
     else:
-        await event.answer(
+        new_message = await event.answer(
             text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
+
+    if not is_callback:
+        handler = MessageHandler(state, bot)
+        await handler.handle_new_message(new_message, event)
+    else:
+        await event.answer()
 
     log.info(
         f"\n"
@@ -865,6 +902,7 @@ async def handle_my_orders(event, state: FSMContext):
         {
             "pending_orders",
             "active_orders",
+            "canceled_orders",
             "completed_orders",
         }
     )
@@ -914,6 +952,11 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
             order_data.get_active_orders,
             CustomerState.myOrders_active,
             "активных",
+        ),
+        "canceled_orders": (
+            order_data.get_canceled_orders,
+            CustomerState.myOrders_canceled,
+            "отменённых",
         ),
         "completed_orders": (
             order_data.get_completed_orders,
@@ -990,6 +1033,8 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     data = await state.get_data()
     orders_data = data.get("orders_data", [])
     counter = data.get("counter", 0)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
 
     if not orders_data:
         log.warning("Нет доступных заказов для переключения")
@@ -1019,6 +1064,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
 
     log.info(f"cancel_my_order was called!")
 
+    handler = MessageHandler(state, callback_query.message.bot)
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
 
@@ -1029,7 +1075,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
     order = await order_data.get_order_by_id(current_order_id)
 
     if order.order_status != OrderStatus.PENDING:
-        await callback_query.message.answer(
+        new_message = await callback_query.message.answer(
             f"Заказ №{current_order_id} нельзя отменить, так как он не в статусе ожидания."
         )
         return
@@ -1042,9 +1088,11 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отмененные.</b>\n\n"
         f"▼ <b>Выберите действие ...</b>"
     )
-    await callback_query.message.answer(
+    new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
+
+    await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(f"order {current_order_id} is_canceled: {is_canceled}")
     log.info(f"cancel_my_order was successfully done!")
