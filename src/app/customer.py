@@ -615,6 +615,7 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"set_phone was called!")
 
+    handler = MessageHandler(state, callback_query.bot)
     bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
     current_state = CustomerState.change_Phone.state
@@ -624,9 +625,10 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
 
     reply_kb = await kb.get_customer_kb("phone_number")
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш Телефон:</b>"
-    await callback_query.message.answer(
+    new_message = await callback_query.message.answer(
         text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
     )
+    await handler.handle_new_message(new_message, callback_query.message)
 
     log.info(
         f"\n"
