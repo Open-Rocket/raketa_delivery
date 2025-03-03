@@ -1,5 +1,4 @@
-import logging
-from aiogram import Router, BaseMiddleware, filters, F
+from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
 from aiogram.types import (
@@ -10,11 +9,6 @@ from aiogram.types import (
 from src.config import log
 from src.confredis import RedisService
 from src.utils import CourierState
-
-
-logging.basicConfig(
-    level=logging.INFO, format="--------------------\n%(message)s\n--------------------"
-)
 
 
 class CourierOuterMiddleware(BaseMiddleware):
@@ -29,21 +23,55 @@ class CourierOuterMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
+        """Обработка внешних событий"""
 
+        tg_id = event.from_user.id
+        bot_id = event.bot.id
         fsm_context = data.get("state")
-        state: FSMContext = (
-            await fsm_context.get_state()
-            if fsm_context
-            else await self.rediska.get_state()
-        )
+        state: FSMContext = await fsm_context.get_state()
+        state_data = await fsm_context.get_data()
+
+        log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
+
+        if not state_data:
+            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
+            state_data = await fsm_context.get_data()
+            log.info(f"is_fsm_restore_data: {True if state_data else False}")
+
+        if state == None:
+            state = await self.rediska.get_state(bot_id, tg_id)
+            log.info(
+                f"\n"
+                f"- Courier 🧍\n"
+                f"- Outer_mw\n"
+                f"- Courier state from redis: {state}"
+            )
+            if state == None:
+                state_previous = state
+                state = CustomerState.default.state
+                log.info(
+                    f"\n"
+                    f"- Courier 🧍\n"
+                    f"- Outer_mw\n"
+                    f"- Courier ID: {tg_id} visited the service for the first time\n"
+                    f"- Courier state previous: {state_previous}\n"
+                    f"- Courier state: {state}"
+                )
+
+            await fsm_context.set_state(state)
 
         if isinstance(event, Message):
             user_id = event.from_user.id
             message_text = event.text
 
-            # Формируем лог-сообщение для OuterMiddleware
-            log_message = f"Couriers - 🚴\nOuter_mw\nCourier message: {message_text}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            log.info(log_message)
+            log.info(
+                f"\n"
+                f"- Courier 🧍\n"
+                f"- Outer_mw\n"
+                f"- Customer message: {message_text}\n"
+                f"- Courier ID: {user_id}\n"
+                f"- Courier state previous: {state}"
+            )
 
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result
@@ -52,8 +80,14 @@ class CourierOuterMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             callback_data = event.data
 
-            log_message = f"Couriers - 🚴\nOuter_mw\nCallback data: {callback_data}\nCourier ID: {user_id}\nCourier state previous: {state}"
-            log.info(log_message)
+            log.info(
+                f"\n"
+                f"- Courier - 🧍\n"
+                f"- Outer_mw\n"
+                f"- Callback data: {callback_data}\n"
+                f"- Courier ID: {user_id}\n"
+                f"- Courier state previous: {state}"
+            )
 
             return await handler(event, data)
 

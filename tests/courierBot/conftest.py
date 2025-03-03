@@ -4,28 +4,28 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Message, CallbackQuery, User
 from src.app.customer import FSMContext
 from src.config import moscow_time
-from src.app.customer import customer_r
+from src.app.courier import courier_r, payment_r
 from src.config import fsm_customer_storage, customer_bot
 from aiogram.fsm.storage.base import StorageKey
 
 
 @pytest_asyncio.fixture(scope="function")
 async def user_id():
-    user_id = 11
+    user_id = 22
     return user_id
 
 
 @pytest_asyncio.fixture(scope="function")
 async def bot():
     bot = AsyncMock(spec=Bot)
-    bot.id = 3434
+    bot.id = 8989
     return bot
 
 
 @pytest_asyncio.fixture(scope="function")
 async def dp():
     dp = Dispatcher(storage=fsm_customer_storage)
-    dp.include_router(customer_r)
+    dp.include_routers(courier_r, payment_r)
     return dp
 
 
@@ -38,7 +38,7 @@ async def message(user_id):
         return Message(
             message_id=1,
             from_user=user,
-            chat={"id": 1846124, "type": "private"},
+            chat={"id": 7895451, "type": "private"},
             text=text,
             contact=contact,
             date=moscow_time,
@@ -50,9 +50,9 @@ async def message(user_id):
 @pytest_asyncio.fixture(scope="function")
 async def callback_query():
     async def _callback_query(
-        user_id=56782547,
+        user_id=22,
         data="test_data",
-        chat_id=1846124,
+        chat_id=7895451,
         message_id=1,
         callback_query_id="1",
     ):
@@ -93,7 +93,7 @@ async def state(user_id):
     storage = fsm_customer_storage
 
     async def _state(state_value=None):
-        key = StorageKey(bot_id=3434, chat_id=1846124, user_id=user_id)
+        key = StorageKey(bot_id=8989, chat_id=7895451, user_id=user_id)
         fsm_context = FSMContext(storage=storage, key=key)
 
         # Устанавливаем состояние, если оно передано

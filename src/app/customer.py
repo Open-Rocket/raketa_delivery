@@ -10,8 +10,6 @@ from ._deps import (
     MessageHandler,
     CustomerState,
     CustomerOuterMiddleware,
-    Router,
-    datetime,
     time,
     zlib,
     moscow_time,
@@ -21,15 +19,14 @@ from ._deps import (
     title,
     customer_data,
     order_data,
-    route,
     recognizer,
     rediska,
     assistant,
     formatter,
-    log,
-    F,
     cities,
+    log,
     find_closest_city,
+    F,
 )
 
 

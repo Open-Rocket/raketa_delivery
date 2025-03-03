@@ -21,27 +21,20 @@ from ._deps import (
     title,
     customer_data,
     order_data,
-    route,
-    recognizer,
     rediska,
-    assistant,
     log,
     F,
 )
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                     ⇣ MDW ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
 courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                              ⇣ Registration steps ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 # start
@@ -303,9 +296,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -
     await handler.handle_new_message(new_message, callback_query.message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Get orders ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 # run
@@ -570,9 +561,9 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.answer("Ошибка при принятии заказа.", show_alert=True)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ My orders ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
+
+
 @courier_r.message(F.text == "/my_orders")
 @courier_r.callback_query(F.data == "back_myOrders")
 async def cmd_my_orders(event, state: FSMContext):
@@ -826,9 +817,7 @@ async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMCont
     )
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ order_delivered ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 @courier_r.callback_query(F.data == "order_delivered")
@@ -913,9 +902,7 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
         logger.error(f"Ошибка при завершении заказа: {e}")
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Payment ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 @courier_r.message(F.text == "/subs")
@@ -1021,9 +1008,7 @@ async def succesful_payment(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ Profile ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 @courier_r.message(F.text == "/profile")
@@ -1168,9 +1153,7 @@ async def change_city(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ fqs ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 @courier_r.message(F.text == "/faq")
@@ -1252,9 +1235,9 @@ async def cmd_rules(message: Message, state: FSMContext) -> None:
     await handler.handle_new_message(new_message, message)
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ ai ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
+
+
 @courier_r.message(F.text == "/ai_support_couriers")
 async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     """
@@ -1273,9 +1256,7 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     """
 
 
-# ------------------------------------------------------------------------------------------------------------------- #
-#                                                    ⇣ make order ⇣
-# ------------------------------------------------------------------------------------------------------------------- #
+# ---
 
 
 @courier_r.message(F.text == "/make_order")
@@ -1315,7 +1296,7 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# -------
+# ---
 
 
 @payment_r.message(F.text == "/subs")
@@ -1399,7 +1380,7 @@ async def succesful_payment(message: Message, state: FSMContext):
     await handler.handle_new_message(new_message, message)
 
 
-# -------
+# ---
 
 
 @courier_fallback.message()

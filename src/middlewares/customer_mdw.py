@@ -6,7 +6,6 @@ from aiogram.types import (
     TelegramObject,
     CallbackQuery,
 )
-
 from src.config import log
 from src.confredis import RedisService
 from src.utils import CustomerState
