@@ -51,7 +51,6 @@ async def cmd_start_customer(message: Message, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
-    handler = MessageHandler(state, message.bot)
     is_reg = await rediska.is_reg(bot_id, tg_id)
 
     if is_reg:
@@ -59,11 +58,9 @@ async def cmd_start_customer(message: Message, state: FSMContext):
         await state.set_state(default_state)
         await rediska.set_state(bot_id, tg_id, default_state)
         text = "▼ <b>Выберите действие ...</b>"
-        await handler.delete_previous_message(message.chat.id)
-        new_message = await message.answer(
-            text, parse_mode="HTML", disable_notification=True
-        )
-        await handler.handle_new_message(new_message, message)
+
+        await message.answer(text, parse_mode="HTML", disable_notification=True)
+
         return
 
     photo_title = await title.get_title_customer("/start")
@@ -76,15 +73,14 @@ async def cmd_start_customer(message: Message, state: FSMContext):
         f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
     )
     reply_kb = await kb.get_customer_kb("/start")
-    await handler.delete_previous_message(message.chat.id)
-    new_message = await message.answer_photo(
+
+    await message.answer_photo(
         photo=photo_title,
         caption=text,
         reply_markup=reply_kb,
         parse_mode="HTML",
         disable_notification=True,
     )
-    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
@@ -706,6 +702,7 @@ async def change_name(message: Message, state: FSMContext):
 async def change_phone(message: Message, state: FSMContext):
     log.info(f"change_phone was called!")
 
+    handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
     phone = message.contact.phone_number
@@ -720,7 +717,13 @@ async def change_phone(message: Message, state: FSMContext):
 
     text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
-    await message.answer(text, disable_notification=True, parse_mode="HTML")
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+
+    await handler.handle_new_message(new_message, message)
 
     log.info(
         f"\n"
