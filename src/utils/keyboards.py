@@ -1,5 +1,4 @@
 from aiogram.types import (
-    Message,
     KeyboardButton,
     ReplyKeyboardMarkup,
     InlineKeyboardMarkup,
@@ -12,22 +11,11 @@ class Keyboard:
 
     @staticmethod
     async def get_customer_kb(
-        key: str = None,
+        key: str,
     ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для клиента"""
+
         kb = {
-            "/order": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Начать", callback_data="ai_order")]
-                ]
-            ),
-            "phone_number": ReplyKeyboardMarkup(
-                keyboard=[
-                    [KeyboardButton(text="Поделиться номером", request_contact=True)],
-                ],
-                resize_keyboard=True,
-                one_time_keyboard=False,
-                input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
-            ),
             "/start": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -38,6 +26,11 @@ class Keyboard:
                     ],
                 ]
             ),
+            "/order": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Начать", callback_data="ai_order")]
+                ]
+            ),
             "/profile": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
@@ -45,6 +38,34 @@ class Keyboard:
                     [InlineKeyboardButton(text="Город", callback_data="set_my_city")],
                 ]
             ),
+            "/become_courier": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Go", url="https://t.me/raketadeliverywork_bot"
+                        )
+                    ]
+                ]
+            ),
+            # ---
+            "accept_tou": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="✅ Принять", callback_data="accept_tou"
+                        )
+                    ]
+                ]
+            ),
+            "phone_number": ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text="Поделиться номером", request_contact=True)],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=False,
+                input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
+            ),
+            # ---
             "voice_order_accept": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -62,28 +83,7 @@ class Keyboard:
                     ],
                 ]
             ),
-            "/become_courier": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Go", url="https://t.me/raketadeliverywork_bot"
-                        )
-                    ]
-                ]
-            ),
-            "/test": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="⇤", callback_data="back_left"),
-                        InlineKeyboardButton(text="⇥", callback_data="next_right"),
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="Принять заказ", callback_data="accept_order"
-                        )
-                    ],
-                ]
-            ),
+            # ---
             "one_order": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -93,12 +93,13 @@ class Keyboard:
                     ]
                 ]
             ),
-            "pending_orders": InlineKeyboardMarkup(
+            "one_my_order": InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
-                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
-                    ],
+                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+                ]
+            ),
+            "one_my_pending": InlineKeyboardMarkup(
+                inline_keyboard=[
                     [
                         InlineKeyboardButton(
                             text="Отменить заказ", callback_data="cancel_my_order"
@@ -107,13 +108,13 @@ class Keyboard:
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
                 ]
             ),
-            "one_my_order": InlineKeyboardMarkup(
+            # ---
+            "pending_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
-                ]
-            ),
-            "one_my_pending": InlineKeyboardMarkup(
-                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
+                    ],
                     [
                         InlineKeyboardButton(
                             text="Отменить заказ", callback_data="cancel_my_order"
@@ -149,6 +150,7 @@ class Keyboard:
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
                 ]
             ),
+            # ---
             "rerecord": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -156,15 +158,6 @@ class Keyboard:
                             text="Перезаписать ゞ", callback_data="ai_order"
                         )
                     ],
-                ]
-            ),
-            "accept_tou": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="✅ Принять", callback_data="accept_tou"
-                        )
-                    ]
                 ]
             ),
         }
@@ -175,6 +168,8 @@ class Keyboard:
     async def get_customer_orders_kb(
         pending_count: int, active_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для заказов клиента"""
+
         my_orders_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -200,10 +195,10 @@ class Keyboard:
 
     @staticmethod
     async def get_courier_kb(
-        message: Optional[Message] = None,
-        callback_data: Optional[str] = None,
-        text: str = None,
+        key: str,
     ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для курьера"""
+
         kb = {
             "/run": ReplyKeyboardMarkup(
                 keyboard=[
@@ -365,23 +360,14 @@ class Keyboard:
             ),
         }
 
-        if message:
-            if message.text == "/start":
-                return kb["next_kb"]
-            if message and message.text in kb:
-                return kb[message.text]
-
-        if callback_data:
-            pass
-
-        if text:
-            if text in kb:
-                return kb[text]
+        return kb[key]
 
     @staticmethod
     async def get_courier_orders_kb(
         active_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для заказов курьера"""
+
         my_orders_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [

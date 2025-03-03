@@ -17,6 +17,9 @@ if __name__ == "__main__":
 
 __all__ = ["reset_db"]
 
+"""
 
-# python -m src.models.reset_db
-# redis-cli flushdb
+python -m src.models.reset_db
+redis-cli flushdb
+
+"""

@@ -5,7 +5,9 @@ from aiogram.types import FSInputFile
 class Title:
 
     @staticmethod
-    async def get_title_courier(command: str):
+    async def get_title_courier(command: str) -> FSInputFile | None:
+        """Возвращает картинку для курьера"""
+
         dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "../..", "public"
         )
@@ -28,7 +30,9 @@ class Title:
         return None
 
     @staticmethod
-    async def get_title_customer(command: str):
+    async def get_title_customer(command: str) -> FSInputFile | None:
+        """Возвращает картинку для клиента"""
+
         dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "../..", "public"
         )

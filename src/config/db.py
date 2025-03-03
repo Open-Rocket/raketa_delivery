@@ -9,8 +9,9 @@ class SettingsDB(BaseSettings):
     DB_NAME: str
 
     @property
-    def DB_URL_asyncpg(self):
-        # Формат URL для asyncpg
+    def DB_URL_asyncpg(self) -> str:
+        """Возвращает строку подключения к базе данных для asyncpg"""
+
         return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     model_config = SettingsConfigDict(env_file=".env", extra="allow")

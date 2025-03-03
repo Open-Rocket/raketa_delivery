@@ -3,23 +3,17 @@ import requests
 from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
 from src.config import YANDEX_API_KEY
+from src.services.fuzzy import cities
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class RouteMaster:
-    """
-    Класс для расчета расстояний, стоимости доставки и получения маршрутов.
-    """
 
     @staticmethod
     async def get_coordinates(address: str) -> tuple[str, str] | tuple[None, None]:
-        """
-        Получает координаты по адресу через API Яндекса.
-        :param address: строка с адресом
-        :return: кортеж (широта, долгота) или (None, None) при ошибке
-        """
+        """Получает координаты по адресу через API Яндекса"""
 
         base_url = "https://geocode-maps.yandex.ru/1.x/"
         params = {"apikey": YANDEX_API_KEY, "geocode": address, "format": "json"}
@@ -38,12 +32,8 @@ class RouteMaster:
     async def calculate_total_distance(
         coordinates, adjustment_factor: int = 1.34
     ) -> int:
-        """
-        Рассчитывает общее расстояние между набором координат с учётом погрешности.
-        :param coordinates: список кортежей вида (широта, долгота)
-        :param adjustment_factor: коэффициент увеличения (по умолчанию 1.34)
-        :return: общее расстояние
-        """
+        """Рассчитывает общее расстояние между набором координат с учётом погрешности"""
+
         R = 6371  # радиус Земли в километрах
         total_distance = 0
 
@@ -64,12 +54,8 @@ class RouteMaster:
 
     @staticmethod
     async def get_rout(pickup_coords: tuple, delivery_coords: list) -> str:
-        """
-        Генерирует URL маршрута на Яндекс.Картах.
-        :param pickup_coords: координаты точки отправки (широта, долгота)
-        :param delivery_coords: список координат точек доставки [(широта, долгота), ...]
-        :return: URL маршрута
-        """
+        """Генерирует URL маршрута на Яндекс.Картах."""
+
         route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
             f"{coord[0]},{coord[1]}" for coord in delivery_coords
         ]
@@ -87,8 +73,18 @@ class RouteMaster:
         :param over_price: надбавка к стоимости
         :return: стоимость доставки
         """
-        base_price_per_km = 101 if 0 < distance <= 2 else 38
+
+        millions_cities = await cities.get_millions_cities()
+        small_cities = await cities.get_small_cities()
+
+        base_price_per_km = 100 if 0 < distance <= 2 else 38
         city_coefficient = 1.0
+
+        if city in millions_cities:
+            city_coefficient = 1.2
+
+        if city in small_cities:
+            city_coefficient = 0.9
 
         if 0 <= order_time.hour < 6:
             time_coefficient = 1.15

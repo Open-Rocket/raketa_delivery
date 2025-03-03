@@ -11,9 +11,10 @@ COLORS = {
 }
 
 
-# Кастомный цветной форматтер
 class ColoredFormatter(logging.Formatter):
-    def format(self, record):
+    def format(self, record) -> str:
+        """Форматирование лог-записи с учётом цвета"""
+
         log_color = COLORS.get(record.levelname, COLORS["RESET"])
         log_message = super().format(record)
         return f"{log_color}{log_message}{COLORS['RESET']}"

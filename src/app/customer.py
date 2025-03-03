@@ -44,7 +44,7 @@ customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 
 @customer_r.message(CommandStart())
-async def cmd_start_customer(message: Message, state: FSMContext) -> None:
+async def cmd_start_customer(message: Message, state: FSMContext):
     log.info(f"cmd_start_customer was called!")
 
     bot_id = message.bot.id
@@ -232,18 +232,16 @@ async def data_city_customer(message: Message, state: FSMContext):
     bot_id = message.bot.id
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
-    customer_city, score = await find_closest_city(message.text, russian_cities)
+    city, score = await find_closest_city(message.text, russian_cities)
 
-    if not customer_city:
+    if not city:
         text = f"Введите корректное название города!\n<b>Ваш город:</b>"
 
         new_message = await message.answer(
             text, disable_notification=True, parse_mode="HTML"
         )
 
-        log.info(
-            f"city name was uncorrectable: {customer_city}\n" f"text message: {text}\n"
-        )
+        log.info(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
 
         await handler.delete_previous_message(message.chat.id)
         await handler.handle_new_message(new_message, message)
@@ -254,7 +252,7 @@ async def data_city_customer(message: Message, state: FSMContext):
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
-    is_city_set = await rediska.set_user_city(bot_id, tg_id, customer_city)
+    is_city_set = await rediska.set_user_city(bot_id, tg_id, city)
 
     reply_kb = await kb.get_customer_kb("accept_tou")
     text = (
@@ -791,8 +789,25 @@ async def change_city(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     bot_id = message.bot.id
     tg_id = message.from_user.id
-    city = message.text
+
+    russian_cities = await cities.get_cities()
+    city, score = await find_closest_city(message.text, russian_cities)
+
     current_state = CustomerState.default.state
+
+    if not city:
+        text = f"Введите корректное название города!\n<b>Ваш город:</b>"
+
+        new_message = await message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
+
+        log.info(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
+
+        await handler.delete_previous_message(message.chat.id)
+        await handler.handle_new_message(new_message, message)
+
+        return
 
     new_city_was_set = await customer_data.update_customer_city(tg_id, city)
     new_city_was_set_redis = await rediska.set_user_city(bot_id, tg_id, city)
@@ -1195,7 +1210,7 @@ async def process_order_logic(
     bot_id = message.bot.id
     tg_id = message.from_user.id
     chat_id = message.chat.id
-    current_state = CustomerState.waiting_Courier.state
+    current_state = CustomerState.assistant_run.state
     customer_name = await rediska.get_user_name(bot_id, tg_id)
     customer_phone = await rediska.get_user_phone(bot_id, tg_id)
     customer_city = await rediska.get_user_city(bot_id, tg_id)
@@ -1209,6 +1224,19 @@ async def process_order_logic(
         city, addresses, delivery_object, description = await assistant.process_order(
             text_msg, customer_city
         )
+
+        if city == "N":
+            new_message = await message.answer(
+                error_messages[1],
+                reply_markup=await kb.get_customer_kb("rerecord"),
+                disable_notification=True,
+            )
+            await wait_message.delete()
+            await handler.handle_new_message(new_message, message)
+
+            log.warning(f" Оформление заказа не удалось! Модерация не прошла")
+
+            return
 
         log.info("request was successfully done")
     except Exception as e:

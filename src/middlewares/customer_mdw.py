@@ -1,5 +1,4 @@
-import logging
-from aiogram import Router, BaseMiddleware, filters, F
+from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
 from aiogram.types import (
@@ -25,11 +24,12 @@ class CustomerOuterMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
+        """Обработка внешних событий"""
 
         tg_id = event.from_user.id
         bot_id = event.bot.id
         fsm_context = data.get("state")
-        state = await fsm_context.get_state()
+        state: FSMContext = await fsm_context.get_state()
         state_data = await fsm_context.get_data()
 
         log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
@@ -96,6 +96,8 @@ class CustomerOuterMiddleware(BaseMiddleware):
 async def _check_state_and_handle_message(
     state: str, event: Message, handler: Callable, data: Dict[str, Any]
 ) -> Any:
+    """Проверка состояния пользователя и обработка сообщения"""
+
     message_text = event.text
 
     # Обработка команды /start в любом состоянии
@@ -133,7 +135,7 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
-    if state == CustomerState.waiting_Courier.state:
+    if state == CustomerState.assistant_run.state:
         await event.delete()
         return
 

@@ -9,10 +9,14 @@ class MessageHandler:
         self.bot = bot
 
     async def handle_new_message(self, new_message, current_message):
+        """Отлавливает новое сообщение"""
+
         await self.state.update_data(previous_message_id=new_message.message_id)
         await current_message.delete()
 
     async def delete_previous_message(self, chat_id):
+        """Удаляет предыдущее сообщение"""
+
         data = await self.state.get_data()
         previous_message_id = data.get("previous_message_id")
         if previous_message_id:

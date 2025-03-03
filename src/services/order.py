@@ -43,7 +43,7 @@ class OrderFormatter:
 
         yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
         distance = round(await route.calculate_total_distance(coordinates), 2)
-        price = await route.get_price(distance, time)
+        price = await route.get_price(distance, time, city=city)
         addresses_text = "\n".join(
             [
                 f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
@@ -80,10 +80,10 @@ class OrderFormatter:
 
         order_forma = (
             f"<b>Город:</b> {city}\n\n"
-            f"<b>Заказчик:</b> {customer_name}\n"
-            f"<b>Телефон:</b> {customer_phone}\n\n"
+            f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
+            f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n\n"
             f"{addresses_text}\n\n"
-            f"<b>Доставляем:</b> {delivery_object}\n"
+            f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
             f"<b>Стоимость доставки:</b> {price}₽\n\n"
             f"<b>Описание:</b> {description}\n\n"
