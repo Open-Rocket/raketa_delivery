@@ -18,6 +18,10 @@ class CustomerState(StatesGroup):
     change_City = State()
 
     myOrders = State()
+    myOrders_pending = State()
+    myOrders_completed = State()
+    myOrders_active = State()
+    myOrders_canceled = State()
 
 
 class CourierState(StatesGroup):
