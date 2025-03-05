@@ -131,11 +131,14 @@ class Order(Base):
     order_city: Mapped[stringData]
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
+    customer_tg_id: Mapped[intData]
     delivery_object: Mapped[stringData]
     distance_km: Mapped[floatData]
     price_rub: Mapped[intData]
     description: Mapped[textData]
     full_rout: Mapped[stringData]
+
+    starting_point: Mapped[coordinates]
 
     order_forma: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 

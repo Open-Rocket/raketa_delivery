@@ -19,6 +19,7 @@ from src.services import (
 from src.models import OrderStatus
 from src.confredis import rediska
 from src.config import (
+    customer_bot,
     moscow_time,
     customer_r,
     courier_r,

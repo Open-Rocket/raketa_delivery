@@ -200,6 +200,7 @@ class Keyboard:
         """Возвращает клавиатуру для курьера"""
 
         kb = {
+            # ---
             "/run": ReplyKeyboardMarkup(
                 keyboard=[
                     [
@@ -226,15 +227,6 @@ class Keyboard:
                     ],
                 ]
             ),
-            "success_payment": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Перейти к заказам!", callback_data="lets_go"
-                        )
-                    ]
-                ]
-            ),
             "/profile": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Имя", callback_data="set_my_name")],
@@ -247,6 +239,17 @@ class Keyboard:
                     [InlineKeyboardButton(text="Город", callback_data="set_my_city")],
                 ]
             ),
+            "/make_order": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Заказать доставку",
+                            url="https://t.me/raketadelivery_bot",
+                        )
+                    ]
+                ]
+            ),
+            # ---
             "phone_number": ReplyKeyboardMarkup(
                 keyboard=[
                     [KeyboardButton(text="Поделиться номером", request_contact=True)],
@@ -264,15 +267,7 @@ class Keyboard:
                     ]
                 ]
             ),
-            "one_order": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Принять заказ", callback_data="accept_order"
-                        )
-                    ]
-                ]
-            ),
+            # ---
             "available_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -286,15 +281,37 @@ class Keyboard:
                     ],
                 ]
             ),
-            "/make_order": InlineKeyboardMarkup(
+            # ---
+            "one_order": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Go", url="https://t.me/raketadelivery_bot"
+                            text="Принять заказ", callback_data="accept_order"
                         )
                     ]
                 ]
             ),
+            "one_my_order": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
+                ]
+            ),
+            # ---
+            "complete_one": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+                ]
+            ),
+            "complete_orders": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
+                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
+                    ],
+                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
+                ]
+            ),
+            # ---
             "active_one": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -319,28 +336,39 @@ class Keyboard:
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
                 ]
             ),
-            "complete_orders": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
-                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
-                    ],
-                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
-                ]
-            ),
-            "complete_one": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
-                ]
-            ),
+            # ---
             "empty_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
                 ]
             ),
+            # ---
             "go_back": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
+                ]
+            ),
+            # ---
+            "success_payment": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Перейти к заказам!", callback_data="lets_go"
+                        )
+                    ]
+                ]
+            ),
+            # ---
+            "choose_order_view": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Заказы в радиусе", callback_data="view_nearby_orders"
+                        ),
+                        InlineKeyboardButton(
+                            text="Заказы в городе", callback_data="view_city_orders"
+                        ),
+                    ]
                 ]
             ),
         }

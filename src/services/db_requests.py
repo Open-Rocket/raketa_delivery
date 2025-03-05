@@ -3,8 +3,10 @@ from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
+from typing import Optional
 from src.config import moscow_time, log
 from .routing import route
+from geopy.distance import geodesic
 
 
 class CustomerData:
@@ -346,11 +348,13 @@ class OrderData:
                     delivery_object=data.get("delivery_object"),
                     customer_name=data.get("customer_name"),
                     customer_phone=data.get("customer_phone"),
+                    customer_tg_id=data.get("customer_tg_id"),
                     description=data.get("description"),
                     distance_km=data.get("distance"),
                     price_rub=data.get("price"),
                     created_at_moscow_time=data.get("order_time"),
                     full_rout=data.get("yandex_maps_url"),
+                    starting_point=data.get("starting_point"),
                     order_forma=order_forma,
                     order_status=OrderStatus.PENDING,
                 )
@@ -508,6 +512,51 @@ class OrderData:
                 )
             )
             return query.scalars().all()
+
+    # ---
+
+    async def get_customer_tg_id(self, order_id: int) -> Optional[int]:
+        """Возвращает Telegram ID заказчика по ID заказа"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order.customer_id).where(Order.order_id == order_id)
+            )
+            customer_tg_id = query.scalar()
+
+            return customer_tg_id
+
+    # ---
+
+    async def get_available_orders(
+        self, lat: float, lon: float, radius_km: int
+    ) -> list:
+        """Возвращает доступные заказы в заданном радиусе"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order).where(Order.order_status == OrderStatus.PENDING)
+            )
+
+            all_orders = query.scalars().all()
+            available_orders = [
+                order
+                for order in all_orders
+                if self.is_within_radius(
+                    (lat, lon),
+                    (float(order.starting_point[0]), float(order.starting_point[1])),
+                    radius_km,
+                )
+            ]
+
+            return available_orders
+
+    @staticmethod
+    def is_within_radius(
+        courier_coords: tuple, order_coords: tuple, radius_km: int
+    ) -> bool:
+        """Проверяет, находится ли заказ в радиусе курьера"""
+        return geodesic(courier_coords, order_coords).km <= radius_km
 
 
 customer_data = CustomerData(async_session_factory)

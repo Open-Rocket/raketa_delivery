@@ -12,7 +12,7 @@ from ._deps import (
     CourierOuterMiddleware,
     datetime,
     PreCheckoutQuery,
-    Router,
+    zlib,
     moscow_time,
     courier_r,
     courier_fallback,
@@ -27,6 +27,7 @@ from ._deps import (
     log,
     F,
     find_closest_city,
+    customer_bot,
 )
 
 
@@ -338,31 +339,16 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 @courier_r.message(F.text == "/run")
 @courier_r.callback_query(F.data == "lets_go")
 async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
-    """
-    Обрабатывает команду доставить заказ /run или нажатие кнопки lets_go.
-
-    - Переводит пользователя в состояние (`CourierState.location`).
-    - Отправляет сообщение c просьбой поделиться локацией и KeyboardButton(send location).
-
-    Args:
-        event (Message | CallbackQuery): Объект, содержащий информацию о событии.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
 
     handler = MessageHandler(state, event.bot)
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
 
-    # Удаление предыдущего сообщения, если это сообщение
     if isinstance(event, Message):
         await handler.delete_previous_message(chat_id)
 
     await state.set_state(CourierState.location)
-    reply_kb = await kb.get_courier_kb(text="/run")
+    reply_kb = await kb.get_courier_kb("/run")
 
-    # Отправляем новое сообщение с просьбой отправить локацию
     new_message = await event.bot.send_message(
         chat_id=chat_id,
         text="Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
@@ -372,7 +358,6 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
         parse_mode="HTML",
     )
 
-    # Обрабатываем новое сообщение с помощью MessageHandler
     await handler.handle_new_message(
         new_message, event if isinstance(event, Message) else event.message
     )
@@ -390,10 +375,15 @@ async def get_location(message: Message, state: FSMContext):
     my_lat = message.location.latitude
     radius_km = 5
 
-    # Получаем доступные заказы
-    available_orders = await order_data.get_available_orders(
-        courier_tg_id, my_lat, my_lon, radius_km=radius_km
-    )
+    # Получаем заказы в радиусе
+    available_orders = await order_data.get_available_orders(my_lat, my_lon, radius_km)
+
+    if not available_orders:
+        new_message = await message.answer(
+            "Нет доступных заказов в вашем радиусе.", disable_notification=True
+        )
+        await handler.handle_new_message(new_message, message)
+        return
 
     orders = []
     order_ids = []
@@ -401,55 +391,30 @@ async def get_location(message: Message, state: FSMContext):
     for index, order in enumerate(available_orders, start=1):
         order_ids.append(order.order_id)
 
-        order_forma = (
+        # Декодируем форму заказа, если она есть
+        order_forma_bytes = zlib.decompress(order.order_forma)
+        order_forma = order_forma_bytes.decode("utf-8")
+
+        order_text = (
             f"<b>{index}/{len(available_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
             f"---------------------------------------------\n\n"
-            f"<b>Город:</b> {order.order_city}\n\n"
-            f"<b>Заказчик:</b> {order.customer_name}\n"
-            f"<b>Телефон:</b> <i>*Доступен после принятия.</i>\n\n"
-            f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
+            f"{order_forma}"
         )
 
-        if order.destination_point_b:
-            order_forma += f"⦿ <b>Адрес 2:</b> <a href='{order.b_url}'>{order.destination_point_b}</a>\n"
-        if order.destination_point_c:
-            order_forma += f"⦿ <b>Адрес 3:</b> <a href='{order.c_url}'>{order.destination_point_c}</a>\n"
-
-        order_forma += (
-            f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
-            f"<b>Расстояние:</b> {order.distance_km} км\n"
-            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-            f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
-            f"---------------------------------------------\n"
-            f"• Принимайте оплату наличными или переводом.\n\n"
-            f"<a href='{order.full_rout}'>Маршрут доставки</a>\n\n"
-        )
-
-        orders.append(order_forma)
-
-    if not orders:
-        await asyncio.sleep(1)
-        new_message = await message.answer(
-            "Нет доступных заказов в вашем радиусе.", disable_notification=True
-        )
-        await handler.handle_new_message(new_message, message)
-        return
+        orders.append(order_text)
 
     counter = 0
     await state.update_data(orders=orders, order_ids=order_ids, counter=counter)
 
-    # Логируем перед отправкой
     log.info(
         f"Курьер {courier_tg_id} видит {len(orders)} доступных заказов. Показан первый заказ с индексом {counter}."
     )
 
     reply_kb = await kb.get_courier_kb(
-        text="one_order" if len(orders) == 1 else "available_orders"
+        "one_order" if len(orders) == 1 else "available_orders"
     )
 
-    await asyncio.sleep(1)
-    handler = MessageHandler(state, message.bot)
     new_message = await message.answer(
         orders[counter],
         reply_markup=reply_kb,
@@ -458,63 +423,58 @@ async def get_location(message: Message, state: FSMContext):
     )
     await handler.handle_new_message(new_message, message)
 
-    # Логируем, что сообщение отправлено
     log.info(f"Курьер {courier_tg_id} получил сообщение о первом заказе.")
 
 
 @courier_r.callback_query(
-    F.data == "next_right", filters.StateFilter(CourierState.location)
+    F.data.in_({"next_right", "back_left"}), filters.StateFilter(CourierState.location)
 )
-async def on_button_next(callback_query: CallbackQuery, state: FSMContext):
+async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
+    log.info("handle_order_navigation was called!")
+
     data = await state.get_data()
-    orders = data.get("orders")
+    orders = data.get("orders", [])
     counter = data.get("counter", 0)
 
-    counter = (counter + 1) % len(orders)
+    if not orders:
+        log.warning("Нет доступных заказов для переключения")
+        await callback_query.answer("Нет доступных заказов.", show_alert=True)
+        return
+
+    total_orders = len(orders)
+    counter = (
+        (counter + 1) % total_orders
+        if callback_query.data == "next_right"
+        else (counter - 1) % total_orders
+    )
+
     await state.update_data(counter=counter)
+
     await callback_query.message.edit_text(
         orders[counter],
         reply_markup=callback_query.message.reply_markup,
         parse_mode="HTML",
     )
 
-
-@courier_r.callback_query(
-    F.data == "back_left", filters.StateFilter(CourierState.location)
-)
-async def on_button_back(callback_query: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    orders = data.get("orders")
-    counter = data.get("counter", 0)
-
-    counter = (counter - 1) % len(orders)
-    await state.update_data(counter=counter)
-    await callback_query.message.edit_text(
-        orders[counter],
-        reply_markup=callback_query.message.reply_markup,
-        parse_mode="HTML",
-    )
+    log.info(f"Переключение на заказ #{counter + 1}/{total_orders}")
 
 
 @courier_r.callback_query(F.data == "accept_order")
 async def accept_order(callback_query: CallbackQuery, state: FSMContext):
-    # Получаем текущие данные состояния
+
     data = await state.get_data()
     order_ids = data.get("order_ids", [])
     counter = data.get("counter", 0)
     courier_tg_id = callback_query.from_user.id
 
-    # Логирование данных перед обработкой
     log.info(f"Курьер {courier_tg_id} нажал на кнопку 'Принять заказ'.")
     log.info(f"Заказов найдено: {len(order_ids)}, текущий индекс: {counter}")
 
-    # Проверка наличия заказов
     if not order_ids:
         log.warning(f"Курьер {courier_tg_id} не имеет доступных заказов.")
         await callback_query.answer("Заказы не найдены.", show_alert=True)
         return
 
-    # Проверка на правильность индекса
     if counter >= len(order_ids):
         log.warning(
             f"Курьер {courier_tg_id} передал неверный индекс для заказа: {counter}."
@@ -526,29 +486,20 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"Курьер {courier_tg_id} принял заказ с ID: {order_id}.")
 
     try:
-        # Назначаем курьера к заказу
+
         log.info(f"Назначаем курьера {courier_tg_id} на заказ с ID {order_id}.")
         await order_data.assign_courier_to_order(
             order_id=order_id, courier_tg_id=courier_tg_id
         )
 
-        # Обновляем статус заказа на "В работе"
         log.info(f"Обновляем статус заказа {order_id} на 'В работе'.")
         await order_data.update_order_status(
             order_id=order_id, new_status=OrderStatus.IN_PROGRESS
         )
 
-        # Получаем номер телефона заказчика
-        customer_phone = await order_data.get_order_customer_phone(order_id)
-        log.info(
-            f"Получен номер телефона заказчика для заказа {order_id}: {customer_phone}"
-        )
-
-        # Получаем tg_id по номеру телефона
-        customer_tg_id = await customer_data.get_user_tg_id_by_phone(customer_phone)
+        customer_tg_id = await order_data.get_customer_tg_id(order_id)
         log.info(f"Получен tg_id заказчика: {customer_tg_id}")
 
-        # Отправляем уведомление заказчику
         notification_text = (
             f"Ваш заказ №{order_id} был принят курьером!\n"
             f"Подробности смотрите в Моих заказах\n\n"
@@ -561,7 +512,6 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             f"Отправлено уведомление заказчику {customer_tg_id} о принятии заказа."
         )
 
-        # Уведомляем курьера о принятии заказа
         new_message = await callback_query.message.answer(
             "Заказ принят. Вы закреплены за этим заказом.",
             parse_mode="HTML",
@@ -569,14 +519,12 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         )
         log.info(f"Уведомление курьеру {courier_tg_id}: 'Заказ принят'.")
 
-        # Обновляем состояние
         await state.set_state(CourierState.default)
 
         handler = MessageHandler(state, callback_query.message.bot)
         await handler.handle_new_message(new_message, callback_query.message)
 
-        # Удаляем уведомление спустя 1 час
-        await asyncio.sleep(900)  # Ожидаем 15 минут
+        await asyncio.sleep(900)
         try:
             await customer_bot.delete_message(
                 chat_id=customer_tg_id, message_id=notification_message.message_id
@@ -622,7 +570,7 @@ async def handle_my_orders(event, state: FSMContext):
 
     reply_kb = await kb.get_courier_orders_kb(active_count, completed_count)
     text = (
-        f"✎ <b>Мои заказы</b>\n\n"
+        f"✎  <b>Мои заказы</b>\n\n"
         f"Здесь вы можете посмотреть статус ваших заказов, "
         f"а также статистику их выполнения.\n\n"
         f"<b>Статус ваших заказов:</b>"
@@ -729,37 +677,18 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     orders_data = []
     for index, order in enumerate(courier_orders, start=1):
         order_forma = (
+            zlib.decompress(order.order_forma).decode("utf-8")
+            if order.order_forma
+            else "-"
+        )
+
+        base_info = (
             f"<b>{index}/{len(courier_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
             f"---------------------------------------------\n"
-            f"<b>Город:</b> {order.order_city}\n\n"
-            f"<b>Заказчик:</b> {order.customer_name if order.customer_name else '-'}\n"
-            f"<b>Телефон:</b> {order.customer_phone if order.customer_phone else '-'}\n\n"
-            f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
+            f"{order_forma}"
         )
-
-        delivery_points = [
-            (order.destination_point_b, order.b_url),
-            (order.destination_point_c, order.c_url),
-            (order.destination_point_d, order.d_url),
-            (order.destination_point_e, order.e_url),
-        ]
-
-        for i, (point, url) in enumerate(delivery_points, start=2):
-            if point:
-                order_forma += f"⦿ <b>Адрес {i}:</b> <a href='{url}'>{point}</a>\n"
-
-        order_forma += (
-            f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
-            f"<b>Расстояние:</b> {order.distance_km} км\n"
-            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-            f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
-            f"---------------------------------------------\n"
-            f"• Принимайте оплату наличными или переводом.\n\n"
-            f"⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n"
-        )
-
-        orders_data.append((order_forma, order.order_id))
+        orders_data.append((base_info, order.order_id))
 
     if not orders_data:
         log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
@@ -1258,6 +1187,47 @@ async def cmd_rules(message: Message, state: FSMContext):
     )
 
     log.info(f"cmd_rules was successfully done!")
+
+
+@courier_r.message(F.text == "/make_order")
+async def cmd_make_order(message: Message, state: FSMContext):
+    log.info(f"cmd_make_order was called!")
+
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
+    current_state = CourierState.default.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    text = (
+        f"📦 <b>Оформить заказ</b>\n\n"
+        f"⦿ Сделать заказ у нас — это просто и удобно!\n"
+        f"⦿ Наслаждайтесь удобством и скоростью нашего сервиса!"
+    )
+    reply_kb = await kb.get_courier_kb("/make_order")
+
+    await handler.delete_previous_message(message.chat.id)
+
+    new_message = await message.answer(
+        text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🧍\n"
+        f"- Handler F.text: {F.text}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"cmd_make_order was successfully done!")
 
 
 # ---

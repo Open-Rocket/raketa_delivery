@@ -953,11 +953,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
             CustomerState.myOrders_active,
             "активных",
         ),
-        "canceled_orders": (
-            order_data.get_canceled_orders,
-            CustomerState.myOrders_canceled,
-            "отменённых",
-        ),
         "completed_orders": (
             order_data.get_completed_orders,
             CustomerState.myOrders_completed,
@@ -1243,7 +1238,7 @@ async def process_order_logic(
         await wait_message.delete()
         await handler.handle_new_message(new_message, message)
 
-        log.info(f"Output error message: {new_message}")
+        # log.info(f"Output error message: {new_message}")
         log.error(f"Error: {e}")
 
         return
@@ -1261,6 +1256,7 @@ async def process_order_logic(
     full_rout = prepare_dict.get("yandex_maps_url")
     distance = prepare_dict.get("distance")
     price = prepare_dict.get("price")
+    starting_point = prepare_dict.get("starting_point")
 
     add_order_info = (
         f"<b>Ваш заказ</b> ✍︎\n---------------------------------------------\n\n"
@@ -1274,11 +1270,13 @@ async def process_order_logic(
         "city": city,
         "customer_name": customer_name,
         "customer_phone": customer_phone,
+        "customer_tg_id": tg_id,
         "addresses": addresses,
         "delivery_object": delivery_object,
         "description": description,
         "order_info": order_info,
         "yandex_maps_url": full_rout,
+        "starting_point": starting_point,
         "distance": distance,
         "price": price,
     }

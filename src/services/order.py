@@ -51,6 +51,8 @@ class OrderFormatter:
             ]
         )
 
+        log.info(f"starting_point: {coordinates[0]}")
+
         return {
             "city": city,
             "customer_name": customer_name,
@@ -61,6 +63,7 @@ class OrderFormatter:
             "yandex_maps_url": yandex_maps_url,
             "distance": distance,
             "price": price,
+            "starting_point": coordinates[0],
         }
 
     @staticmethod
@@ -76,6 +79,7 @@ class OrderFormatter:
             yandex_maps_url,
             distance,
             price,
+            starting_point,
         ) = [data[key] for key in data.keys()]
 
         order_forma = (
