@@ -48,7 +48,7 @@ class CourierOuterMiddleware(BaseMiddleware):
             )
             if state == None:
                 state_previous = state
-                state = CustomerState.default.state
+                state = CourierState.default.state
                 log.info(
                     f"\n"
                     f"- Courier 🧍\n"

@@ -137,6 +137,8 @@ async def find_closest_city(city_name: str, cities: list):
         city_name = "Санкт-Петербург"
     elif city_name == "екб":
         city_name = "Екатеринбург"
+    elif city_name == "мск":
+        city_name = "Москва"
 
     result = process.extractOne(city_name, cities, score_cutoff=73)
 

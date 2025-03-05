@@ -13,7 +13,7 @@ from .routers import (
 )
 from .bots import (
     customer_bot,
-    couriers_bot,
+    courier_bot,
     customer_dp,
     courier_dp,
     fsm_customer_storage,
@@ -37,7 +37,7 @@ __all__ = [
     "courier_fallback",
     "payment_provider",
     "customer_bot",
-    "couriers_bot",
+    "courier_bot",
     "customer_dp",
     "courier_dp",
     "payment_r",

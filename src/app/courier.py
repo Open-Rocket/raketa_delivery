@@ -37,91 +37,83 @@ courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
 # ---
 
 
-# start
 @courier_r.message(CommandStart())
-async def cmd_start_courier(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает команду /start для курьеров.
+async def cmd_start_courier(message: Message, state: FSMContext):
+    log.info(f"cmd_start_courier was called!")
 
-    Эта функция активируется, когда курьер отправляет команду /start.
-    - Назначает курьеру начальное состояние регистрации (`CourierState.reg_state`).
-    - Отправляет приветственное сообщение, в котором кратко описывается сервис.
-    - Предлагает курьеру пройти процесс регистрации.
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
+    current_state = CourierState.reg_state.state
 
-    Args:
-        message (Message): Объект сообщения от пользователя, содержащий команду /start.
-        state (FSMContext): Контекст состояния конечного автомата, используемый для управления состояниями пользователя.
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и устанавливает состояние.
-    """
-
-    await state.set_state(CourierState.start_reg)
     handler = MessageHandler(state, message.bot)
-    courier = await courier_data.get_courier_info(message.from_user.id)
-    courier_name, courier_phone = courier
+    is_reg = await rediska.is_reg(bot_id, tg_id)
 
-    # Если курьер уже зарегистрирован
-    if courier_name and courier_phone:
-        await state.set_state(CourierState.default)
-        await handler.delete_previous_message(message.chat.id)
+    if is_reg:
+        default_state = CourierState.default.state
+        await state.set_state(default_state)
+        await rediska.set_state(bot_id, tg_id, default_state)
         text = "▼ <b>Выберите действие ...</b>"
+        await handler.delete_previous_message(message.chat.id)
         new_message = await message.answer(
             text, parse_mode="HTML", disable_notification=True
         )
         await handler.handle_new_message(new_message, message)
         return
-    else:
-        await handler.delete_previous_message(message.chat.id)
 
-        # Приветственное сообщение для курьера
-        photo_title = await title.get_title_courier("/start")
-        text = (
-            "Добро пожаловать в Ракету — платформу, которая делает каждого курьера независимым и успешным!\n"
-            "Стань частью сообщества, где ты сам управляешь своими доходами и работаешь на своих условиях.\n\n"
-            "Почему Ракета?\n\n"
-            "◉ <b>Зарабатывай больше</b>: \n"
-            "Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого заказа. Чем больше работаешь, тем больше зарабатываешь.\n\n"
-            "◉ <b>Свобода выбора</b>: \n"
-            "Твоя работа — на твоих условиях. Бери заказы в любое время и работай так, как удобно тебе.\n\n"
-            "◉ <b>Прозрачность</b>: \n"
-            "Каждый заработанный рубль — твой. Никаких посредников, штрафов и скрытых условий.\n\n"
-            "Присоединяйся к Ракете и начинай зарабатывать больше уже сегодня!"
-        )
-        reply_kb = await kb.kb.get_courier_kb(message)
+    photo_title = await title.get_title_courier("/start")
+    text = (
+        "Добро пожаловать в Ракету — платформу, которая делает каждого курьера независимым и успешным!\n"
+        "Стань частью сообщества, где ты сам управляешь своими доходами и работаешь на своих условиях.\n\n"
+        "Почему Ракета?\n\n"
+        "◉ <b>Зарабатывай больше</b>: \n"
+        "Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого заказа. Чем больше работаешь, тем больше зарабатываешь.\n\n"
+        "◉ <b>Свобода выбора</b>: \n"
+        "Твоя работа — на твоих условиях. Бери заказы в любое время и работай так, как удобно тебе.\n\n"
+        "◉ <b>Прозрачность</b>: \n"
+        "Каждый заработанный рубль — твой. Никаких посредников, штрафов и скрытых условиях.\n\n"
+        "Присоединяйся к Ракете и начинай зарабатывать больше уже сегодня!"
+    )
+    reply_kb = await kb.get_courier_kb("/start")
+    await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer_photo(
+        photo=photo_title,
+        caption=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+        disable_notification=True,
+    )
+    await handler.handle_new_message(new_message, message)
 
-        new_message = await message.answer_photo(
-            photo=photo_title,
-            caption=text,
-            reply_markup=reply_kb,
-            parse_mode="HTML",
-            disable_notification=True,
-        )
-        await handler.handle_new_message(new_message, message)
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler /start\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {message.text}\n"
+        f"- Courier state now: {current_state}"
+    )
+
+    log.info(f"cmd_start_courier was successfully done!")
 
 
 @courier_r.callback_query(F.data == "reg")
-async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext) -> None:
-    """
-    Обрабатывает нажатие на кнопку регистрации курьера.
+async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"data_reg_courier was called!")
 
-    После нажатия на кнопку с идентификатором "reg":
-    - Переводит пользователя в состояние регистрации (`CourierState.name`).
-    - Отправляет сообщение с просьбой ввести имя курьера.
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CourierState.name.state
 
-    Args:
-        callback_query (CallbackQuery): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.name)
     handler = MessageHandler(state, callback_query.bot)
-
     text = (
-        "Добро пожаловать в Ракету!\n"
-        "Чтобы начать, пройдите короткую регистрацию.\n\n"
+        "Пройдите небольшую регистрацию.\n"
+        "Это не займет много времени.\n\n"
         "<b>Как вас зовут?</b>"
     )
     new_message = await callback_query.message.answer(
@@ -129,177 +121,201 @@ async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext) -> 
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {callback_query.message.text}\n"
+        f"- Courier state now: {current_state}"
+    )
+
+    log.info(f"data_reg_courier was successfully done!")
+
 
 @courier_r.message(filters.StateFilter(CourierState.name))
-async def data_name_courier(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает состояние курьера после отправки его имени.
+async def data_name_courier(message: Message, state: FSMContext):
+    log.info(f"data_name_courier was called!")
 
-    После отправки курьером своего имени:
-    - Переводит пользователя в состояние регистрации (`CourierState.phone_number`).
-    - Сохраняет в состояние имя курьера (await state.update_data(name=message.text))
-    - Отправляет сообщение с просьбой указать номер телефона с помощью KeyboardButton и никак иначе.
-
-    Args:
-        message (Message): Объект сообщения от пользователя, содержащий его имя.
-        state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
     courier_name = message.text
-    if len(courier_name) > 42:
-        text = "Слишком длинное имя!\n\n" "<b>Введите имя еще раз:</b>"
-        msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
-    else:
-        await state.update_data(name=courier_name)
-        await state.set_state(CourierState.phone_number)
+    current_state = CourierState.phone_number.state
 
-        reply_kb = await kb.get_courier_kb(
-            text="phone_number"
-        )  # кнопка для ввода номера телефона
-        text = (
-            f"Привет, {courier_name}!👋\n\n"
-            "Чтобы начать работу, пожалуйста, укажите ваш номер телефона для связи.\n\n"
-            "<b>Ваш номер:</b>"
-        )
-        msg = await message.answer(
-            text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
-        )
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    is_name_set = await rediska.set_user_name(bot_id, tg_id, courier_name)
 
-    await handler.handle_new_message(msg, message)
+    reply_kb = await kb.get_courier_kb("phone_number")
+    text = (
+        f"Привет, {courier_name}!👋\n\nЧтобы начать работу, пожалуйста, укажите ваш номер телефона для связи.\n\n"
+        f"<i>*Отправка номера возможно только по клику на кнопку!</i>\n\n"
+        f"<b>Ваш номер:</b>"
+    )
+
+    await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer(
+        text,
+        disable_notification=True,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+    await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {courier_name}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- Is name set: {is_name_set}"
+    )
+
+    log.info(f"data_name_courier was successfully done!")
 
 
 @courier_r.message(filters.StateFilter(CourierState.phone_number))
-async def data_phone_courier(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает состояние курьера после отправки его номера.
+async def data_phone_courier(message: Message, state: FSMContext):
+    log.info(f"data_phone_courier was called!")
 
-    После отправки курьером своего номера:
-    - Сохраняет номер курьера в состоянии.
-    - Переводит пользователя в состояние регистрации (`CourierState.city`).
-    - Отправляет сообщение с просьбой указать свой город работы.
-
-    Args:
-        message (Message): Объект сообщения от пользователя, содержащий его номер телефона.
-        state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
     courier_phone = message.contact.phone_number
-    await state.update_data(phone_number=courier_phone)
-    await state.set_state(CourierState.city)
+    current_state = CourierState.city.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    is_phone_set = await rediska.set_user_phone(bot_id, tg_id, courier_phone)
+
     text = (
-        "Почти всё готово!\n\n"
-        "Чтобы сделать заказы максимально удобными, пожалуйста, укажите город, где вы будете работать.\n\n"
-        "<b>Ваш город:</b>"
+        f"Последний шаг!\n\n"
+        f"Чтобы сделать заказы максимально удобными, пожалуйста, укажите город, где вы будете работать.\n\n"
+        f"<b>Ваш город:</b>"
     )
-    msg = await message.answer(text, disable_notification=True, parse_mode="HTML")
-    await handler.handle_new_message(msg, message)
+
+    await handler.delete_previous_message(message.chat.id)
+    new_message = await message.answer(
+        text, disable_notification=True, parse_mode="HTML"
+    )
+    await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {courier_phone}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- Is phone set: {is_phone_set}"
+    )
+
+    log.info(f"data_phone_courier was successfully done!")
 
 
 @courier_r.message(filters.StateFilter(CourierState.city))
-async def data_city_courier(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает состояние курьера после отправки его города.
+async def data_city_courier(message: Message, state: FSMContext):
+    log.info(f"data_city_courier was called!")
 
-    После отправки курьером своего города:
-    - Переводит пользователя в состояние регистрации (`CourierState.accept_tou`).
-    - Сохраняет в состояние город курьера (await state.update_data(city=message.text))
-    - Отправляет сообщение с предложением ознакомиться и принять пользовательское соглашение.
-
-    Args:
-        message (Message): Объект сообщения от пользователя, содержащий его город.
-        state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
+    handle_state = await state.get_state()
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
     courier_city = message.text
-    await state.update_data(city=courier_city)
-    await state.set_state(CourierState.accept_tou)
 
-    reply_kb = await kb.get_courier_kb(text="accept_tou")
+    current_state = CourierState.accept_tou.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    is_city_set = await rediska.set_user_city(bot_id, tg_id, courier_city)
+
+    reply_kb = await kb.get_courier_kb("accept_tou")
     text = (
-        "Спасибо за предоставленную информацию!\n\n"
-        "Прежде чем начать, пожалуйста, ознакомьтесь и примите "
-        "<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
-        "Пользовательское соглашение и правила использования</a>, а также "
-        "<a href='https://telegram.org/privacy'>Политику конфиденциальности</a>.\n\n"
-        "<i>*Пожалуйста, соблюдайте законы и этические нормы при выполнении заказов.</i>"
+        f"Начиная использование сервиса, вы соглашаетесь с "
+        f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+        f"Пользовательским соглашением и правилами использования</a>, а также "
+        f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+        f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+        f"отправкой или получением посылок, должны соответствовать законодательству "
+        f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
+    await handler.delete_previous_message(message.chat.id)
     new_message = await message.answer(
         text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler StateFilter: {handle_state}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier city: {courier_city}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- Is city set: {is_city_set}"
+    )
+
+    log.info(f"data_city_courier was successfully done!")
+
 
 @courier_r.callback_query(F.data == "accept_tou")
-async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext) -> None:
-    """
-    Обрабатывает принятие курьером пользовательского соглашения.
+async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"courier_accept_tou was called!")
 
-    После принятия курьером пользовательского соглашения:
-    - Извлекает из состояния CourierState данные name, phone_number, city, accept_tou.
-    - Отправляет запрос в БД для записи.
-    - Переводит пользователя в состояние регистрации (`CourierState.default`).
-    - Отправляет сообщение с успешной регистрацией и предложением выбрать дальнейшее действие в пункте меню.
-
-    Args:
-        callback_query (CallbackQuery): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для управления регистрацией.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
+    current_state = CourierState.default.state
 
-    # Извлекаем данные о курьере
-    data = await state.get_data()
-    name = data.get("name")
-    phone_number = data.get("phone_number")
-    city = data.get("city")
     accept_tou = (
         "Пользовательское соглашение и правила использования сервиса - Принимаю"
     )
 
-    registration_date = datetime.now().isoformat()  # Используем ISO формат для даты
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+    await rediska.set_user_tou(bot_id, tg_id, accept_tou)
+    await rediska.set_reg(bot_id, tg_id, True)
 
-    # Сохраняем информацию в БД
-    await courier_data.set_courier_info(
-        tg_id, name, phone_number, city, accept_tou, registration_date
+    courier_name, courier_phone, courier_city, tou = await rediska.get_user_info(
+        bot_id, tg_id
     )
 
-    await state.set_state(CourierState.default)
+    is_new_courier_add = await courier_data.set_courier_info(
+        tg_id, courier_name, courier_phone, courier_city, tou
+    )
 
     text = (
-        f"Вы успешно зарегистрировались! 🎉\n\n"
-        f"Имя: {name}\n"
-        f"Номер: {phone_number}\n"
-        f"Город: {city}\n\n"
+        "Вы успешно зарегистрировались! 🎉\n\n"
+        f"Имя: {courier_name}\n"
+        f"Номер: {courier_phone}\n"
+        f"Город: {courier_city}\n\n"
         f"▼ <b>Выберите действие ...</b>"
     )
-
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier click: {accept_tou}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- Is new courier add: {is_new_courier_add}"
+    )
+
+    log.info(f"courier_accept_tou was successfully done!")
+
 
 # ---
 
 
-# run
 @courier_r.message(F.text == "/run")
 @courier_r.callback_query(F.data == "lets_go")
 async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
@@ -343,7 +359,6 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
     )
 
 
-# Location
 @courier_r.message(
     F.content_type == ContentType.LOCATION, filters.StateFilter(CourierState.location)
 )
@@ -406,7 +421,7 @@ async def get_location(message: Message, state: FSMContext) -> None:
     await state.update_data(orders=orders, order_ids=order_ids, counter=counter)
 
     # Логируем перед отправкой
-    logger.info(
+    log.info(
         f"Курьер {courier_tg_id} видит {len(orders)} доступных заказов. Показан первый заказ с индексом {counter}."
     )
 
@@ -425,7 +440,7 @@ async def get_location(message: Message, state: FSMContext) -> None:
     await handler.handle_new_message(new_message, message)
 
     # Логируем, что сообщение отправлено
-    logger.info(f"Курьер {courier_tg_id} получил сообщение о первом заказе.")
+    log.info(f"Курьер {courier_tg_id} получил сообщение о первом заказе.")
 
 
 @courier_r.callback_query(
@@ -471,48 +486,48 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
     courier_tg_id = callback_query.from_user.id
 
     # Логирование данных перед обработкой
-    logger.info(f"Курьер {courier_tg_id} нажал на кнопку 'Принять заказ'.")
-    logger.info(f"Заказов найдено: {len(order_ids)}, текущий индекс: {counter}")
+    log.info(f"Курьер {courier_tg_id} нажал на кнопку 'Принять заказ'.")
+    log.info(f"Заказов найдено: {len(order_ids)}, текущий индекс: {counter}")
 
     # Проверка наличия заказов
     if not order_ids:
-        logger.warning(f"Курьер {courier_tg_id} не имеет доступных заказов.")
+        log.warning(f"Курьер {courier_tg_id} не имеет доступных заказов.")
         await callback_query.answer("Заказы не найдены.", show_alert=True)
         return
 
     # Проверка на правильность индекса
     if counter >= len(order_ids):
-        logger.warning(
+        log.warning(
             f"Курьер {courier_tg_id} передал неверный индекс для заказа: {counter}."
         )
         await callback_query.answer("Неверный индекс для заказа.", show_alert=True)
         return
 
     order_id = order_ids[counter]
-    logger.info(f"Курьер {courier_tg_id} принял заказ с ID: {order_id}.")
+    log.info(f"Курьер {courier_tg_id} принял заказ с ID: {order_id}.")
 
     try:
         # Назначаем курьера к заказу
-        logger.info(f"Назначаем курьера {courier_tg_id} на заказ с ID {order_id}.")
+        log.info(f"Назначаем курьера {courier_tg_id} на заказ с ID {order_id}.")
         await order_data.assign_courier_to_order(
             order_id=order_id, courier_tg_id=courier_tg_id
         )
 
         # Обновляем статус заказа на "В работе"
-        logger.info(f"Обновляем статус заказа {order_id} на 'В работе'.")
+        log.info(f"Обновляем статус заказа {order_id} на 'В работе'.")
         await order_data.update_order_status(
             order_id=order_id, new_status=OrderStatus.IN_PROGRESS
         )
 
         # Получаем номер телефона заказчика
         customer_phone = await order_data.get_order_customer_phone(order_id)
-        logger.info(
+        log.info(
             f"Получен номер телефона заказчика для заказа {order_id}: {customer_phone}"
         )
 
         # Получаем tg_id по номеру телефона
         customer_tg_id = await customer_data.get_user_tg_id_by_phone(customer_phone)
-        logger.info(f"Получен tg_id заказчика: {customer_tg_id}")
+        log.info(f"Получен tg_id заказчика: {customer_tg_id}")
 
         # Отправляем уведомление заказчику
         notification_text = (
@@ -523,7 +538,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         notification_message = await customer_bot.send_message(
             chat_id=customer_tg_id, text=notification_text, parse_mode="HTML"
         )
-        logger.info(
+        log.info(
             f"Отправлено уведомление заказчику {customer_tg_id} о принятии заказа."
         )
 
@@ -533,7 +548,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             parse_mode="HTML",
             disable_notification=False,
         )
-        logger.info(f"Уведомление курьеру {courier_tg_id}: 'Заказ принят'.")
+        log.info(f"Уведомление курьеру {courier_tg_id}: 'Заказ принят'.")
 
         # Обновляем состояние
         await state.set_state(CourierState.default)
@@ -547,17 +562,17 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             await customer_bot.delete_message(
                 chat_id=customer_tg_id, message_id=notification_message.message_id
             )
-            logger.info(
+            log.info(
                 f"Удалено уведомление для заказчика {customer_tg_id} с ID сообщения {notification_message.message_id}."
             )
         except Exception as e:
-            logger.error(f"Ошибка при удалении сообщения: {e}")
+            log.error(f"Ошибка при удалении сообщения: {e}")
 
     except ValueError as e:
-        logger.error(f"ValueError при принятии заказа {order_id}: {e}")
+        log.error(f"ValueError при принятии заказа {order_id}: {e}")
         await callback_query.answer(str(e), show_alert=True)
     except Exception as e:
-        logger.error(f"Ошибка при принятии заказа {order_id}: {e}")
+        log.error(f"Ошибка при принятии заказа {order_id}: {e}")
         await callback_query.answer("Ошибка при принятии заказа.", show_alert=True)
 
 
@@ -656,7 +671,7 @@ async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
         text = f"У вас нет {status_text} заказов."
         reply_kb = await kb.get_courier_kb(text="empty_orders")
         await callback_query.message.edit_text(
-            text, reply_markup=reply_kb, disable_notification=True
+            text, reply_kb, disable_notification=True
         )
         return
     elif num_orders == 1:
@@ -826,8 +841,8 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
 
-    # logger.info(f"Состояние перед завершением заказа: {data}")
-    logger.info(f"current_order_id: {current_order_id}")
+    # log.info(f"Состояние перед завершением заказа: {data}")
+    log.info(f"current_order_id: {current_order_id}")
 
     # Проверка наличия активного заказа
     if not current_order_id:
@@ -839,7 +854,7 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
     try:
         # Загружаем АКТУАЛЬНЫЙ статус заказа без кэша
         order = await order_data.get_order_by_id(current_order_id)
-        logger.info(
+        log.info(
             f"Попытка завершить заказ {current_order_id}, его статус: {order.order_status}"
         )
 
@@ -893,13 +908,13 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
                 chat_id=customer_tg_id, message_id=notification_message.message_id
             )
         except Exception as e:
-            logger.error(f"Ошибка при удалении сообщения заказчику: {e}")
+            log.error(f"Ошибка при удалении сообщения заказчику: {e}")
 
     except ValueError as e:
         await callback_query.answer(str(e), show_alert=True)
     except Exception as e:
         await callback_query.answer("Ошибка при завершении заказа.", show_alert=True)
-        logger.error(f"Ошибка при завершении заказа: {e}")
+        log.error(f"Ошибка при завершении заказа: {e}")
 
 
 # ---
@@ -967,7 +982,6 @@ async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
     )
 
 
-# Обработка подтверждения платежа
 @courier_r.pre_checkout_query()
 async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
     try:
@@ -990,7 +1004,6 @@ async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
         )
 
 
-# Сообщение об успешной оплате
 @courier_r.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
 async def succesful_payment(message: Message, state: FSMContext):
     await state.set_state(CourierState.default)
@@ -1179,7 +1192,7 @@ async def cmd_faq(message: Message, state: FSMContext) -> None:
     try:
         await handler.delete_previous_message(message.chat.id)
     except Exception as e:
-        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
 
     text = (
         f"🤔 <b>Вопросы и ответы</b>\n\n"
@@ -1216,7 +1229,7 @@ async def cmd_rules(message: Message, state: FSMContext) -> None:
     try:
         await handler.delete_previous_message(message.chat.id)
     except Exception as e:
-        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
 
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
@@ -1282,7 +1295,7 @@ async def cmd_ai_support_couriers(message: Message, state: FSMContext):
     try:
         await handler.delete_previous_message(message.chat.id)
     except Exception as e:
-        logger.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
 
     reply_kb = await kb.get_courier_kb(text="/make_order")
     # Формируем текст сообщения

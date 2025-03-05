@@ -4,7 +4,7 @@ from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
 from src.config import (
     customer_bot,
-    couriers_bot,
+    courier_bot,
     customer_dp,
     courier_dp,
     log,
@@ -22,7 +22,7 @@ async def main():
     try:
         await asyncio.gather(
             customer_dp.start_polling(customer_bot, skip_updates=True),
-            courier_dp.start_polling(couriers_bot, skip_updates=True),
+            courier_dp.start_polling(courier_bot, skip_updates=True),
         )
     finally:
         await rediska.redis.aclose()

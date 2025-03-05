@@ -272,7 +272,7 @@ async def data_city_customer(message: Message, state: FSMContext):
         f"- Customer 🧍\n"
         f"- Handler StateFilter: {handle_state}\n"
         f"- Customer telegram ID: {tg_id}\n"
-        f"- Customer city: {customer_city}, score: {score}\n"
+        f"- Customer city: {city}, score: {score}\n"
         f"- Customer state now: {current_state}\n"
         f"- Is city set: {is_city_set}"
     )
@@ -1033,8 +1033,6 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     data = await state.get_data()
     orders_data = data.get("orders_data", [])
     counter = data.get("counter", 0)
-    bot_id = callback_query.bot.id
-    tg_id = callback_query.from_user.id
 
     if not orders_data:
         log.warning("Нет доступных заказов для переключения")

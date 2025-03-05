@@ -2,10 +2,10 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, patch
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, CallbackQuery, User
-from src.app.customer import FSMContext
+from src.app.courier import FSMContext
 from src.config import moscow_time
 from src.app.courier import courier_r, payment_r
-from src.config import fsm_customer_storage, customer_bot
+from src.config import fsm_courier_storage, courier_bot
 from aiogram.fsm.storage.base import StorageKey
 
 
@@ -24,7 +24,7 @@ async def bot():
 
 @pytest_asyncio.fixture(scope="function")
 async def dp():
-    dp = Dispatcher(storage=fsm_customer_storage)
+    dp = Dispatcher(storage=fsm_courier_storage)
     dp.include_routers(courier_r, payment_r)
     return dp
 
@@ -90,7 +90,7 @@ async def mock_state():
 @pytest_asyncio.fixture(scope="function")
 async def state(user_id):
 
-    storage = fsm_customer_storage
+    storage = fsm_courier_storage
 
     async def _state(state_value=None):
         key = StorageKey(bot_id=8989, chat_id=7895451, user_id=user_id)
