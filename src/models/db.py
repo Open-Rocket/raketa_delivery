@@ -99,12 +99,12 @@ class Courier(Base):
 
     courier_id: Mapped[intPK]
 
-    courier_tg_id: Mapped[int] = mapped_column(BigInteger)
-    courier_name: Mapped[str] = mapped_column(String(100), nullable=True)
-    courier_phone_number: Mapped[str] = mapped_column(String(20), nullable=True)
-    courier_default_city: Mapped[stringData]
+    courier_tg_id: Mapped[intData]
+    courier_name: Mapped[stringData]
+    courier_phone: Mapped[stringData]
+    courier_city: Mapped[stringData]
     courier_accept_terms_of_use: Mapped[stringData]
-    courier_registration_date: Mapped[stringData]
+    courier_registration_date: Mapped[datetimeData]
 
     orders = relationship("Order", back_populates="couriers")
     subscription = relationship("Subscription", back_populates="couriers")

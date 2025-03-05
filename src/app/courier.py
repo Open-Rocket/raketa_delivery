@@ -16,14 +16,17 @@ from ._deps import (
     moscow_time,
     courier_r,
     courier_fallback,
+    courier_data,
     payment_r,
     kb,
     title,
     customer_data,
     order_data,
     rediska,
+    cities,
     log,
     F,
+    find_closest_city,
 )
 
 
@@ -65,9 +68,9 @@ async def cmd_start_courier(message: Message, state: FSMContext):
 
     photo_title = await title.get_title_courier("/start")
     text = (
-        "Добро пожаловать в Ракету — платформу, которая делает каждого курьера независимым и успешным!\n"
+        "Добро пожаловать в сервис доставки Ракета!\n"
         "Стань частью сообщества, где ты сам управляешь своими доходами и работаешь на своих условиях.\n\n"
-        "Почему Ракета?\n\n"
+        "Почему мы?\n\n"
         "◉ <b>Зарабатывай больше</b>: \n"
         "Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого заказа. Чем больше работаешь, тем больше зарабатываешь.\n\n"
         "◉ <b>Свобода выбора</b>: \n"
@@ -105,7 +108,7 @@ async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext):
 
     bot_id = callback_query.bot.id
     tg_id = callback_query.from_user.id
-    current_state = CourierState.name.state
+    current_state = CourierState.reg_Name.state
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
@@ -133,7 +136,7 @@ async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext):
     log.info(f"data_reg_courier was successfully done!")
 
 
-@courier_r.message(filters.StateFilter(CourierState.name))
+@courier_r.message(filters.StateFilter(CourierState.reg_Name))
 async def data_name_courier(message: Message, state: FSMContext):
     log.info(f"data_name_courier was called!")
 
@@ -142,7 +145,7 @@ async def data_name_courier(message: Message, state: FSMContext):
     bot_id = message.bot.id
     tg_id = message.from_user.id
     courier_name = message.text
-    current_state = CourierState.phone_number.state
+    current_state = CourierState.reg_Phone.state
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
@@ -151,7 +154,8 @@ async def data_name_courier(message: Message, state: FSMContext):
     reply_kb = await kb.get_courier_kb("phone_number")
     text = (
         f"Привет, {courier_name}!👋\n\nЧтобы начать работу, пожалуйста, укажите ваш номер телефона для связи.\n\n"
-        f"<i>*Отправка номера возможно только по клику на кнопку!</i>\n\n"
+        f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
+        f"<i>*Отправка номера возможно только по клику на кнопку 'Поделится номером'!</i>\n\n"
         f"<b>Ваш номер:</b>"
     )
 
@@ -177,7 +181,7 @@ async def data_name_courier(message: Message, state: FSMContext):
     log.info(f"data_name_courier was successfully done!")
 
 
-@courier_r.message(filters.StateFilter(CourierState.phone_number))
+@courier_r.message(filters.StateFilter(CourierState.reg_Phone))
 async def data_phone_courier(message: Message, state: FSMContext):
     log.info(f"data_phone_courier was called!")
 
@@ -186,7 +190,7 @@ async def data_phone_courier(message: Message, state: FSMContext):
     bot_id = message.bot.id
     tg_id = message.from_user.id
     courier_phone = message.contact.phone_number
-    current_state = CourierState.city.state
+    current_state = CourierState.reg_City.state
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
@@ -217,7 +221,7 @@ async def data_phone_courier(message: Message, state: FSMContext):
     log.info(f"data_phone_courier was successfully done!")
 
 
-@courier_r.message(filters.StateFilter(CourierState.city))
+@courier_r.message(filters.StateFilter(CourierState.reg_City))
 async def data_city_courier(message: Message, state: FSMContext):
     log.info(f"data_city_courier was called!")
 
@@ -225,13 +229,28 @@ async def data_city_courier(message: Message, state: FSMContext):
     handle_state = await state.get_state()
     bot_id = message.bot.id
     tg_id = message.from_user.id
-    courier_city = message.text
+    russian_cities = await cities.get_cities()
+    city, score = await find_closest_city(message.text, russian_cities)
 
-    current_state = CourierState.accept_tou.state
+    if not city:
+        text = f"Введите корректное название города!\n<b>Ваш город:</b>"
+
+        new_message = await message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
+
+        log.info(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
+
+        await handler.delete_previous_message(message.chat.id)
+        await handler.handle_new_message(new_message, message)
+
+        return
+
+    current_state = CourierState.reg_tou.state
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
-    is_city_set = await rediska.set_user_city(bot_id, tg_id, courier_city)
+    is_city_set = await rediska.set_user_city(bot_id, tg_id, city)
 
     reply_kb = await kb.get_courier_kb("accept_tou")
     text = (
@@ -254,7 +273,7 @@ async def data_city_courier(message: Message, state: FSMContext):
         f"- Courier 🚴\n"
         f"- Handler StateFilter: {handle_state}\n"
         f"- Courier telegram ID: {tg_id}\n"
-        f"- Courier city: {courier_city}\n"
+        f"- Courier city: {city}, score: {score}\n"
         f"- Courier state now: {current_state}\n"
         f"- Is city set: {is_city_set}"
     )
@@ -284,7 +303,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
         bot_id, tg_id
     )
 
-    is_new_courier_add = await courier_data.set_courier_info(
+    is_new_courier_add = await courier_data.set_courier(
         tg_id, courier_name, courier_phone, courier_city, tou
     )
 
@@ -318,7 +337,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
 @courier_r.message(F.text == "/run")
 @courier_r.callback_query(F.data == "lets_go")
-async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
+async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
     """
     Обрабатывает команду доставить заказ /run или нажатие кнопки lets_go.
 
@@ -362,7 +381,7 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext) -> None:
 @courier_r.message(
     F.content_type == ContentType.LOCATION, filters.StateFilter(CourierState.location)
 )
-async def get_location(message: Message, state: FSMContext) -> None:
+async def get_location(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
 
@@ -581,24 +600,27 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
 
 @courier_r.message(F.text == "/my_orders")
 @courier_r.callback_query(F.data == "back_myOrders")
-async def cmd_my_orders(event, state: FSMContext):
-    is_callback = isinstance(event, CallbackQuery)
-    courier_tg_id = event.from_user.id
-    chat_id = event.message.chat.id if is_callback else event.chat.id
-    bot = event.message.bot if is_callback else event.bot
+async def handle_my_orders(event, state: FSMContext):
+    log.info(f"handle_my_orders was called!")
 
-    # Удаление предыдущего сообщения, если это не callback
+    is_callback = isinstance(event, CallbackQuery)
+    tg_id = event.from_user.id
+    chat_id = event.message.chat.id if is_callback else event.chat.id
+    bot = event.bot
+    bot_id = event.bot.id
+    current_state = CourierState.myOrders.state
+
     if not is_callback:
         handler = MessageHandler(state, bot)
         await handler.delete_previous_message(chat_id)
 
-    await state.set_state(CourierState.myOrders)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
-    # Получение количества заказов курьера
-    active_count = len(await order_data.get_active_orders(courier_tg_id))
-    completed_count = len(await order_data.get_completed_orders(courier_tg_id))
+    active_count = len(await order_data.get_active_orders(tg_id))
+    completed_count = len(await order_data.get_completed_orders(tg_id))
 
-    # Клавиатура и текст сообщения(active_count, completed_count)
+    reply_kb = await kb.get_courier_orders_kb(active_count, completed_count)
     text = (
         f"✎ <b>Мои заказы</b>\n\n"
         f"Здесь вы можете посмотреть статус ваших заказов, "
@@ -615,89 +637,107 @@ async def cmd_my_orders(event, state: FSMContext):
             text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
 
-    # Если это сообщение, обрабатываем новое сообщение
     if not is_callback:
         handler = MessageHandler(state, bot)
         await handler.handle_new_message(new_message, event)
     else:
         await event.answer()
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier event info: {event.data if is_callback else event.text}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"handle_my_orders was successfully done!")
+
 
 @courier_r.callback_query(
-    F.data.in_({"active_orders", "completed_orders", "next_order", "prev_order"})
+    F.data.in_(
+        {
+            "active_orders",
+            "completed_orders",
+        }
+    )
 )
-async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
+async def get_orders(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"get_orders was called!")
+
     data = await state.get_data()
 
-    # Если курьер листает заказы (вперёд или назад)
-    if callback_query.data in {"next_order", "prev_order"}:
+    if callback_query.data in {"next_right_mo", "back_left_mo"}:
         counter = data.get("counter", 0)
-        orders_text = data.get("orders_text", [])
+        orders_data = data.get("orders_data", [])
 
-        # Переключение по заказам (вперёд или назад) с циклическим зацикливанием
-        if orders_text:
-            total_orders = len(orders_text)
-            if callback_query.data == "next_order":
-                counter = (counter + 1) % total_orders
-            elif callback_query.data == "prev_order":
-                counter = (counter - 1) % total_orders
+        if not orders_data:
+            log.warning("Нет доступных заказов для переключения")
+            await callback_query.answer("Нет доступных заказов.", show_alert=True)
+            return
 
-            await state.update_data(counter=counter)
-            reply_kb = await kb.get_courier_kb(text="one_my_order")
-            await callback_query.message.edit_text(
-                orders_text[counter],
-                reply_markup=reply_kb,
-                parse_mode="HTML",
-                disable_notification=True,
-            )
-        return
+        total_orders = len(orders_data)
+        counter = (
+            (counter + 1) % total_orders
+            if callback_query.data == "next_right_mo"
+            else (counter - 1) % total_orders
+        )
+        await state.update_data(counter=counter)
 
-    # Основная логика получения заказов
-    order_type = callback_query.data
-    courier_tg_id = callback_query.from_user.id
-
-    if order_type == "active_orders":
-        courier_orders = await order_data.get_active_orders(courier_tg_id)
-        await state.set_state(CourierState.myOrders_active)
-        status_text = "активных"
-    elif order_type == "completed_orders":
-        courier_orders = await order_data.get_completed_orders(courier_tg_id)
-        await state.set_state(CourierState.myOrders_completed)
-        status_text = "завершенных"
-
-    # Проверяем наличие заказов и настраиваем клавиатуру соответственно
-    num_orders = len(courier_orders)
-    if num_orders == 0:
-        text = f"У вас нет {status_text} заказов."
-        reply_kb = await kb.get_courier_kb(text="empty_orders")
+        log.info(f"Переключение заказа: counter={counter}, total_orders={total_orders}")
         await callback_query.message.edit_text(
-            text, reply_kb, disable_notification=True
+            orders_data[counter][0],
+            reply_markup=await kb.get_courier_kb("one_my_order"),
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+        log.info(
+            f"Конец выполнения get_orders: успешно переключен заказ #{counter + 1}"
         )
         return
-    elif num_orders == 1:
-        keyboard_type = (
-            "active_one" if order_type == "active_orders" else "complete_one"
-        )
-    else:
-        keyboard_type = (
-            "active_orders" if order_type == "active_orders" else "complete_orders"
-        )
 
-    # Формируем текст для каждого заказа с учетом нового формата
-    orders_text = []
-    orders_dict = {}  # Храним заказы в виде словаря с ID в качестве ключей
+    order_status_mapping = {
+        "active_orders": (
+            order_data.get_active_orders,
+            CourierState.myOrders_active,
+            "активных",
+        ),
+        "completed_orders": (
+            order_data.get_completed_orders,
+            CourierState.myOrders_completed,
+            "завершённых",
+        ),
+    }
+
+    get_orders_func, state_status, status_text = order_status_mapping.get(
+        callback_query.data, (None, None, "")
+    )
+    if not get_orders_func:
+        log.error(f"Неизвестный тип заказа: {callback_query.data}")
+        await callback_query.answer("Ошибка запроса заказов.", show_alert=True)
+        return
+
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
+    current_status = state_status if state_status else CourierState.default.state
+    courier_orders = await get_orders_func(tg_id)
+
+    await state.set_state(state_status)
+    await rediska.set_state(bot_id, tg_id, current_status)
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
+    orders_data = []
     for index, order in enumerate(courier_orders, start=1):
         order_forma = (
-            f"<b>{index}/{len(courier_orders)}</b>\n"  # Добавляем индекс заказа
+            f"<b>{index}/{len(courier_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
-            f"---------------------------------------------\n\n"
+            f"---------------------------------------------\n"
             f"<b>Город:</b> {order.order_city}\n\n"
             f"<b>Заказчик:</b> {order.customer_name if order.customer_name else '-'}\n"
             f"<b>Телефон:</b> {order.customer_phone if order.customer_phone else '-'}\n\n"
             f"⦿ <b>Адрес 1:</b> <a href='{order.a_url}'>{order.starting_point_a}</a>\n"
         )
 
-        # Добавляем дополнительные адреса
         delivery_points = [
             (order.destination_point_b, order.b_url),
             (order.destination_point_c, order.c_url),
@@ -713,123 +753,69 @@ async def get_courier_orders(callback_query: CallbackQuery, state: FSMContext):
             f"\n<b>Доставляем:</b> {order.delivery_object if order.delivery_object else '...'}\n"
             f"<b>Расстояние:</b> {order.distance_km} км\n"
             f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
-            f"<b>Стоимость доставки:</b> {order.price_rub}₽\n\n"
             f"<b>Описание:</b> {order.description if order.description else '...'}\n\n"
             f"---------------------------------------------\n"
             f"• Принимайте оплату наличными или переводом.\n\n"
             f"⦿ <a href='{order.full_rout}'>Маршрут доставки</a>\n"
         )
 
-        orders_text.append(order_forma)
-        orders_dict[order.order_id] = order  # Сохраняем каждый заказ по его ID
+        orders_data.append((order_forma, order.order_id))
 
-    # Устанавливаем данные для состояния
-    counter = 0
-    current_order_id = courier_orders[counter].order_id
-    await state.update_data(
-        orders_text=orders_text,
-        orders=orders_dict,
-        counter=counter,
-        current_order_id=current_order_id,
+    if not orders_data:
+        log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
+        await callback_query.message.edit_text(
+            f"У вас нет {status_text} заказов.",
+            reply_markup=await kb.get_courier_kb("one_my_order"),
+            disable_notification=True,
+        )
+        log.info(f"Конец выполнения get_orders: заказов не найдено")
+        return
+
+    await state.update_data(orders_data=orders_data, counter=0)
+    reply_kb = await kb.get_courier_kb(
+        "one_my_order" if len(orders_data) == 1 else callback_query.data
     )
 
-    # Устанавливаем соответствующую клавиатуру
-    reply_kb = await kb.get_courier_kb(text=keyboard_type)
+    log.info(f"Отображение первого заказа: total_orders={len(orders_data)}")
     await callback_query.message.edit_text(
-        orders_text[counter],
+        orders_data[0][0],
         reply_markup=reply_kb,
-        parse_mode="HTML",
         disable_notification=True,
+        parse_mode="HTML",
     )
 
-
-@courier_r.callback_query(F.data == "my_statistic")
-async def get_courier_statistic(callback_query: CallbackQuery, state: FSMContext):
-    courier_tg_id = callback_query.from_user.id
-
-    # Получение статистики курьера из одного вызова
-    stats = await order_data.get_order_statistics(courier_tg_id)
-
-    # Вычисление процента успешных доставок
-    total_orders = stats["total_orders"]
-    completed_orders = stats["completed_orders"]
-    success_rate = (completed_orders / total_orders) * 100 if total_orders > 0 else 0
-
-    # Формирование текста сообщения
-    text = (
-        f"☈ <b>Статистика доставок</b>\n\n"
-        f"Всего заказов: {total_orders}\n"
-        f"Завершенные заказы: {completed_orders}\n\n"
-        f"Самая низкая скорость: {stats['slowest_order_speed']:.2f} км/ч\n"
-        f"Самая высокая скорость: {stats['fastest_order_speed']:.2f} км/ч\n"
-        f"Средняя скорость: {stats['avg_order_speed']:.2f} км/ч\n\n"
-        f"Самая долгая доставка: {stats['longest_order_time']:.2f} мин\n"
-        f"Самая быстрая доставка: {stats['fastest_order_time']:.2f} мин\n"
-        f"Среднее время доставки: {stats['avg_order_time']:.2f} мин\n\n"
-        f"Самое короткое расстояние: {stats['shortest_order_distance']:.2f} км\n"
-        f"Самое длинное расстояние: {stats['longest_order_distance']:.2f} км\n"
-        f"Среднее расстояние: {stats['avg_order_distance']:.2f} км\n\n"
-        f"Минимальная стоимость: {stats['min_price']:.2f} руб.\n"
-        f"Максимальная стоимость: {stats['max_price']:.2f} руб.\n"
-        f"Средняя стоимость: {stats['avg_price']:.2f} руб.\n\n"
-        f"Всего заработано: {stats['total_earn']:.2f} руб.\n\n"
-        f"Процент успешных доставок: {success_rate:.2f}%\n"
-    )
-
-    reply_kb = await kb.get_courier_kb(text="go_back")
-
-    # Отправка сообщения курьеру
-    await callback_query.message.edit_text(
-        text, reply_markup=reply_kb, parse_mode="HTML"
-    )
+    log.info(f"get_orders was successfully done!")
 
 
-@courier_r.callback_query(F.data == "next_right_mo")
-async def on_button_next_my_orders(callback_query: CallbackQuery, state: FSMContext):
+@courier_r.callback_query(F.data.in_({"next_right_mo", "back_left_mo"}))
+async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
+    log.info("handle_order_navigation was called!")
+
     data = await state.get_data()
-    orders_text = data.get("orders_text", [])  # Список текста для каждого заказа
-    orders = data.get("orders", {})  # Словарь с полными данными заказов
+    orders_data = data.get("orders_data", [])
     counter = data.get("counter", 0)
 
-    # Увеличиваем счетчик и зацикливаем его
-    counter = (counter + 1) % len(orders_text) if orders_text else 0
+    if not orders_data:
+        log.warning("Нет доступных заказов для переключения")
+        await callback_query.answer("Нет доступных заказов.", show_alert=True)
+        return
 
-    # Обновляем состояние с новым значением счетчика и ID текущего заказа
-    current_order_id = list(orders.keys())[
-        counter
-    ]  # Получаем ID нового активного заказа
-    await state.update_data(counter=counter, current_order_id=current_order_id)
+    total_orders = len(orders_data)
+    counter = (
+        (counter + 1) % total_orders
+        if callback_query.data == "next_right_mo"
+        else (counter - 1) % total_orders
+    )
 
-    # Обновляем сообщение с новым заказом
-    new_order_info = orders_text[counter] if orders_text else "Нет заказов"
+    await state.update_data(counter=counter, current_order_id=orders_data[counter][1])
+
     await callback_query.message.edit_text(
-        new_order_info,
+        orders_data[counter][0],
         reply_markup=callback_query.message.reply_markup,
         parse_mode="HTML",
     )
 
-
-@courier_r.callback_query(F.data == "back_left_mo")
-async def on_button_back_my_orders(callback_query: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    orders_text = data.get("orders_text", [])
-    orders = data.get("orders", {})
-    counter = data.get("counter", 0)
-
-    # Уменьшаем счетчик и зацикливаем его
-    counter = (counter - 1) % len(orders_text) if orders_text else 0
-
-    # Обновляем состояние с новым значением счетчика
-    current_order_id = list(orders.keys())[counter]
-    await state.update_data(counter=counter, current_order_id=current_order_id)
-
-    # Обновляем сообщение с новым заказом
-    new_order_info = orders_text[counter] if orders_text else "Нет заказов"
-    await callback_query.message.edit_text(
-        new_order_info,
-        reply_markup=callback_query.message.reply_markup,
-        parse_mode="HTML",
-    )
+    log.info(f"Переключение на заказ #{counter + 1}/{total_orders}")
 
 
 # ---
@@ -920,132 +906,19 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@courier_r.message(F.text == "/subs")
-@courier_r.callback_query(F.data == "pay_sub")
-async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
-    """
-    Обрабатывает команду доставить заказ /subs.
-
-    После отправки команды /subs:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c предложением преобрести или продлить подписку с InlineButton для перехода на инвойс.
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.pay)
-    handler = MessageHandler(state, event.bot)
-    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
-
-    if isinstance(event, Message):
-        await handler.delete_previous_message(chat_id)
-
-    prices = [
-        LabeledPrice(
-            label="Месячная подписка",
-            amount=99000,  # Сумма указана в копейках (990 рублей)
-        ),
-    ]
-
-    provider_token = os.getenv("UKASSA_TEST")
-    if not provider_token:
-        print("Ошибка: provider_token не найден. Проверьте переменные окружения.")
-        return
-
-    # Отправка инвойса пользователю
-    new_message = await event.bot.send_invoice(
-        chat_id=chat_id,
-        title="Подписка Raketa",
-        description="Оформите подписку на сервис доставки...",
-        payload="Payment through a bot",
-        provider_token=provider_token,
-        currency="RUB",
-        prices=prices,
-        max_tip_amount=50000,
-        start_parameter="",
-        photo_url="https://i.ibb.co/NpQzZyY/subs.jpg",
-        photo_width=1200,
-        photo_height=720,
-        need_name=True,
-        need_phone_number=True,
-        need_email=True,
-        reply_markup=None,
-        disable_notification=True,
-    )
-
-    await handler.handle_new_message(
-        new_message, event if isinstance(event, Message) else event.message
-    )
-
-
-@courier_r.pre_checkout_query()
-async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
-    try:
-        if (
-            pre_checkout_query.currency == "RUB"
-            and pre_checkout_query.total_amount == 99000
-        ):
-            await pre_checkout_query.bot.answer_pre_checkout_query(
-                pre_checkout_query.id, ok=True
-            )
-        else:
-            await pre_checkout_query.bot.answer_pre_checkout_query(
-                pre_checkout_query.id,
-                ok=False,
-                error_message="Неверная сумма или валюта",
-            )
-    except Exception as e:
-        await pre_checkout_query.bot.answer_pre_checkout_query(
-            pre_checkout_query.id, ok=False, error_message=f"Ошибка: {str(e)}"
-        )
-
-
-@courier_r.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
-async def succesful_payment(message: Message, state: FSMContext):
-    await state.set_state(CourierState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-    photo_title = await title.get_title_courier("success_payment")
-    text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
-    reply_kb = await kb.get_courier_kb(text="success_payment")
-    new_message = await message.answer_photo(
-        photo=photo_title,
-        caption=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-    )
-    await handler.handle_new_message(new_message, message)
-
-
-# ---
-
-
 @courier_r.message(F.text == "/profile")
-async def cmd_profile(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает команду доставить заказ /profile.
+async def cmd_profile(message: Message, state: FSMContext):
+    log.info(f"cmd_profile was called!")
 
-    После отправки команды /profile:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c информацией о курьере (имя, номер телефона, город, статус подписки и ее срок).
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.default)
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
+    bot_id = message.bot.id
     tg_id = message.from_user.id
-    courier_name, courier_phone_number, courier_default_city, subscription_status = (
+    current_state = CourierState.default.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    courier_name, courier_phone, courier_city, subscription_status = (
         await courier_data.get_courier_full_info(tg_id)
     )
 
@@ -1053,146 +926,274 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
         f"👤 <b>Профиль курьера</b>\n\n"
         f"Посмотрите или измените данные о себе.\n\n"
         f"<b>Имя:</b> {courier_name}\n"
-        f"<b>Номер:</b> {courier_phone_number}\n"
-        f"<b>Город:</b> {courier_default_city}\n"
+        f"<b>Номер:</b> {courier_phone}\n"
+        f"<b>Город:</b> {courier_city}\n"
         f"<b>Статус подписки:</b> {subscription_status}\n"
     )
 
-    reply_kb = await kb.get_courier_kb(text="/profile")
+    reply_kb = await kb.get_courier_kb("/profile")
+
+    await handler.delete_previous_message(message.chat.id)
 
     new_message = await message.answer(
         text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.text: {F.text}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"cmd_profile was successfully done!")
+
 
 @courier_r.callback_query(F.data == "set_my_name")
-async def set_name(callback_query: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(CourierState.change_Name)
+async def set_name(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"set_name was called!")
+
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CourierState.change_Name.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"set_name was successfully done!")
+
 
 @courier_r.callback_query(F.data == "set_my_phone")
-async def set_phone(callback_query: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(CourierState.change_Phone)
+async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"set_phone was called!")
+
     handler = MessageHandler(state, callback_query.bot)
-    reply_kb = await kb.get_courier_kb(text="phone_number")
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CourierState.change_Phone.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    reply_kb = await kb.get_courier_kb("phone_number")
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш Телефон:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, reply_markup=reply_kb, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"set_phone was successfully done!")
+
 
 @courier_r.callback_query(F.data == "set_my_city")
-async def set_city(callback_query: CallbackQuery, state: FSMContext) -> None:
-    await state.set_state(CourierState.change_City)
+async def set_city(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"set_city was called!")
+
     handler = MessageHandler(state, callback_query.bot)
+    bot_id = callback_query.bot.id
+    tg_id = callback_query.from_user.id
+    current_state = CourierState.change_City.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, callback_query.message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.data: {F.data}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"set_city was successfully done!")
+
+
+# ---
+
 
 @courier_r.message(filters.StateFilter(CourierState.change_Name))
 async def change_name(message: Message, state: FSMContext):
-    await state.set_state(CourierState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    log.info(f"change_name was called!")
 
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
     tg_id = message.from_user.id
     name = message.text
+    current_state = CourierState.default.state
 
-    await courier_data.set_courier_name(
-        tg_id, name
-    )  # Метод для обновления имени курьера
+    new_name_was_set = await courier_data.update_courier_name(tg_id, name)
+    new_name_was_set_redis = await rediska.set_user_name(bot_id, tg_id, name)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    log.info(f"new_name_was_set_redis: {new_name_was_set_redis}")
     text = (
         f"Имя курьера было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     )
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {message.text}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- new_name_was_set: {new_name_was_set}\n"
+    )
+
+    log.info(f"change_name was successfully done!")
 
 
 @courier_r.message(filters.StateFilter(CourierState.change_Phone))
 async def change_phone(message: Message, state: FSMContext):
-    await state.set_state(CourierState.default)
-    handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
+    log.info(f"change_phone was called!")
 
+    handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
     tg_id = message.from_user.id
     phone = message.contact.phone_number
+    current_state = CourierState.default.state
 
-    await courier_data.set_courier_phone(
-        tg_id, phone
-    )  # Метод для обновления телефона курьера
+    new_phone_was_set = await courier_data.update_courier_phone(tg_id, phone)
+    new_phone_was_set_redis = await rediska.set_user_phone(bot_id, tg_id, phone)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    log.info(f"new_phone_was_set_redis: {new_phone_was_set_redis}")
+
     text = (
         f"Номер курьера был изменен на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     )
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {message.text}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- new_phone_was_set: {new_phone_was_set}\n"
+    )
+
+    log.info(f"change_phone was successfully done!")
 
 
 @courier_r.message(filters.StateFilter(CourierState.change_City))
 async def change_city(message: Message, state: FSMContext):
-    await state.set_state(CourierState.default)
+    log.info(f"change_city was called!")
+
     handler = MessageHandler(state, message.bot)
-    await handler.delete_previous_message(message.chat.id)
-
+    bot_id = message.bot.id
     tg_id = message.from_user.id
-    city = message.text
+    russian_cities = await cities.get_cities()
+    city, score = await find_closest_city(message.text, russian_cities)
 
-    await courier_data.set_courier_city(
-        tg_id, city
-    )  # Метод для обновления города курьера
+    if not city:
+        text = f"Введите корректное название города!\n<b>Ваш город:</b>"
+
+        new_message = await message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
+
+        log.info(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
+
+        await handler.delete_previous_message(message.chat.id)
+        await handler.handle_new_message(new_message, message)
+
+        return
+
+    current_state = CourierState.default.state
+
+    new_city_was_set = await courier_data.update_courier_city(tg_id, city)
+    new_city_was_set_redis = await rediska.set_user_city(bot_id, tg_id, city)
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
+
+    log.info(f"new_city_was_set_redis: {new_city_was_set_redis}")
+
     text = (
         f"Город курьера был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
     )
+
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
 
     await handler.handle_new_message(new_message, message)
+
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier message: {message.text}\n"
+        f"- Courier state now: {current_state}\n"
+        f"- new_city_was_set: {new_city_was_set}\n"
+    )
+
+    log.info(f"change_city was successfully done!")
 
 
 # ---
 
 
 @courier_r.message(F.text == "/faq")
-async def cmd_faq(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает команду /faq.
+async def cmd_faq(message: Message, state: FSMContext):
+    log.info(f"cmd_faq was called!")
 
-    После отправки команды /faq:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c ссылкой на документ с вопросами и ответами.
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.default)
     handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
+    current_state = CourierState.default.state
 
-    # Логируем попытку удаления предыдущего сообщения
-    try:
-        await handler.delete_previous_message(message.chat.id)
-    except Exception as e:
-        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
     text = (
         f"🤔 <b>Вопросы и ответы</b>\n\n"
@@ -1200,36 +1201,35 @@ async def cmd_faq(message: Message, state: FSMContext) -> None:
         f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>"
     )
 
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.text: {F.text}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
+    )
+
+    log.info(f"cmd_faq was successfully done!")
+
 
 @courier_r.message(F.text == "/rules")
-async def cmd_rules(message: Message, state: FSMContext) -> None:
-    """
-    Обрабатывает команду /rules.
+async def cmd_rules(message: Message, state: FSMContext):
+    log.info(f"cmd_rules was called!")
 
-    После отправки команды /rules:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c ссылкой на документ с правилами сервиса.
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.default)
     handler = MessageHandler(state, message.bot)
+    bot_id = message.bot.id
+    tg_id = message.from_user.id
+    current_state = CourierState.default.state
 
-    # Логируем попытку удаления предыдущего сообщения
-    try:
-        await handler.delete_previous_message(message.chat.id)
-    except Exception as e:
-        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
+    await state.set_state(current_state)
+    await rediska.set_state(bot_id, tg_id, current_state)
 
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
@@ -1242,71 +1242,22 @@ async def cmd_rules(message: Message, state: FSMContext) -> None:
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
+    await handler.delete_previous_message(message.chat.id)
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
-
-# ---
-
-
-@courier_r.message(F.text == "/ai_support_couriers")
-async def cmd_ai_support_couriers(message: Message, state: FSMContext):
-    """
-    Обрабатывает команду доставить заказ /ai_support_couriers.
-
-    После отправки команды /ai_support_couriers:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c InlineButton кнопкой для перехода на бот поддержки.
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-
-
-# ---
-
-
-@courier_r.message(F.text == "/make_order")
-async def cmd_ai_support_couriers(message: Message, state: FSMContext):
-    """
-    Обрабатывает команду /make_order.
-
-    После отправки команды /make_order:
-    - Переводит пользователя в состояние (`CourierState.default`).
-    - Отправляет сообщение c InlineButton кнопкой для перехода на клиентский бот для оформления заказов.
-
-    Args:
-        message (Message): Объект, содержащий информацию о нажатии на кнопку.
-        state (FSMContext): Контекст состояния конечного автомата для отслеживания положения в переходах.
-
-    Returns:
-        None: Функция не возвращает значение, только отправляет сообщение и изменяет состояние.
-    """
-    await state.set_state(CourierState.default)
-    handler = MessageHandler(state, message.bot)
-
-    # Логируем попытку удаления предыдущего сообщения
-    try:
-        await handler.delete_previous_message(message.chat.id)
-    except Exception as e:
-        log.error(f"Ошибка при удалении предыдущего сообщения: {e}")
-
-    reply_kb = await kb.get_courier_kb(text="/make_order")
-    # Формируем текст сообщения
-    text = "📦 Для оформления заказа, пожалуйста, перейдите в клиентский бот."
-
-    # Отправляем сообщение с кнопкой для перехода на клиентский бот
-    new_message = await message.answer(
-        text, disable_notification=True, reply_markup=reply_kb
+    log.info(
+        f"\n"
+        f"- Courier 🚴\n"
+        f"- Handler F.text: {F.text}\n"
+        f"- Courier telegram ID: {tg_id}\n"
+        f"- Courier state now: {current_state}\n"
     )
 
-    await handler.handle_new_message(new_message, message)
+    log.info(f"cmd_rules was successfully done!")
 
 
 # ---
@@ -1381,7 +1332,7 @@ async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
 
 
 @payment_r.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
-async def succesful_payment(message: Message, state: FSMContext):
+async def successful_payment(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
     ttl = await title.get_title_courier("success_payment")

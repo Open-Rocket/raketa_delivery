@@ -216,22 +216,7 @@ class Keyboard:
                     [InlineKeyboardButton(text="Оплатить", callback_data="pay_sub")]
                 ]
             ),
-            "/ai": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Поддержка", callback_data="support")],
-                    [
-                        InlineKeyboardButton(
-                            text="Задать вопрос", callback_data="ask_question"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="Отзывы и предложения", callback_data="reviews"
-                        )
-                    ],
-                ]
-            ),
-            "next_kb": InlineKeyboardMarkup(
+            "/start": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(

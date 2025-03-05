@@ -21,7 +21,7 @@ class CustomerData:
         city: str,
         tou: str,
     ) -> bool:
-        """Добавляет в БД нового пользователя."""
+        """Добавляет в БД нового пользователя"""
 
         async with self.async_session_factory() as session:
             try:
@@ -158,70 +158,136 @@ class CourierData:
     def __init__(self, async_session_factory):
         self.async_session_factory = async_session_factory
 
-    async def set_courier_info(
+    # ---
+
+    async def set_courier(
         self,
         tg_id: int,
         name: str,
-        phone_number: str,
-        default_city: str,
-        accept_terms_tou: str,
-        registration_date: str,
-    ):
+        phone: str,
+        city: str,
+        tou: str,
+    ) -> bool:
+        """Добавляет в БД нового курьера"""
+
         async with self.async_session_factory() as session:
-            # Пытаемся найти существующего курьера
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                # Если курьер найден, обновляем его данные
-                courier.courier_name = name
-                courier.courier_phone_number = phone_number
-                courier.courier_default_city = default_city
-                courier.courier_accept_terms_of_use = accept_terms_tou
-                courier.registration_date = registration_date
-            else:
-                # Если курьер не найден, создаем нового курьера
+            try:
                 new_courier = Courier(
                     courier_tg_id=tg_id,
                     courier_name=name,
-                    courier_phone_number=phone_number,
-                    courier_default_city=default_city,
-                    courier_accept_terms_of_use=accept_terms_tou,
-                    courier_registration_date=registration_date,
+                    courier_phone=phone,
+                    courier_city=city,
+                    courier_accept_terms_of_use=tou,
+                    courier_registration_date=moscow_time,
                 )
                 session.add(new_courier)
-
-            # Сохраняем изменения в базе данных
-            await session.commit()
-
-    async def set_courier_name(self, tg_id: int, name: str):
-        async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                courier.courier_name = name
+                await session.flush()
                 await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении курьера: {e}")
+                return False
 
-    async def set_courier_phone(self, tg_id: int, phone: str):
+    # ---
+
+    async def update_courier_name(
+        self,
+        tg_id: int,
+        new_name: str,
+    ) -> bool:
+        """Обновляет имя курьера в БД"""
+
         async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                courier.courier_phone_number = phone
-                await session.commit()
+            try:
+                # Находим курьера по tg_id
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
 
-    async def set_courier_city(self, tg_id: int, city: str):
+                if not courier:
+                    log.error(f"Курьер с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем имя
+                courier.courier_name = new_name
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Имя успешно обновлено для курьера {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении имени: {e}")
+                return False
+
+    async def update_courier_phone(
+        self,
+        tg_id: int,
+        new_phone: str,
+    ) -> bool:
+        """Обновляет номер курьера в БД"""
+
         async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                courier.courier_default_city = city
-                await session.commit()
+            try:
+                # Находим курьера по tg_id
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
 
-    async def get_courier_info(self, tg_id: int):
+                if not courier:
+                    log.error(f"Курьер с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем телефон
+                courier.courier_phone_number = new_phone
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Телефон успешно обновлен для курьера {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении телефона: {e}")
+                return False
+
+    async def update_courier_city(
+        self,
+        tg_id: int,
+        new_city: str,
+    ) -> bool:
+        """Обновляет город курьера в БД"""
+
+        async with self.async_session_factory() as session:
+            try:
+                # Находим курьера по tg_id
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    log.error(f"Курьер с tg_id={tg_id} не найден.")
+                    return False
+
+                # Обновляем город
+                courier.courier_default_city = new_city
+
+                # Сохраняем изменения
+                await session.commit()
+                log.info(f"Город успешно обновлен для курьера {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении города: {e}")
+                return False
+
+    # ---
+
+    async def get_courier_info(self, tg_id: int) -> tuple:
+        """Возвращает имя, номер и город курьера из БД"""
         async with self.async_session_factory() as session:
             courier = await session.scalar(
                 select(Courier).where(Courier.courier_tg_id == tg_id)
@@ -230,12 +296,14 @@ class CourierData:
                 return (
                     courier.courier_name or "...",
                     courier.courier_phone_number or "...",
+                    courier.courier_default_city or "...",
                 )
-            return (None, None)
+            return ("...", "...", "...")
 
-    async def get_courier_full_info(self, tg_id: int):
+    async def get_courier_full_info(self, tg_id: int) -> tuple:
+        """Возвращает полную информацию о курьере, включая статус подписки"""
         async with self.async_session_factory() as session:
-            # Используем join для извлечения связанных данных о подписке
+
             courier = await session.scalar(
                 select(Courier)
                 .where(Courier.courier_tg_id == tg_id)
@@ -249,35 +317,11 @@ class CourierData:
                 )
                 return (
                     courier.courier_name or "...",
-                    courier.courier_phone_number or "...",
-                    courier.courier_default_city
-                    or "...",  # убедитесь, что поле существует в модели
+                    courier.courier_phone or "...",
+                    courier.courier_city or "...",
                     subscription_status,
                 )
-            return (
-                None,
-                None,
-                None,
-                "Нет подписки",
-            )  # добавлено "Нет подписки" для более полного результата
-
-    async def get_courier_phone(self, tg_id: int):
-        async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                return courier.courier_phone_number
-            return None
-
-    async def get_courier_city(self, tg_id: int):
-        async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier).where(Courier.courier_tg_id == tg_id)
-            )
-            if courier:
-                return courier.courier_default_city
-            return None
+            return (None, None, None, "Нет подписки")
 
 
 class OrderData:
