@@ -132,6 +132,7 @@ class Order(Base):
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_tg_id: Mapped[intData]
+    courier_tg_id: Mapped[intData]
     delivery_object: Mapped[stringData]
     distance_km: Mapped[floatData]
     price_rub: Mapped[intData]

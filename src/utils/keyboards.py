@@ -271,8 +271,8 @@ class Keyboard:
             "available_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
-                        InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
-                        InlineKeyboardButton(text="⇥", callback_data="next_right_mo"),
+                        InlineKeyboardButton(text="⇤", callback_data="back_left"),
+                        InlineKeyboardButton(text="⇥", callback_data="next_right"),
                     ],
                     [
                         InlineKeyboardButton(
@@ -368,6 +368,17 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="Заказы в городе", callback_data="view_city_orders"
                         ),
+                    ]
+                ]
+            ),
+            # ---
+            "city_orders": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Показать заказы рядом",
+                            callback_data="show_nearby_orders",
+                        )
                     ]
                 ]
             ),

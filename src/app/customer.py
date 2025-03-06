@@ -898,50 +898,51 @@ async def handle_my_orders(event, state: FSMContext):
 
 
 @customer_r.callback_query(
-    F.data.in_(
-        {
-            "pending_orders",
-            "active_orders",
-            "canceled_orders",
-            "completed_orders",
-        }
-    )
+    F.data.in_({"pending_orders", "active_orders", "completed_orders"})
 )
 async def get_orders(callback_query: CallbackQuery, state: FSMContext):
-
-    log.info(f"handle_my_orders was called!")
+    log.info(f"get_orders was called! Callback data: {callback_query.data}")
 
     data = await state.get_data()
 
+    # Обработка переключения заказов
     if callback_query.data in {"next_right_mo", "back_left_mo"}:
         counter = data.get("counter", 0)
-        orders_data = data.get("orders_data", [])
+        orders_data = data.get("orders_data", {})
 
-        if not orders_data:
-            log.warning("Нет доступных заказов для переключения")
+        if not orders_data or not isinstance(orders_data, dict):
+            log.warning(
+                f"Нет доступных заказов для переключения или неверный формат: {orders_data}"
+            )
             await callback_query.answer("Нет доступных заказов.", show_alert=True)
             return
 
         total_orders = len(orders_data)
+        order_ids = list(orders_data.keys())
         counter = (
             (counter + 1) % total_orders
             if callback_query.data == "next_right_mo"
             else (counter - 1) % total_orders
         )
-        await state.update_data(counter=counter)
+        current_order_id = order_ids[counter]
+        await state.update_data(counter=counter, current_order_id=current_order_id)
+        await rediska.save_fsm_state(
+            state, callback_query.bot.id, callback_query.from_user.id
+        )
 
-        log.info(f"Переключение заказа: counter={counter}, total_orders={total_orders}")
+        log.info(
+            f"Переключение заказа: counter={counter}, total_orders={total_orders}, order_id={current_order_id}"
+        )
         await callback_query.message.edit_text(
-            orders_data[counter][0],
+            orders_data[current_order_id]["text"],
             reply_markup=await kb.get_customer_kb("one_my_order"),
             disable_notification=True,
             parse_mode="HTML",
         )
-        log.info(
-            f"Конец выполнения get_orders: успешно переключен заказ #{counter + 1}"
-        )
+        log.info(f"Успешно переключен заказ #{counter + 1}")
         return
 
+    # Маппинг статусов заказов
     order_status_mapping = {
         "pending_orders": (
             order_data.get_pending_orders,
@@ -971,48 +972,64 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     tg_id = callback_query.from_user.id
     bot_id = callback_query.bot.id
     current_status = state_status if state_status else CustomerState.default.state
+
+    # Получаем заказы клиента
     customer_orders = await get_orders_func(tg_id)
 
-    await state.set_state(state_status)
-    await rediska.set_state(bot_id, tg_id, current_status)
-    await rediska.save_fsm_state(state, bot_id, tg_id)
-
-    orders_data = []
+    # Формируем orders_data как словарь
+    orders_data = {}
     for index, order in enumerate(customer_orders, start=1):
-        order_forma = (
-            zlib.decompress(order.order_forma).decode("utf-8")
-            if order.order_forma
-            else "-"
-        )
+        try:
+            order_forma = (
+                zlib.decompress(order.order_forma).decode("utf-8")
+                if order.order_forma
+                else "-"
+            )
+        except Exception as e:
+            log.error(
+                f"Ошибка декодирования order_forma для заказа {order.order_id}: {e}"
+            )
+            order_forma = "-"
 
-        log.info(f"Формирование заказа #{order.order_id}: order_forma={order_forma}")
-
+        courier = await order_data.get_courier_phone(order.order_id)
         base_info = (
             f"<b>{index}/{len(customer_orders)}</b>\n"
-            f"<b>Заказ: №{order.order_id}</b>\n"
+            f"<b>Заказ: №{order.order_id}</b>\n\n"
+            f"---------------------------------------------\n"
+            f"<b>Курьер:</b> {courier if courier else '...'}\n"
             f"---------------------------------------------\n"
             f"{order_forma}"
         )
-        orders_data.append((base_info, order.order_id))
+        orders_data[order.order_id] = {"text": base_info, "index": index - 1}
 
     if not orders_data:
         log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
-        await callback_query.message.edit_text(
+        await callback_query.answer(
             f"У вас нет {status_text} заказов.",
             reply_markup=await kb.get_customer_kb("one_my_order"),
             disable_notification=True,
+            show_alert=True,
         )
         log.info(f"Конец выполнения get_orders: заказов не найдено")
         return
 
+    # Очищаем и обновляем состояние
+    await state.clear()  # Удаляем старые данные
     await state.update_data(orders_data=orders_data, counter=0)
+    await state.set_state(state_status)
+    await rediska.set_state(bot_id, tg_id, current_status)
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
     reply_kb = await kb.get_customer_kb(
         "one_my_order" if len(orders_data) == 1 else callback_query.data
     )
 
-    log.info(f"Отображение первого заказа: total_orders={len(orders_data)}")
+    first_order_id = list(orders_data.keys())[0]
+    log.info(
+        f"Отображение первого заказа: total_orders={len(orders_data)}, order_id={first_order_id}"
+    )
     await callback_query.message.edit_text(
-        orders_data[0][0],
+        orders_data[first_order_id]["text"],
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
@@ -1023,72 +1040,123 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_r.callback_query(F.data.in_({"next_right_mo", "back_left_mo"}))
 async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
-    log.info("handle_order_navigation was called!")
+    log.info("handle_order_navigation вызван!")
+
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
 
     data = await state.get_data()
-    orders_data = data.get("orders_data", [])
+    orders_data = data.get("orders_data", {})  # Ожидаем словарь, а не список
     counter = data.get("counter", 0)
 
-    if not orders_data:
-        log.warning("Нет доступных заказов для переключения")
+    # Проверка на отсутствие заказов или неверный формат данных
+    if not orders_data or not isinstance(orders_data, dict):
+        log.warning(
+            f"Нет доступных заказов для переключения или неверный формат: {orders_data}"
+        )
         await callback_query.answer("Нет доступных заказов.", show_alert=True)
         return
 
     total_orders = len(orders_data)
+    order_ids = list(orders_data.keys())
+
+    # Обновление индекса на основе нажатой кнопки
     counter = (
         (counter + 1) % total_orders
         if callback_query.data == "next_right_mo"
         else (counter - 1) % total_orders
     )
 
-    await state.update_data(counter=counter, current_order_id=orders_data[counter][1])
+    current_order_id = order_ids[counter]
+    await state.update_data(counter=counter, current_order_id=current_order_id)
+    await rediska.save_fsm_state(state, bot_id, tg_id)
 
-    await callback_query.message.edit_text(
-        orders_data[counter][0],
-        reply_markup=callback_query.message.reply_markup,
-        parse_mode="HTML",
-    )
-
-    log.info(f"Переключение на заказ #{counter + 1}/{total_orders}")
+    try:
+        await callback_query.message.edit_text(
+            orders_data[current_order_id]["text"],
+            reply_markup=callback_query.message.reply_markup,
+            parse_mode="HTML",
+        )
+        log.info(
+            f"Переключение на заказ #{counter + 1}/{total_orders}, order_id={current_order_id}"
+        )
+    except Exception as e:
+        log.error(
+            f"Ошибка при обновлении текста сообщения для заказа {current_order_id}: {e}"
+        )
+        await callback_query.answer(
+            "Ошибка при обновлении информации о заказе.", show_alert=True
+        )
 
 
 @customer_r.callback_query(F.data == "cancel_my_order")
 async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
+    log.info("cancel_my_order вызван!")
 
-    log.info(f"cancel_my_order was called!")
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
 
     handler = MessageHandler(state, callback_query.message.bot)
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
 
+    # Проверка на отсутствие текущего заказа
     if not current_order_id:
-        await callback_query.message.answer("Не удалось найти заказ для отмены.")
+        log.warning("Не удалось найти current_order_id в состоянии FSM")
+        await callback_query.message.answer(
+            "Не удалось найти заказ для отмены.", parse_mode="HTML"
+        )
         return
 
     order = await order_data.get_order_by_id(current_order_id)
 
-    if order.order_status != OrderStatus.PENDING:
-        new_message = await callback_query.message.answer(
-            f"Заказ №{current_order_id} нельзя отменить, так как он не в статусе ожидания."
+    # Проверка, существует ли заказ
+    if not order:
+        log.error(f"Заказ с ID {current_order_id} не найден в базе данных")
+        await callback_query.message.answer(
+            f"Заказ №{current_order_id} не найден.", parse_mode="HTML"
         )
         return
 
-    is_canceled = await order_data.update_order_status(
-        current_order_id, OrderStatus.CANCELLED
-    )
-    text = (
-        f"<b>Заказ №{current_order_id} успешно отменен.</b>\n\n"
-        f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отмененные.</b>\n\n"
-        f"▼ <b>Выберите действие ...</b>"
-    )
-    new_message = await callback_query.message.answer(
-        text, disable_notification=True, parse_mode="HTML"
-    )
+    # Проверка статуса заказа
+    if order.order_status != OrderStatus.PENDING:
+        log.warning(
+            f"Заказ {current_order_id} не в статусе PENDING: {order.order_status}"
+        )
+        new_message = await callback_query.message.answer(
+            f"Заказ №{current_order_id} нельзя отменить, так как он не в статусе ожидания. Текущий статус: {order.order_status}.",
+            parse_mode="HTML",
+        )
+        await handler.handle_new_message(new_message, callback_query.message)
+        return
 
-    await handler.handle_new_message(new_message, callback_query.message)
+    # Отмена заказа
+    try:
+        is_canceled = await order_data.update_order_status(
+            current_order_id, OrderStatus.CANCELLED
+        )
+        text = (
+            f"<b>Заказ №{current_order_id} успешно отменён.</b>\n\n"
+            f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отменённые.</b>\n\n"
+            f"▼ <b>Выберите действие ...</b>"
+        )
+        new_message = await callback_query.message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
+        await handler.handle_new_message(new_message, callback_query.message)
 
-    log.info(f"order {current_order_id} is_canceled: {is_canceled}")
-    log.info(f"cancel_my_order was successfully done!")
+        # Очищаем состояние и сохраняем данные
+        await state.clear()
+        await state.update_data(
+            canceled_order_id=current_order_id
+        )  # Сохраняем ID отменённого заказа
+        await rediska.save_fsm_state(state, bot_id, tg_id)
+
+        log.info(f"Заказ {current_order_id} отменён, статус: {is_canceled}")
+        log.info("cancel_my_order успешно выполнен!")
+    except Exception as e:
+        log.error(f"Ошибка при отмене заказа {current_order_id}: {e}")
+        await callback_query.answer("Ошибка при отмене заказа.", show_alert=True)
 
 
 # ---

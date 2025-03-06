@@ -27,8 +27,8 @@ from ._deps import (
     log,
     F,
     find_closest_city,
-    customer_bot,
 )
+from run import customer_bot
 
 
 # ---
@@ -371,175 +371,200 @@ async def get_location(message: Message, state: FSMContext):
     await handler.delete_previous_message(message.chat.id)
 
     courier_tg_id = message.from_user.id
+    courier_city = await courier_data.get_courier_city(courier_tg_id)
+    bot_id = message.bot.id
     my_lon = message.location.longitude
     my_lat = message.location.latitude
     radius_km = 5
 
-    # Получаем заказы в радиусе
     available_orders = await order_data.get_available_orders(my_lat, my_lon, radius_km)
 
-    if not available_orders:
-        new_message = await message.answer(
-            "Нет доступных заказов в вашем радиусе.", disable_notification=True
-        )
-        await handler.handle_new_message(new_message, message)
-        return
+    await state.update_data(available_orders=available_orders)
+    await rediska.save_fsm_state(state, bot_id, courier_tg_id)
 
-    orders = []
-    order_ids = []
+    city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
-    for index, order in enumerate(available_orders, start=1):
-        order_ids.append(order.order_id)
-
-        # Декодируем форму заказа, если она есть
-        order_forma_bytes = zlib.decompress(order.order_forma)
-        order_forma = order_forma_bytes.decode("utf-8")
-
-        order_text = (
-            f"<b>{index}/{len(available_orders)}</b>\n"
-            f"<b>Заказ: №{order.order_id}</b>\n"
-            f"---------------------------------------------\n\n"
-            f"{order_forma}"
-        )
-
-        orders.append(order_text)
-
-    counter = 0
-    await state.update_data(orders=orders, order_ids=order_ids, counter=counter)
-
-    log.info(
-        f"Курьер {courier_tg_id} видит {len(orders)} доступных заказов. Показан первый заказ с индексом {counter}."
+    text = (
+        f"<b>📋 Заказы</b>\n\n"
+        f"Всего заказов в городе <b>{courier_city}</b>: <b>{len(city_orders)}</b>\n"
+        f"Заказов рядом с вами: <b>{len(available_orders)}</b>\n\n"
+        f"🔍 Хотите посмотреть заказы рядом?"
     )
 
-    reply_kb = await kb.get_courier_kb(
-        "one_order" if len(orders) == 1 else "available_orders"
-    )
+    reply_kb = await kb.get_courier_kb("city_orders")
 
     new_message = await message.answer(
-        orders[counter],
-        reply_markup=reply_kb,
-        parse_mode="HTML",
-        disable_notification=True,
+        text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
     await handler.handle_new_message(new_message, message)
 
-    log.info(f"Курьер {courier_tg_id} получил сообщение о первом заказе.")
-
-
-@courier_r.callback_query(
-    F.data.in_({"next_right", "back_left"}), filters.StateFilter(CourierState.location)
-)
-async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
-    log.info("handle_order_navigation was called!")
-
-    data = await state.get_data()
-    orders = data.get("orders", [])
-    counter = data.get("counter", 0)
-
-    if not orders:
-        log.warning("Нет доступных заказов для переключения")
-        await callback_query.answer("Нет доступных заказов.", show_alert=True)
-        return
-
-    total_orders = len(orders)
-    counter = (
-        (counter + 1) % total_orders
-        if callback_query.data == "next_right"
-        else (counter - 1) % total_orders
+    log.info(
+        f"Курьер {courier_tg_id} получил информацию о {len(available_orders)} заказах в радиусе и {len(city_orders)} в городе."
     )
 
-    await state.update_data(counter=counter)
+
+@courier_r.callback_query(F.data == "show_nearby_orders")
+async def show_nearby_orders(callback_query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
+    available_orders = data.get("available_orders", {})
+
+    if not available_orders or not isinstance(available_orders, dict):
+        log.warning(f"Некорректный формат available_orders: {available_orders}")
+        await callback_query.answer(
+            "Нет доступных заказов в вашем радиусе или данные устарели.",
+            show_alert=True,
+        )
+        return
+
+    orders_data = {}
+    order_ids = list(available_orders.keys())
+    for index, order_id in enumerate(order_ids, start=1):
+        order_forma = available_orders[order_id]["text"]
+        order_text = (
+            f"<b>{index}/{len(available_orders)}</b>\n"
+            f"<b>Заказ: №{order_id}</b>\n"
+            f"---------------------------------------------\n\n"
+            f"{order_forma}"
+        )
+        orders_data[order_id] = {"text": order_text, "index": index}
+
+    await state.clear()
+    await state.update_data(
+        orders_data=orders_data,
+        order_ids=order_ids,
+        current_index=0,
+        current_order_id=order_ids[0],
+    )
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
+    first_order_id = order_ids[0]
+    reply_markup = await kb.get_courier_kb(
+        "one_order" if len(order_ids) == 1 else "available_orders"
+    )
 
     await callback_query.message.edit_text(
-        orders[counter],
-        reply_markup=callback_query.message.reply_markup,
+        orders_data[first_order_id]["text"],
+        reply_markup=reply_markup,
         parse_mode="HTML",
     )
 
-    log.info(f"Переключение на заказ #{counter + 1}/{total_orders}")
+    log.info(f"Курьер {tg_id} получил список доступных заказов рядом.")
+
+
+@courier_r.callback_query(F.data.in_({"next_right", "back_left"}))
+async def handle_order_available_navigation(
+    callback_query: CallbackQuery, state: FSMContext
+):
+    log.info("handle_order_available_navigation вызван!")
+
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
+
+    data = await state.get_data()
+    orders_data = data.get("orders_data", {})
+    order_ids = list(orders_data.keys())
+    current_index = data.get("current_index", 0)
+
+    if not orders_data or not order_ids:
+        log.warning(f"❌ Нет доступных заказов.")
+        await callback_query.answer("Нет доступных заказов.", show_alert=True)
+        return
+
+    total_orders = len(orders_data)
+    if total_orders == 1:
+        return  # Нет смысла переключать, если только один заказ
+
+    if callback_query.data == "next_right":
+        new_index = (current_index + 1) % total_orders
+    else:  # back_left
+        new_index = (current_index - 1) % total_orders
+
+    new_order_id = order_ids[new_index]
+    await state.update_data(current_index=new_index, current_order_id=new_order_id)
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
+    log.info(
+        f"Переключение на заказ {new_index + 1}/{total_orders}, order_id={new_order_id}"
+    )
+
+    reply_markup = await kb.get_courier_kb(
+        "available_orders" if total_orders > 1 else "one_order"
+    )
+
+    await callback_query.message.edit_text(
+        orders_data[new_order_id]["text"],
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+    )
 
 
 @courier_r.callback_query(F.data == "accept_order")
 async def accept_order(callback_query: CallbackQuery, state: FSMContext):
-
+    handler = MessageHandler(state, callback_query.message.bot)
     data = await state.get_data()
     order_ids = data.get("order_ids", [])
-    counter = data.get("counter", 0)
+    current_order_id = data.get("current_order_id")
     courier_tg_id = callback_query.from_user.id
-
-    log.info(f"Курьер {courier_tg_id} нажал на кнопку 'Принять заказ'.")
-    log.info(f"Заказов найдено: {len(order_ids)}, текущий индекс: {counter}")
+    bot_id = callback_query.bot.id
 
     if not order_ids:
-        log.warning(f"Курьер {courier_tg_id} не имеет доступных заказов.")
         await callback_query.answer("Заказы не найдены.", show_alert=True)
         return
 
-    if counter >= len(order_ids):
-        log.warning(
-            f"Курьер {courier_tg_id} передал неверный индекс для заказа: {counter}."
-        )
-        await callback_query.answer("Неверный индекс для заказа.", show_alert=True)
+    if current_order_id not in order_ids:
+        await callback_query.answer("Неверный order_id для заказа.", show_alert=True)
         return
 
-    order_id = order_ids[counter]
-    log.info(f"Курьер {courier_tg_id} принял заказ с ID: {order_id}.")
+    log.info(f"Курьер {courier_tg_id} принял заказ с ID: {current_order_id}.")
 
     try:
-
-        log.info(f"Назначаем курьера {courier_tg_id} на заказ с ID {order_id}.")
-        await order_data.assign_courier_to_order(
-            order_id=order_id, courier_tg_id=courier_tg_id
+        is_assigned = await order_data.assign_courier_to_order(
+            order_id=current_order_id, courier_tg_id=courier_tg_id
         )
 
-        log.info(f"Обновляем статус заказа {order_id} на 'В работе'.")
+        if not is_assigned:
+            await callback_query.message.answer(
+                "К сожалению, заказ уже был принят другим курьером.", parse_mode="HTML"
+            )
+            return
+
         await order_data.update_order_status(
-            order_id=order_id, new_status=OrderStatus.IN_PROGRESS
+            order_id=current_order_id, new_status=OrderStatus.IN_PROGRESS
         )
 
-        customer_tg_id = await order_data.get_customer_tg_id(order_id)
-        log.info(f"Получен tg_id заказчика: {customer_tg_id}")
+        customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
+        await customer_bot.send_message(
+            chat_id=customer_tg_id,
+            text=f"Ваш заказ №{current_order_id} был принят курьером!",
+            parse_mode="HTML",
+        )
 
-        notification_text = (
-            f"Ваш заказ №{order_id} был принят курьером!\n"
-            f"Подробности смотрите в Моих заказах\n\n"
-            f"<i>*Сообщение удалится через 15 минут</i>"
-        )
-        notification_message = await customer_bot.send_message(
-            chat_id=customer_tg_id, text=notification_text, parse_mode="HTML"
-        )
-        log.info(
-            f"Отправлено уведомление заказчику {customer_tg_id} о принятии заказа."
-        )
+        order_ids.remove(current_order_id)
 
         new_message = await callback_query.message.answer(
-            "Заказ принят. Вы закреплены за этим заказом.",
-            parse_mode="HTML",
-            disable_notification=False,
+            f"<b>✅ Заказ №{current_order_id} принят!</b>", parse_mode="HTML"
         )
-        log.info(f"Уведомление курьеру {courier_tg_id}: 'Заказ принят'.")
 
-        await state.set_state(CourierState.default)
+        await state.update_data(
+            order_ids=order_ids,
+            current_order_id=None if not order_ids else order_ids[0],
+        )
+        await rediska.save_fsm_state(state, bot_id, courier_tg_id)
 
-        handler = MessageHandler(state, callback_query.message.bot)
         await handler.handle_new_message(new_message, callback_query.message)
 
         await asyncio.sleep(900)
         try:
             await customer_bot.delete_message(
-                chat_id=customer_tg_id, message_id=notification_message.message_id
-            )
-            log.info(
-                f"Удалено уведомление для заказчика {customer_tg_id} с ID сообщения {notification_message.message_id}."
+                chat_id=customer_tg_id, message_id=new_message.message_id
             )
         except Exception as e:
             log.error(f"Ошибка при удалении сообщения: {e}")
 
-    except ValueError as e:
-        log.error(f"ValueError при принятии заказа {order_id}: {e}")
-        await callback_query.answer(str(e), show_alert=True)
     except Exception as e:
-        log.error(f"Ошибка при принятии заказа {order_id}: {e}")
+        log.error(f"Ошибка при принятии заказа {current_order_id}: {e}")
         await callback_query.answer("Ошибка при принятии заказа.", show_alert=True)
 
 
@@ -602,47 +627,9 @@ async def handle_my_orders(event, state: FSMContext):
     log.info(f"handle_my_orders was successfully done!")
 
 
-@courier_r.callback_query(
-    F.data.in_(
-        {
-            "active_orders",
-            "completed_orders",
-        }
-    )
-)
+@courier_r.callback_query(F.data.in_({"active_orders", "completed_orders"}))
 async def get_orders(callback_query: CallbackQuery, state: FSMContext):
-    log.info(f"get_orders was called!")
-
-    data = await state.get_data()
-
-    if callback_query.data in {"next_right_mo", "back_left_mo"}:
-        counter = data.get("counter", 0)
-        orders_data = data.get("orders_data", [])
-
-        if not orders_data:
-            log.warning("Нет доступных заказов для переключения")
-            await callback_query.answer("Нет доступных заказов.", show_alert=True)
-            return
-
-        total_orders = len(orders_data)
-        counter = (
-            (counter + 1) % total_orders
-            if callback_query.data == "next_right_mo"
-            else (counter - 1) % total_orders
-        )
-        await state.update_data(counter=counter)
-
-        log.info(f"Переключение заказа: counter={counter}, total_orders={total_orders}")
-        await callback_query.message.edit_text(
-            orders_data[counter][0],
-            reply_markup=await kb.get_courier_kb("one_my_order"),
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-        log.info(
-            f"Конец выполнения get_orders: успешно переключен заказ #{counter + 1}"
-        )
-        return
+    log.info(f"get_orders was called! Callback data: {callback_query.data}")
 
     order_status_mapping = {
         "active_orders": (
@@ -668,19 +655,24 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     tg_id = callback_query.from_user.id
     bot_id = callback_query.bot.id
     current_status = state_status if state_status else CourierState.default.state
+
+    # Получаем заказы курьера
     courier_orders = await get_orders_func(tg_id)
 
-    await state.set_state(state_status)
-    await rediska.set_state(bot_id, tg_id, current_status)
-    await rediska.save_fsm_state(state, bot_id, tg_id)
-
-    orders_data = []
+    # Формируем orders_data как словарь
+    orders_data = {}
     for index, order in enumerate(courier_orders, start=1):
-        order_forma = (
-            zlib.decompress(order.order_forma).decode("utf-8")
-            if order.order_forma
-            else "-"
-        )
+        try:
+            order_forma = (
+                zlib.decompress(order.order_forma).decode("utf-8")
+                if order.order_forma
+                else "-"
+            )
+        except Exception as e:
+            log.error(
+                f"Ошибка декодирования order_forma для заказа {order.order_id}: {e}"
+            )
+            order_forma = "-"
 
         base_info = (
             f"<b>{index}/{len(courier_orders)}</b>\n"
@@ -688,26 +680,40 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
             f"---------------------------------------------\n"
             f"{order_forma}"
         )
-        orders_data.append((base_info, order.order_id))
+        orders_data[order.order_id] = {
+            "text": base_info,
+            "index": index - 1,  # Сохраняем индекс для порядка отображения
+        }
 
     if not orders_data:
         log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
-        await callback_query.message.edit_text(
+        await callback_query.answer(
             f"У вас нет {status_text} заказов.",
-            reply_markup=await kb.get_courier_kb("one_my_order"),
             disable_notification=True,
+            show_alert=True,
         )
         log.info(f"Конец выполнения get_orders: заказов не найдено")
         return
 
+    # Сохраняем данные в состояние
     await state.update_data(orders_data=orders_data, counter=0)
-    reply_kb = await kb.get_courier_kb(
-        "one_my_order" if len(orders_data) == 1 else callback_query.data
-    )
+    await rediska.save_fsm_state(state, bot_id, tg_id)
 
+    # Выбираем клавиатуру
+    if callback_query.data == "active_orders":
+        reply_kb = await kb.get_courier_kb(
+            "active_one" if len(orders_data) == 1 else "active_orders"
+        )
+    else:
+        reply_kb = await kb.get_courier_kb(
+            "one_my_order" if len(orders_data) == 1 else "completed_orders"
+        )
+
+    # Отображаем первый заказ
+    first_order_id = list(orders_data.keys())[0]
     log.info(f"Отображение первого заказа: total_orders={len(orders_data)}")
     await callback_query.message.edit_text(
-        orders_data[0][0],
+        orders_data[first_order_id]["text"],
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
@@ -721,30 +727,45 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     log.info("handle_order_navigation was called!")
 
     data = await state.get_data()
-    orders_data = data.get("orders_data", [])
-    counter = data.get("counter", 0)
+    orders_data = data.get("orders_data", {})
+    current_order_id = data.get("current_order_id")  # Используем настоящий order_id
 
-    if not orders_data:
+    tg_id = callback_query.from_user.id
+    bot_id = callback_query.bot.id
+
+    if not orders_data or not current_order_id:
         log.warning("Нет доступных заказов для переключения")
         await callback_query.answer("Нет доступных заказов.", show_alert=True)
         return
 
     total_orders = len(orders_data)
-    counter = (
-        (counter + 1) % total_orders
-        if callback_query.data == "next_right_mo"
-        else (counter - 1) % total_orders
-    )
 
-    await state.update_data(counter=counter, current_order_id=orders_data[counter][1])
+    # Получаем список order_ids из orders_data
+    order_ids = list(orders_data.keys())
 
+    # Находим следующий заказ по текущему order_id
+    current_index = order_ids.index(current_order_id)  # Находим индекс текущего заказа
+    if callback_query.data == "next_right_mo":
+        new_index = (current_index + 1) % total_orders
+    else:
+        new_index = (current_index - 1) % total_orders
+
+    next_order_id = order_ids[new_index]
+
+    # Обновляем состояние с новым заказом
+    await state.update_data(current_order_id=next_order_id, counter=new_index)
+    await rediska.save_fsm_state(state, bot_id, tg_id)
+
+    # Отображаем новый заказ
     await callback_query.message.edit_text(
-        orders_data[counter][0],
+        orders_data[next_order_id]["text"],
         reply_markup=callback_query.message.reply_markup,
         parse_mode="HTML",
     )
 
-    log.info(f"Переключение на заказ #{counter + 1}/{total_orders}")
+    log.info(
+        f"Переключение на заказ #{new_index + 1}/{total_orders}, order_id={next_order_id}"
+    )
 
 
 # ---
@@ -756,10 +777,9 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
 
-    # log.info(f"Состояние перед завершением заказа: {data}")
+    log.info(f"data: {data}")
     log.info(f"current_order_id: {current_order_id}")
 
-    # Проверка наличия активного заказа
     if not current_order_id:
         await callback_query.message.answer(
             "Не удалось найти активный заказ для завершения."
@@ -767,13 +787,12 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
         return
 
     try:
-        # Загружаем АКТУАЛЬНЫЙ статус заказа без кэша
+        # Получаем настоящий заказ по его ID
         order = await order_data.get_order_by_id(current_order_id)
         log.info(
             f"Попытка завершить заказ {current_order_id}, его статус: {order.order_status}"
         )
 
-        # Проверка, что заказ ещё в процессе выполнения
         if order.order_status != OrderStatus.IN_PROGRESS:
             await callback_query.message.answer(
                 f"Заказ №{current_order_id} уже завершён или находится в другом статусе. Статус: {order.order_status}.",
@@ -781,7 +800,7 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
             )
             return
 
-        # Обновляем статус заказа
+        # Обновляем статус заказа на завершённый
         completed_time = datetime.now()
         await order_data.update_order_status_and_time(
             order_id=current_order_id,
@@ -789,11 +808,9 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
             completed_time=completed_time,
         )
 
-        # Получаем данные заказчика
-        customer_phone = await order_data.get_order_customer_phone(current_order_id)
-        customer_tg_id = await customer_data.get_user_tg_id_by_phone(customer_phone)
+        customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 
-        # Уведомляем заказчика
+        # Отправляем уведомление заказчику
         notification_text = (
             f"Ваш заказ №{current_order_id} был успешно доставлен курьером!\n"
             f"Спасибо, что воспользовались нашим сервисом.\n\n"
@@ -803,20 +820,16 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
             chat_id=customer_tg_id, text=notification_text, parse_mode="HTML"
         )
 
-        # Уведомляем курьера
         await callback_query.message.answer(
             f"Статус заказа №{current_order_id} обновлен на 'Завершен'. Заказчик уведомлен.",
             parse_mode="HTML",
             disable_notification=False,
         )
 
-        # Удаляем предыдущее сообщение курьера
         await handler.delete_previous_message(callback_query.message.chat.id)
 
-        # Устанавливаем состояние курьера в начальное состояние
         await state.set_state(CourierState.default)
 
-        # Удаляем уведомление заказчику через 15 минут
         await asyncio.sleep(900)
         try:
             await customer_bot.delete_message(

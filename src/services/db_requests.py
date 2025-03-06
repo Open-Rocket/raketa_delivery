@@ -1,3 +1,4 @@
+import zlib
 from src.models import async_session_factory, Customer, Courier, OrderStatus, Order
 from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
@@ -244,7 +245,7 @@ class CourierData:
                     return False
 
                 # Обновляем телефон
-                courier.courier_phone_number = new_phone
+                courier.courier_phone = new_phone
 
                 # Сохраняем изменения
                 await session.commit()
@@ -275,7 +276,7 @@ class CourierData:
                     return False
 
                 # Обновляем город
-                courier.courier_default_city = new_city
+                courier.courier_city = new_city
 
                 # Сохраняем изменения
                 await session.commit()
@@ -297,10 +298,20 @@ class CourierData:
             if courier:
                 return (
                     courier.courier_name or "...",
-                    courier.courier_phone_number or "...",
-                    courier.courier_default_city or "...",
+                    courier.courier_phone or "...",
+                    courier.courier_city or "...",
                 )
             return ("...", "...", "...")
+
+    async def get_courier_city(self, tg_id: int) -> str:
+        """Возвращает имя, номер и город курьера из БД"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if courier:
+                return courier.courier_city or "..."
+            return "..."
 
     async def get_courier_full_info(self, tg_id: int) -> tuple:
         """Возвращает полную информацию о курьере, включая статус подписки"""
@@ -392,15 +403,25 @@ class OrderData:
 
     # ---
 
-    async def assign_courier_to_order(self, order_id: int, courier_id: int) -> bool:
+    async def assign_courier_to_order(self, order_id: int, courier_tg_id: int) -> bool:
         """Назначает курьера на заказ"""
 
         async with self.async_session_factory() as session:
             order = await session.get(Order, order_id)
+            courier_id_query = await session.execute(
+                select(Courier.courier_id).where(Courier.courier_tg_id == courier_tg_id)
+            )
+            courier_id = courier_id_query.scalar()
+
             if not order:
                 return False
 
+            if order.courier_id is not None:
+                log.error(f"Заказ {order_id} уже имеет назначенного курьера.")
+                return False
+
             order.courier_id = courier_id
+            order.courier_tg_id = courier_tg_id
             await session.flush()
             await session.commit()
             return True
@@ -515,12 +536,24 @@ class OrderData:
 
     # ---
 
+    async def get_pending_orders_in_city(self, city: str) -> list:
+        """Возвращает все ожидающие заказы в указанном городе"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order).where(
+                    Order.order_city == city, Order.order_status == OrderStatus.PENDING
+                )
+            )
+            return query.scalars().all()
+
+    # ---
+
     async def get_customer_tg_id(self, order_id: int) -> Optional[int]:
         """Возвращает Telegram ID заказчика по ID заказа"""
 
         async with self.async_session_factory() as session:
             query = await session.execute(
-                select(Order.customer_id).where(Order.order_id == order_id)
+                select(Order.customer_tg_id).where(Order.order_id == order_id)
             )
             customer_tg_id = query.scalar()
 
@@ -530,25 +563,48 @@ class OrderData:
 
     async def get_available_orders(
         self, lat: float, lon: float, radius_km: int
-    ) -> list:
-        """Возвращает доступные заказы в заданном радиусе"""
+    ) -> dict:
+        """Возвращает доступные заказы в заданном радиусе в виде словаря."""
 
         async with self.async_session_factory() as session:
             query = await session.execute(
                 select(Order).where(Order.order_status == OrderStatus.PENDING)
             )
-
             all_orders = query.scalars().all()
-            available_orders = [
-                order
-                for order in all_orders
-                if self.is_within_radius(
-                    (lat, lon),
-                    (float(order.starting_point[0]), float(order.starting_point[1])),
-                    radius_km,
-                )
-            ]
 
+            available_orders = {}
+            for order in all_orders:
+                try:
+                    start_lat = float(order.starting_point[0])
+                    start_lon = float(order.starting_point[1])
+                    if self.is_within_radius(
+                        (lat, lon), (start_lat, start_lon), radius_km
+                    ):
+                        order_forma = (
+                            zlib.decompress(order.order_forma).decode("utf-8")
+                            if order.order_forma
+                            else "-"
+                        )
+                        available_orders[order.order_id] = {
+                            "text": order_forma,
+                            "starting_point": [start_lat, start_lon],
+                            "status": order.order_status.value,
+                            "distance_km": order.distance_km,  # Добавляем для полноты
+                        }
+                except (ValueError, TypeError) as e:
+                    log.error(
+                        f"Ошибка обработки координат заказа {order.order_id}: {e}"
+                    )
+                    continue
+                except Exception as e:
+                    log.error(
+                        f"Ошибка декодирования order_forma для заказа {order.order_id}: {e}"
+                    )
+                    continue
+
+            log.debug(
+                f"Найдено {len(available_orders)} доступных заказов в радиусе {radius_km} км"
+            )
             return available_orders
 
     @staticmethod
@@ -557,6 +613,24 @@ class OrderData:
     ) -> bool:
         """Проверяет, находится ли заказ в радиусе курьера"""
         return geodesic(courier_coords, order_coords).km <= radius_km
+
+    async def get_courier_phone(self, order_id: int) -> Optional[str]:
+        """Возвращает номер телефона курьера по ID заказа"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Courier.courier_phone)
+                .join(Order)
+                .where(Order.order_id == order_id)
+            )
+            courier_phone = query.scalar()
+            return courier_phone
+
+    async def get_order_by_id(self, order_id: int) -> Optional[Order]:
+        """Возвращает заказ по его ID"""
+        async with self.async_session_factory() as session:
+            order = await session.get(Order, order_id)
+            return order
 
 
 customer_data = CustomerData(async_session_factory)
