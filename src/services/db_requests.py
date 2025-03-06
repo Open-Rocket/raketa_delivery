@@ -538,6 +538,7 @@ class OrderData:
 
     async def get_pending_orders_in_city(self, city: str) -> list:
         """Возвращает все ожидающие заказы в указанном городе"""
+
         async with self.async_session_factory() as session:
             query = await session.execute(
                 select(Order).where(
@@ -558,6 +559,26 @@ class OrderData:
             customer_tg_id = query.scalar()
 
             return customer_tg_id
+
+    # ---
+
+    async def get_courier_phone(self, order_id: int) -> Optional[str]:
+        """Возвращает номер телефона курьера по ID заказа"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Courier.courier_phone)
+                .join(Order)
+                .where(Order.order_id == order_id)
+            )
+            courier_phone = query.scalar()
+            return courier_phone
+
+    async def get_order_by_id(self, order_id: int) -> Optional[Order]:
+        """Возвращает заказ по его ID"""
+        async with self.async_session_factory() as session:
+            order = await session.get(Order, order_id)
+            return order
 
     # ---
 
@@ -589,7 +610,7 @@ class OrderData:
                             "text": order_forma,
                             "starting_point": [start_lat, start_lon],
                             "status": order.order_status.value,
-                            "distance_km": order.distance_km,  # Добавляем для полноты
+                            "distance_km": order.distance_km,
                         }
                 except (ValueError, TypeError) as e:
                     log.error(
@@ -602,9 +623,6 @@ class OrderData:
                     )
                     continue
 
-            log.debug(
-                f"Найдено {len(available_orders)} доступных заказов в радиусе {radius_km} км"
-            )
             return available_orders
 
     @staticmethod
@@ -613,24 +631,6 @@ class OrderData:
     ) -> bool:
         """Проверяет, находится ли заказ в радиусе курьера"""
         return geodesic(courier_coords, order_coords).km <= radius_km
-
-    async def get_courier_phone(self, order_id: int) -> Optional[str]:
-        """Возвращает номер телефона курьера по ID заказа"""
-
-        async with self.async_session_factory() as session:
-            query = await session.execute(
-                select(Courier.courier_phone)
-                .join(Order)
-                .where(Order.order_id == order_id)
-            )
-            courier_phone = query.scalar()
-            return courier_phone
-
-    async def get_order_by_id(self, order_id: int) -> Optional[Order]:
-        """Возвращает заказ по его ID"""
-        async with self.async_session_factory() as session:
-            order = await session.get(Order, order_id)
-            return order
 
 
 customer_data = CustomerData(async_session_factory)

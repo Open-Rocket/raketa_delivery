@@ -8,6 +8,7 @@ from ._deps import (
     CallbackQuery,
     OrderStatus,
     MessageHandler,
+    MessageHandlerState,
     CustomerState,
     CustomerOuterMiddleware,
     time,
@@ -850,9 +851,10 @@ async def handle_my_orders(event, state: FSMContext):
     bot_id = event.bot.id
     current_state = CustomerState.myOrders.state
 
-    if not is_callback:
-        handler = MessageHandler(state, bot)
-        await handler.delete_previous_message(chat_id)
+    handler = MessageHandler(state, bot)
+
+    # Удаляем предыдущее сообщение (если оно было сохранено)
+    await handler.delete_previous_message(chat_id)
 
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
@@ -876,15 +878,15 @@ async def handle_my_orders(event, state: FSMContext):
             text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
         )
     else:
-        new_message = await event.answer(
-            text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        new_message = await bot.send_message(
+            chat_id,
+            text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
         )
 
-    if not is_callback:
-        handler = MessageHandler(state, bot)
-        await handler.handle_new_message(new_message, event)
-    else:
-        await event.answer()
+    await handler.handle_new_message(new_message, event)
 
     log.info(
         f"\n"
@@ -905,7 +907,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
 
-    # Обработка переключения заказов
     if callback_query.data in {"next_right_mo", "back_left_mo"}:
         counter = data.get("counter", 0)
         orders_data = data.get("orders_data", {})
@@ -942,7 +943,6 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         log.info(f"Успешно переключен заказ #{counter + 1}")
         return
 
-    # Маппинг статусов заказов
     order_status_mapping = {
         "pending_orders": (
             order_data.get_pending_orders,
@@ -973,10 +973,8 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
     bot_id = callback_query.bot.id
     current_status = state_status if state_status else CustomerState.default.state
 
-    # Получаем заказы клиента
     customer_orders = await get_orders_func(tg_id)
 
-    # Формируем orders_data как словарь
     orders_data = {}
     for index, order in enumerate(customer_orders, start=1):
         try:
@@ -1013,16 +1011,21 @@ async def get_orders(callback_query: CallbackQuery, state: FSMContext):
         log.info(f"Конец выполнения get_orders: заказов не найдено")
         return
 
-    # Очищаем и обновляем состояние
-    await state.clear()  # Удаляем старые данные
+    await state.clear()
     await state.update_data(orders_data=orders_data, counter=0)
     await state.set_state(state_status)
     await rediska.set_state(bot_id, tg_id, current_status)
     await rediska.save_fsm_state(state, bot_id, tg_id)
 
-    reply_kb = await kb.get_customer_kb(
-        "one_my_order" if len(orders_data) == 1 else callback_query.data
-    )
+    # Определяем клавиатуру в зависимости от типа заказов
+    if callback_query.data == "pending_orders":
+        reply_kb = await kb.get_customer_kb(
+            "one_my_pending" if len(orders_data) == 1 else "pending_orderss"
+        )
+    else:
+        reply_kb = await kb.get_customer_kb(
+            "one_my_order" if len(orders_data) == 1 else callback_query.data
+        )
 
     first_order_id = list(orders_data.keys())[0]
     log.info(
@@ -1046,10 +1049,9 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     bot_id = callback_query.bot.id
 
     data = await state.get_data()
-    orders_data = data.get("orders_data", {})  # Ожидаем словарь, а не список
+    orders_data = data.get("orders_data", {})
     counter = data.get("counter", 0)
 
-    # Проверка на отсутствие заказов или неверный формат данных
     if not orders_data or not isinstance(orders_data, dict):
         log.warning(
             f"Нет доступных заказов для переключения или неверный формат: {orders_data}"
@@ -1060,7 +1062,6 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     total_orders = len(orders_data)
     order_ids = list(orders_data.keys())
 
-    # Обновление индекса на основе нажатой кнопки
     counter = (
         (counter + 1) % total_orders
         if callback_query.data == "next_right_mo"

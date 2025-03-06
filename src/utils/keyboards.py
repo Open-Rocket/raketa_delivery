@@ -337,12 +337,6 @@ class Keyboard:
                 ]
             ),
             # ---
-            "empty_orders": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
-                ]
-            ),
-            # ---
             "go_back": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
@@ -359,20 +353,7 @@ class Keyboard:
                 ]
             ),
             # ---
-            "choose_order_view": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Заказы в радиусе", callback_data="view_nearby_orders"
-                        ),
-                        InlineKeyboardButton(
-                            text="Заказы в городе", callback_data="view_city_orders"
-                        ),
-                    ]
-                ]
-            ),
-            # ---
-            "city_orders": InlineKeyboardMarkup(
+            "near_orders": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
