@@ -1,5 +1,12 @@
 import zlib
-from src.models import async_session_factory, Customer, Courier, OrderStatus, Order
+from src.models import (
+    async_session_factory,
+    Customer,
+    Courier,
+    OrderStatus,
+    Order,
+    Subscription,
+)
 from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
@@ -192,6 +199,51 @@ class CourierData:
                 log.error(f"Ошибка при добавлении курьера: {e}")
                 return False
 
+    async def set_courier_subscription_status(
+        self,
+        tg_id: int,
+        subscription_cost: float,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> bool:
+        """Создает новую подписку для курьера"""
+
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    log.error(f"Курьер с tg_id={tg_id} не найден.")
+                    return False
+
+                # Деактивируем старые подписки
+                await session.execute(
+                    update(Subscription)
+                    .where(Subscription.courier_id == courier.courier_id)
+                    .values(is_active=False)
+                )
+
+                # Создаем новую подписку
+                new_subscription = Subscription(
+                    is_active=True,
+                    subscription_cost=subscription_cost,
+                    start_date=start_date,
+                    end_date=end_date,
+                    courier_id=courier.courier_id,
+                )
+                session.add(new_subscription)
+
+                await session.commit()
+                log.info(f"Новая подписка успешно создана для курьера {tg_id}.")
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при создании подписки: {e}")
+                return False
+
     # ---
 
     async def update_courier_name(
@@ -265,7 +317,7 @@ class CourierData:
 
         async with self.async_session_factory() as session:
             try:
-                # Находим курьера по tg_id
+
                 result = await session.execute(
                     select(Courier).where(Courier.courier_tg_id == tg_id)
                 )
@@ -275,10 +327,8 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                # Обновляем город
                 courier.courier_city = new_city
 
-                # Сохраняем изменения
                 await session.commit()
                 log.info(f"Город успешно обновлен для курьера {tg_id}.")
                 return True
@@ -316,25 +366,85 @@ class CourierData:
     async def get_courier_full_info(self, tg_id: int) -> tuple:
         """Возвращает полную информацию о курьере, включая статус подписки"""
         async with self.async_session_factory() as session:
-
             courier = await session.scalar(
                 select(Courier)
                 .where(Courier.courier_tg_id == tg_id)
                 .options(selectinload(Courier.subscription))
             )
+
             if courier:
-                subscription_status = (
-                    courier.subscription.status
-                    if courier.subscription
-                    else "Нет подписки"
+                subscription_status = next(
+                    (sub for sub in courier.subscription if sub.is_active), None
                 )
+
                 return (
                     courier.courier_name or "...",
                     courier.courier_phone or "...",
                     courier.courier_city or "...",
                     subscription_status,
                 )
-            return (None, None, None, "Нет подписки")
+
+            return (None, None, None, None)
+
+    # ---
+
+    async def get_courier_statistic(self, tg_id: int) -> tuple:
+        """Возвращает статистику курьера"""
+
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if courier:
+                orders = await session.execute(
+                    select(Order).where(Order.courier_id == courier.courier_id)
+                )
+                orders = orders.scalars().all()
+                total_orders = len(orders)
+                completed_orders = len(
+                    [
+                        order
+                        for order in orders
+                        if order.order_status == OrderStatus.COMPLETED
+                    ]
+                )
+
+                total_money_earned = sum(
+                    order.price_rub
+                    for order in orders
+                    if order.order_status == OrderStatus.COMPLETED
+                )
+                total_execution_time = sum(
+                    (
+                        order.completed_at_moscow_time - order.started_at_moscow_time
+                    ).total_seconds()
+                    for order in orders
+                    if order.order_status == OrderStatus.COMPLETED
+                )
+                total_distance = sum(
+                    order.distance_km
+                    for order in orders
+                    if order.order_status == OrderStatus.COMPLETED
+                )
+                average_execution_time = (
+                    total_execution_time / completed_orders
+                    if completed_orders > 0
+                    else 0
+                )
+                average_speed = (
+                    total_distance / (total_execution_time / 3600)
+                    if total_execution_time > 0
+                    else 0
+                )
+
+                return (
+                    total_orders,
+                    completed_orders,
+                    average_execution_time,
+                    average_speed,
+                    total_money_earned,
+                )
+            return 0, 0, 0, 0, 0, 0
 
 
 class OrderData:
@@ -433,7 +543,11 @@ class OrderData:
 
         async with self.async_session_factory() as session:
             order = await session.get(Order, order_id)
-            if not order or order.order_status == new_status:
+            if not order or order.order_status in (
+                OrderStatus.IN_PROGRESS,
+                OrderStatus.COMPLETED,
+                OrderStatus.CANCELLED,
+            ):
                 return False
 
             order.order_status = new_status
@@ -441,10 +555,32 @@ class OrderData:
             await session.commit()
             return True
 
-    async def update_order_status_and_time(
+    async def update_order_status_and_started_time(
+        self, order_id: int, new_status: OrderStatus, started_time: datetime
+    ) -> bool:
+        """Обновляет статус заказа и время начала его выполнения"""
+
+        async with self.async_session_factory() as session:
+            async with session.begin():
+                order = await session.get(Order, order_id)
+                if not order or order.order_status == new_status:
+                    return False
+
+                if not order:
+                    log.error("Заказ не найден")
+                    return False
+
+                order.order_status = new_status
+                order.started_at_moscow_time = started_time
+
+                await session.flush()
+                await session.commit()
+                return True
+
+    async def update_order_status_and_completed_time(
         self, order_id: int, new_status: OrderStatus, completed_time: datetime
     ) -> bool:
-        """Обновляет статус заказа и время его выполнения"""
+        """Обновляет статус заказа и время завершения его выполнения"""
 
         async with self.async_session_factory() as session:
             async with session.begin():

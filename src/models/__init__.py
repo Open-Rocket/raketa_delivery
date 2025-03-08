@@ -3,6 +3,7 @@ from .db import (
     Customer,
     Courier,
     OrderStatus,
+    Subscription,
     Order,
     engine,
     Base,

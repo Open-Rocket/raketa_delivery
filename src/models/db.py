@@ -128,6 +128,15 @@ class Order(Base):
     created_at_moscow_time: Mapped[datetime] = mapped_column(
         DateTime, default=moscow_time, nullable=True
     )
+
+    started_at_moscow_time: Mapped[datetime] = mapped_column(
+        DateTime, default=moscow_time, nullable=True
+    )
+
+    completed_at_moscow_time: Mapped[datetime] = mapped_column(
+        DateTime, default=moscow_time, nullable=True
+    )
+
     order_city: Mapped[stringData]
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]

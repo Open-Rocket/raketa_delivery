@@ -12,7 +12,9 @@ from ._deps import (
     CourierState,
     CourierOuterMiddleware,
     datetime,
+    timedelta,
     PreCheckoutQuery,
+    LabeledPrice,
     zlib,
     moscow_time,
     courier_r,
@@ -25,11 +27,12 @@ from ._deps import (
     order_data,
     rediska,
     cities,
+    payment_provider,
     log,
     F,
     find_closest_city,
+    customer_bot,
 )
-from run import customer_bot
 
 
 # ---
@@ -539,8 +542,10 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             )
             return
 
-        await order_data.update_order_status(
-            order_id=current_order_id, new_status=OrderStatus.IN_PROGRESS
+        await order_data.update_order_status_and_started_time(
+            order_id=current_order_id,
+            new_status=OrderStatus.IN_PROGRESS,
+            started_time=moscow_time,
         )
 
         customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
@@ -800,11 +805,10 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
             )
             return
 
-        completed_time = datetime.now()
-        await order_data.update_order_status_and_time(
+        await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             new_status=OrderStatus.COMPLETED,
-            completed_time=completed_time,
+            completed_time=moscow_time,
         )
 
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
@@ -858,17 +862,23 @@ async def cmd_profile(message: Message, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(bot_id, tg_id, current_state)
 
-    courier_name, courier_phone, courier_city, subscription_status = (
+    courier_name, courier_phone, courier_city, subscription = (
         await courier_data.get_courier_full_info(tg_id)
     )
+
+    remaining_days = (subscription.end_date - moscow_time).days
 
     text = (
         f"👤 <b>Профиль курьера</b>\n\n"
         f"Посмотрите или измените данные о себе.\n\n"
         f"<b>Имя:</b> {courier_name}\n"
         f"<b>Номер:</b> {courier_phone}\n"
-        f"<b>Город:</b> {courier_city}\n"
-        f"<b>Статус подписки:</b> {subscription_status}\n"
+        f"<b>Город:</b> {courier_city}\n\n"
+        f"<b>Подписка:</b> {'Активна 🚀' if subscription else 'Не активна'}\n"
+        + f"📅 Действует до: {subscription.end_date.strftime('%d.%m.%Y')}\n"
+        f"🕒 Осталось дней: {remaining_days}\n\n"
+        if subscription
+        else ""
     )
 
     reply_kb = await kb.get_courier_kb("/profile")
@@ -1244,20 +1254,94 @@ async def cmd_make_order(message: Message, state: FSMContext):
 # ---
 
 
+@courier_r.callback_query(F.data == "my_statistic")
+async def show_courier_statistic(callback_query: CallbackQuery, state: FSMContext):
+    log.info(f"show_courier_statistic was called!")
+
+    tg_id = callback_query.from_user.id
+
+    (
+        total_orders,
+        completed_orders,
+        average_execution_time,
+        average_speed,
+        total_money_earned,
+    ) = await courier_data.get_courier_statistic(tg_id)
+
+    text = (
+        f"📊 <b>Ваша статистика</b>\n\n"
+        f"Всего заказов: {total_orders}\n"
+        f"Завершенные заказы: {completed_orders}\n"
+        f"Среднее время выполнения: {average_execution_time:.2f} секунд\n"
+        f"Средняя скорость: {average_speed:.2f} км/ч\n"
+        f"Общая сумма заработка: {total_money_earned} руб.\n"
+    )
+
+    reply_kb = await kb.get_courier_kb("go_back")
+
+    await callback_query.message.edit_text(
+        text, reply_markup=reply_kb, parse_mode="HTML"
+    )
+
+    log.info(f"show_courier_statistic was successfully done!")
+
+
+# ---
+
+
 @payment_r.message(F.text == "/subs")
 @payment_r.callback_query(F.data == "pay_sub")
 async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
-
     handler = MessageHandler(state, event.bot)
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+    tg_id = event.from_user.id
 
     if isinstance(event, Message):
         await handler.delete_previous_message(chat_id)
 
+    _, _, _, subscription = await courier_data.get_courier_full_info(tg_id)
+
+    if subscription:
+        now = moscow_time
+        remaining_days = (subscription.end_date - now).days
+
+        text = (
+            f"🚀 <b>Ваша подписка активна</b>\n\n"
+            f"📅 Действует до: {subscription.end_date.strftime('%d.%m.%Y')}\n"
+            f"🕒 Осталось дней: {remaining_days}\n\n"
+            f"Хотите продлить подписку заранее?"
+        )
+
+        keyboard = await kb.get_courier_kb("extend_sub")
+
+        new_message = await event.bot.send_message(
+            chat_id, text, reply_markup=keyboard, parse_mode="HTML"
+        )
+        await handler.handle_new_message(
+            new_message, event if isinstance(event, Message) else event.message
+        )
+        return
+
+    await send_payment_invoice(chat_id, event, handler)
+
+
+@payment_r.callback_query(F.data == "extend_sub")
+async def extend_subscription(event: CallbackQuery, state: FSMContext):
+    """Отправляет форму оплаты для продления подписки"""
+    handler = MessageHandler(state, event.bot)
+    chat_id = event.message.chat.id
+
+    await send_payment_invoice(chat_id, event, handler)
+
+
+async def send_payment_invoice(
+    chat_id: int, event: Message | CallbackQuery, handler: MessageHandler
+):
+    """Отправляет инвойс на оплату подписки"""
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=99000,  # Сумма указана в копейках (990 рублей)
+            amount=99000,  # 990.00 RUB
         ),
     ]
 
@@ -1265,18 +1349,17 @@ async def payment_invoice(event: Message | CallbackQuery, state: FSMContext):
         log.info("Ошибка: provider_token не найден. Проверьте переменные окружения.")
         return
 
-    # Отправка инвойса пользователю
     new_message = await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
         description="Оформите подписку на сервис доставки...",
         payload="Payment through a bot",
-        provider_token=provider_token,
+        provider_token=payment_provider,
         currency="RUB",
         prices=prices,
         max_tip_amount=50000,
         start_parameter="",
-        photo_url="https://ltdfoto.ru/images/2024/08/31/subs.jpg",
+        photo_url="https://i.ibb.co/NpQzZyY/subs.jpg",
         photo_width=1200,
         photo_height=720,
         need_name=True,
@@ -1316,13 +1399,31 @@ async def pre_checkout_query(pre_checkout_query: PreCheckoutQuery):
 async def successful_payment(message: Message, state: FSMContext):
     handler = MessageHandler(state, message.bot)
     await handler.delete_previous_message(message.chat.id)
+
     ttl = await title.get_title_courier("success_payment")
     text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
-    reply_kb = await kb.get_courier_kb(text="success_payment")
-    new_message = await message.answer_photo(
-        photo=ttl, caption=text, reply_markup=reply_kb
-    )
+    reply_kb = await kb.get_courier_kb("success_payment")
+    new_message = await message.answer_photo(photo=ttl, caption=text, reply_kb=reply_kb)
     await handler.handle_new_message(new_message, message)
+
+    tg_id = message.from_user.id
+    subscription_cost = message.successful_payment.total_amount // 100
+    start_date = moscow_time
+    end_date = start_date + timedelta(days=30)
+
+    try:
+        is_updated = await courier_data.set_courier_subscription_status(
+            tg_id=tg_id,
+            subscription_cost=subscription_cost,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if is_updated:
+            log.info(f"Subscription updated successfully for courier {tg_id}.")
+        else:
+            log.error(f"Failed to update subscription for courier {tg_id}.")
+    except Exception as e:
+        log.error(f"Error updating subscription for courier {tg_id}: {e}")
 
 
 # ---

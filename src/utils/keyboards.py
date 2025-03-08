@@ -363,6 +363,21 @@ class Keyboard:
                     ]
                 ]
             ),
+            # ---
+            "pay_sub": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Оплатить", callback_data="pay_sub")]
+                ]
+            ),
+            "extend_sub": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🔄 Продлить", callback_data="extend_sub"
+                        )
+                    ]
+                ]
+            ),
         }
 
         return kb[key]
@@ -395,3 +410,10 @@ kb: Keyboard = Keyboard()
 
 
 __all__ = ["kb"]
+
+
+keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Продлить", callback_data="pay_sub")]
+    ]
+)
