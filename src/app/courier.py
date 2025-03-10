@@ -472,7 +472,7 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=event.message if isinstance(event, CallbackQuery) else event,
+        current_message=None if isinstance(event, CallbackQuery) else event,
         delete_previous=delete_previous,
     )
 
@@ -542,9 +542,9 @@ async def show_nearby_orders(callback_query: CallbackQuery, state: FSMContext):
     available_orders = data.get("available_orders", {})
 
     if not available_orders or not isinstance(available_orders, dict):
-        log.warning(f"Некорректный формат available_orders: {available_orders}")
+        log.info(f"Заказов рядом: {len(available_orders)}")
         await callback_query.answer(
-            "Нет доступных заказов в вашем радиусе или данные устарели.",
+            "Нет доступных заказов в вашем радиусе.",
             show_alert=True,
         )
         return
@@ -737,33 +737,29 @@ async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
         f"<b>Статус ваших заказов:</b>"
     )
 
-    if is_callback:
-        new_message = await event.message.edit_text(
+    new_message = (
+        await event.message.edit_text(
             text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
-
-        delete_previous = False
-
-    else:
-        new_message = await event.answer(
+        if is_callback
+        else await event.answer(
             text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
-
-        delete_previous = True
+    )
 
     await handler.catch(
         bot=courier_bot,
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=event.message if isinstance(event, CallbackQuery) else event,
-        delete_previous=delete_previous,
+        current_message=None if isinstance(event, CallbackQuery) else event,
+        delete_previous=False if is_callback else True,
     )
 
     log.info(
@@ -1226,9 +1222,7 @@ async def change_phone(message: Message, state: FSMContext):
 
     log.info(f"new_phone_was_set_redis: {new_phone_was_set_redis}")
 
-    text = (
-        f"Номер курьера был изменен на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-    )
+    text = f"Номер был изменен на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
@@ -1277,9 +1271,7 @@ async def change_city(message: Message, state: FSMContext):
     else:
 
         new_city_was_set = await courier_data.update_courier_city(tg_id, city)
-        new_city_was_set_redis = await rediska.set_user_city(
-            courier_bot_id, tg_id, city
-        )
+        new_city_was_set_redis = await rediska.set_city(courier_bot_id, tg_id, city)
         await state.set_state(current_state)
         await rediska.set_state(courier_bot_id, tg_id, current_state)
 
@@ -1525,11 +1517,10 @@ async def payment_invoice(event: Message | CallbackQuery):
             chat_id=chat_id,
             user_id=tg_id,
             new_message=new_message,
-            current_message=(
-                event.message if isinstance(event, CallbackQuery) else event
-            ),
+            current_message=None if isinstance(event, CallbackQuery) else event,
             delete_previous=True,
         )
+
         return
 
     log.info(f"payment_invoice was successfully done!")
@@ -1600,7 +1591,7 @@ async def _send_payment_invoice(
         user_id=tg_id,
         new_message=new_message,
         current_message=None,
-        delete_previous=False,
+        delete_previous=True,
     )
 
     log.info(f"_send_payment_invoice was successfully done!")

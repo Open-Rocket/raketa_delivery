@@ -12,7 +12,7 @@ from ._deps import (
     CustomerOuterMiddleware,
     time,
     zlib,
-    message_handler_customer,
+    handler,
     moscow_time,
     customer_r,
     customer_fallback,
