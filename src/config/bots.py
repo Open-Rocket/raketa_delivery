@@ -11,6 +11,8 @@ load_dotenv()
 customer_bot = Bot(token=os.getenv("CUSTOMER_BOT"))
 courier_bot = Bot(token=os.getenv("COURIER_BOT"))
 
+customer_bot_id = customer_bot.id
+courier_bot_id = courier_bot.id
 
 customer_dp = Dispatcher(storage=fsm_customer_storage)
 courier_dp = Dispatcher(storage=fsm_courier_storage)
@@ -23,4 +25,6 @@ __all__ = [
     "courier_dp",
     "fsm_customer_storage",
     "fsm_courier_storage",
+    "customer_bot_id",
+    "courier_bot_id",
 ]

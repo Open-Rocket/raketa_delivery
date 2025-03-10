@@ -18,6 +18,8 @@ from .bots import (
     courier_dp,
     fsm_customer_storage,
     fsm_courier_storage,
+    customer_bot_id,
+    courier_bot_id,
 )
 
 
@@ -43,4 +45,6 @@ __all__ = [
     "payment_r",
     "fsm_customer_storage",
     "fsm_courier_storage",
+    "customer_bot_id",
+    "courier_bot_id",
 ]

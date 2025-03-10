@@ -106,6 +106,8 @@ class Courier(Base):
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[datetimeData]
 
+    orders_active_now: Mapped[intData]
+
     orders = relationship("Order", back_populates="couriers")
     subscription = relationship("Subscription", back_populates="couriers")
 
@@ -161,11 +163,6 @@ class Subscription(Base):
 
     subscription_id: Mapped[intPK]
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    subscription_cost: Mapped[float] = mapped_column(Float, nullable=False)
-    start_date: Mapped[datetime] = mapped_column(
-        DateTime, default=moscow_time, nullable=False
-    )
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     courier_id: Mapped[int] = mapped_column(

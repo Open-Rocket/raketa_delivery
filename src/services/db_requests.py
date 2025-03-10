@@ -10,7 +10,7 @@ from src.models import (
 from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from src.config import moscow_time, log
 from .routing import route
@@ -199,14 +199,9 @@ class CourierData:
                 log.error(f"Ошибка при добавлении курьера: {e}")
                 return False
 
-    async def set_courier_subscription_status(
-        self,
-        tg_id: int,
-        subscription_cost: float,
-        start_date: datetime,
-        end_date: datetime,
-    ) -> bool:
-        """Создает новую подписку для курьера"""
+    # ---
+    async def change_order_active_count(self, tg_id: int, count: int) -> bool:
+        """Изменяет счетчик активных заказов курьера на count"""
 
         async with self.async_session_factory() as session:
             try:
@@ -219,29 +214,14 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                # Деактивируем старые подписки
-                await session.execute(
-                    update(Subscription)
-                    .where(Subscription.courier_id == courier.courier_id)
-                    .values(is_active=False)
-                )
+                courier.orders_active_now += count
 
-                # Создаем новую подписку
-                new_subscription = Subscription(
-                    is_active=True,
-                    subscription_cost=subscription_cost,
-                    start_date=start_date,
-                    end_date=end_date,
-                    courier_id=courier.courier_id,
-                )
-                session.add(new_subscription)
-
+                await session.flush()
                 await session.commit()
-                log.info(f"Новая подписка успешно создана для курьера {tg_id}.")
                 return True
             except Exception as e:
                 await session.rollback()
-                log.error(f"Ошибка при создании подписки: {e}")
+                log.error(f"Ошибка при увеличении счетчика активных заказов: {e}")
                 return False
 
     # ---
@@ -255,7 +235,7 @@ class CourierData:
 
         async with self.async_session_factory() as session:
             try:
-                # Находим курьера по tg_id
+
                 result = await session.execute(
                     select(Courier).where(Courier.courier_tg_id == tg_id)
                 )
@@ -265,10 +245,9 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                # Обновляем имя
                 courier.courier_name = new_name
 
-                # Сохраняем изменения
+                await session.flush()
                 await session.commit()
                 log.info(f"Имя успешно обновлено для курьера {tg_id}.")
                 return True
@@ -286,7 +265,7 @@ class CourierData:
 
         async with self.async_session_factory() as session:
             try:
-                # Находим курьера по tg_id
+
                 result = await session.execute(
                     select(Courier).where(Courier.courier_tg_id == tg_id)
                 )
@@ -296,10 +275,9 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                # Обновляем телефон
                 courier.courier_phone = new_phone
 
-                # Сохраняем изменения
+                await session.flush()
                 await session.commit()
                 log.info(f"Телефон успешно обновлен для курьера {tg_id}.")
                 return True
@@ -329,12 +307,61 @@ class CourierData:
 
                 courier.courier_city = new_city
 
+                await session.flush()
                 await session.commit()
                 log.info(f"Город успешно обновлен для курьера {tg_id}.")
                 return True
             except Exception as e:
                 await session.rollback()
                 log.error(f"Ошибка при обновлении города: {e}")
+                return False
+
+    async def update_courier_subscription(self, tg_id: int, days: int) -> bool:
+        """Продлевает подписку курьера на 30 дней, либо создаёт новую, если её нет."""
+
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    log.error(f"Курьер с tg_id={tg_id} не найден.")
+                    return False
+
+                now = moscow_time
+
+                result = await session.execute(
+                    select(Subscription).where(
+                        Subscription.courier_id == courier.courier_id
+                    )
+                )
+                subscription = result.scalar_one_or_none()
+
+                if subscription:
+
+                    if subscription.end_date >= now:
+                        subscription.end_date += timedelta(days=days)
+                    else:
+
+                        subscription.end_date = now + timedelta(days=days)
+                else:
+
+                    new_subscription = Subscription(
+                        end_date=now + timedelta(days=30),
+                        courier_id=courier.courier_id,
+                    )
+                    session.add(new_subscription)
+
+                await session.flush()
+                await session.commit()
+                log.info(f"Подписка успешно обновлена/создана для курьера {tg_id}.")
+                return True
+
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении подписки: {e}")
                 return False
 
     # ---
@@ -364,27 +391,32 @@ class CourierData:
             return "..."
 
     async def get_courier_full_info(self, tg_id: int) -> tuple:
-        """Возвращает полную информацию о курьере, включая статус подписки"""
+        """Возвращает полную информацию о курьере, включая дату окончания подписки"""
         async with self.async_session_factory() as session:
-            courier = await session.scalar(
-                select(Courier)
+            result = await session.execute(
+                select(Courier, Subscription.end_date)
+                .join(
+                    Subscription,
+                    Subscription.courier_id == Courier.courier_id,
+                    isouter=True,
+                )
                 .where(Courier.courier_tg_id == tg_id)
-                .options(selectinload(Courier.subscription))
+                .order_by(Subscription.end_date.desc())
+                .limit(1)
             )
+            row = result.first()
 
-            if courier:
-                subscription_status = next(
-                    (sub for sub in courier.subscription if sub.is_active), None
-                )
+            if row:
+                courier, end_date = row
+            else:
+                courier, end_date = None, None
 
-                return (
-                    courier.courier_name or "...",
-                    courier.courier_phone or "...",
-                    courier.courier_city or "...",
-                    subscription_status,
-                )
-
-            return (None, None, None, None)
+            return (
+                courier.courier_name if courier else "...",
+                courier.courier_phone if courier else "...",
+                courier.courier_city if courier else "...",
+                end_date,
+            )
 
     # ---
 
@@ -445,6 +477,16 @@ class CourierData:
                     total_money_earned,
                 )
             return 0, 0, 0, 0, 0, 0
+
+    async def get_courier_active_orders_count(self, tg_id: int) -> int:
+        """Возвращает количество активных заказов у курьера"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Courier.orders_active_now).where(Courier.courier_tg_id == tg_id)
+            )
+            active_order_count = query.scalar()
+            return active_order_count if active_order_count else 0
 
 
 class OrderData:
@@ -513,13 +555,13 @@ class OrderData:
 
     # ---
 
-    async def assign_courier_to_order(self, order_id: int, courier_tg_id: int) -> bool:
+    async def assign_courier_to_order(self, order_id: int, tg_id: int) -> bool:
         """Назначает курьера на заказ"""
 
         async with self.async_session_factory() as session:
             order = await session.get(Order, order_id)
             courier_id_query = await session.execute(
-                select(Courier.courier_id).where(Courier.courier_tg_id == courier_tg_id)
+                select(Courier.courier_id).where(Courier.courier_tg_id == tg_id)
             )
             courier_id = courier_id_query.scalar()
 
@@ -531,7 +573,7 @@ class OrderData:
                 return False
 
             order.courier_id = courier_id
-            order.courier_tg_id = courier_tg_id
+            order.courier_tg_id = tg_id
             await session.flush()
             await session.commit()
             return True

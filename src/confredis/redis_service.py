@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from typing import Optional
 from src.config import log
+from aiogram.types import Message
 
 
 class RedisKey:
@@ -33,11 +34,28 @@ class RedisKey:
 
 
 class RedisService:
-    """Сервис для работы с пользователями и состояниями FSM в Redis"""
 
     def __init__(self, redis: aioredis.Redis):
         self.redis = redis
         self.fsm_storage = RedisStorage(self.redis)
+
+    # ---
+
+    async def set_message(self, bot_id: int, user_id: int, message: Message):
+        """Сохраняет ID сообщения от пользователя в Redis."""
+        key = f"user_message:{RedisKey(bot_id, user_id)}"
+        await self.redis.set(key, message.message_id)
+
+    async def get_message_id(self, bot_id: int, user_id: int) -> int | None:
+        """Получает ID сообщения от пользователя из Redis."""
+        key = f"user_message:{RedisKey(bot_id, user_id)}"
+        message_id = await self.redis.get(key)
+        return int(message_id) if message_id else None
+
+    async def delete_message(self, bot_id: int, user_id: int):
+        """Удаляет ID сообщения от пользователя из Redis."""
+        key = f"user_message:{RedisKey(bot_id, user_id)}"
+        await self.redis.delete(key)
 
     # ---
 
@@ -64,25 +82,25 @@ class RedisService:
 
     # ---
 
-    async def set_user_name(self, bot_id: int, user_id: int, name: str) -> bool:
+    async def set_name(self, bot_id: int, user_id: int, name: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user_info:{key}", mapping={"name": name})
         return True
 
-    async def set_user_phone(self, bot_id: int, user_id: int, phone: str) -> bool:
+    async def set_phone(self, bot_id: int, user_id: int, phone: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user_info:{key}", mapping={"phone": phone})
         return True
 
-    async def set_user_city(self, bot_id: int, user_id: int, city: str) -> bool:
+    async def set_city(self, bot_id: int, user_id: int, city: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user_info:{key}", mapping={"city": city})
         return True
 
-    async def set_user_tou(self, bot_id: int, user_id: int, tou: str) -> bool:
+    async def set_tou(self, bot_id: int, user_id: int, tou: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user_info:{key}", mapping={"tou": tou})
@@ -134,7 +152,7 @@ class RedisService:
 
     # ---
 
-    async def get_user_name(self, bot_id: int, user_id: int) -> str | None:
+    async def get_name(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
         user_data = await self.redis.hgetall(f"user_info:{key}")
@@ -142,7 +160,7 @@ class RedisService:
             return None
         return user_data.get(b"name", b"").decode("utf-8")
 
-    async def get_user_phone(self, bot_id: int, user_id: int) -> str | None:
+    async def get_phone(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
         user_data = await self.redis.hgetall(f"user_info:{key}")
@@ -150,7 +168,7 @@ class RedisService:
             return None
         return user_data.get(b"phone", b"").decode("utf-8")
 
-    async def get_user_city(self, bot_id: int, user_id: int) -> str | None:
+    async def get_city(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
         user_data = await self.redis.hgetall(f"user_info:{key}")
@@ -158,7 +176,7 @@ class RedisService:
             return None
         return user_data.get(b"city", b"").decode("utf-8")
 
-    async def get_user_tou(self, bot_id: int, user_id: int) -> str | None:
+    async def get_tou(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
         user_data = await self.redis.hgetall(f"user_info:{key}")
@@ -166,7 +184,7 @@ class RedisService:
             return None
         return user_data.get(b"tou", b"").decode("utf-8")
 
-    async def get_user_info(self, bot_id: int, user_id: int) -> str | None:
+    async def get_info(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
         user_data = await self.redis.hgetall(f"user_info:{key}")
@@ -222,6 +240,6 @@ async def main():
     return rediska
 
 
-rediska = asyncio.run(main())
+rediska: RedisService = asyncio.run(main())
 
 __all__ = ["rediska", "create_redis_service", "RedisService"]

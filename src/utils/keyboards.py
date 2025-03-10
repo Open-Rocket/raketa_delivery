@@ -378,6 +378,12 @@ class Keyboard:
                     ]
                 ]
             ),
+            # ---
+            "super_go": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="Супер 🌟", callback_data="super_go")]
+                ]
+            ),
         }
 
         return kb[key]

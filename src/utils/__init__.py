@@ -1,7 +1,7 @@
 from .keyboards import kb
 from .states import CustomerState, CourierState
 from .titles import title
-from .message_handler import MessageHandler, MessageHandlerState
+from .message_handler import handler
 
 
 __all__ = [
@@ -9,6 +9,5 @@ __all__ = [
     "CustomerState",
     "CourierState",
     "title",
-    "MessageHandler",
-    "MessageHandlerState",
+    "handler",
 ]

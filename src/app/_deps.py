@@ -21,6 +21,9 @@ from src.models import OrderStatus
 from src.confredis import rediska
 from src.config import (
     customer_bot,
+    courier_bot,
+    customer_bot_id,
+    courier_bot_id,
     moscow_time,
     customer_r,
     courier_r,
@@ -32,8 +35,7 @@ from src.config import (
 )
 from aiogram.types import Message, CallbackQuery, PreCheckoutQuery
 from src.utils import (
-    MessageHandler,
-    MessageHandlerState,
+    handler,
     CustomerState,
     CourierState,
     kb,
@@ -71,7 +73,7 @@ __all__ = [
     "log",
     "Message",
     "CallbackQuery",
-    "MessageHandler",
+    "handler",
     "CustomerState",
     "CourierState",
     "kb",
@@ -84,4 +86,8 @@ __all__ = [
     "find_closest_city",
     "LabeledPrice",
     "payment_provider",
+    "customer_bot",
+    "courier_bot",
+    "customer_bot_id",
+    "courier_bot_id",
 ]
