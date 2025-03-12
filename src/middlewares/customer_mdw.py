@@ -14,31 +14,30 @@ from src.utils import CustomerState
 class CustomerOuterMiddleware(BaseMiddleware):
 
     def __init__(self, rediska: RedisService):
-        super().__init__()
         self.rediska = rediska
 
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
+        event: Message | CallbackQuery,
         data: Dict[str, Any],
     ) -> Any:
         """Обработка внешних событий"""
 
         tg_id = event.from_user.id
         bot_id = event.bot.id
-        fsm_context = data.get("state")
+        fsm_context: FSMContext = data.get("state")
         state: FSMContext = await fsm_context.get_state()
         state_data = await fsm_context.get_data()
 
         log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
 
         if not state_data:
-            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
+            await self.rediska.restore_fsm_state_2(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
             log.info(f"is_fsm_restore_data: {True if state_data else False}")
 
-        if state == None:
+        if not state:
             state = await self.rediska.get_state(bot_id, tg_id)
             log.info(
                 f"\n"

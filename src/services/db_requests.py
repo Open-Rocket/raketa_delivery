@@ -11,10 +11,13 @@ from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
+from sqlalchemy.engine import Result
 from typing import Optional
 from src.config import moscow_time, log
 from .routing import route
 from geopy.distance import geodesic
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Callable
 
 
 class CustomerData:
@@ -165,7 +168,7 @@ class CustomerData:
 
 
 class CourierData:
-    def __init__(self, async_session_factory):
+    def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
     # ---
@@ -214,7 +217,8 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                courier.orders_active_now += count
+                if courier.orders_active_now:
+                    courier.orders_active_now += count
 
                 await session.flush()
                 await session.commit()
@@ -482,7 +486,7 @@ class CourierData:
         """Возвращает количество активных заказов у курьера"""
 
         async with self.async_session_factory() as session:
-            query = await session.execute(
+            query: Result = await session.execute(
                 select(Courier.orders_active_now).where(Courier.courier_tg_id == tg_id)
             )
             active_order_count = query.scalar()
@@ -490,7 +494,7 @@ class CourierData:
 
 
 class OrderData:
-    def __init__(self, async_session_factory):
+    def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
     # ---
@@ -509,9 +513,9 @@ class OrderData:
                     customer_id=customer.customer_id,
                     order_city=data.get("city"),
                     delivery_object=data.get("delivery_object"),
-                    customer_name=data.get("customer_name"),
-                    customer_phone=data.get("customer_phone"),
-                    customer_tg_id=data.get("customer_tg_id"),
+                    customer_name=customer.customer_name,
+                    customer_phone=customer.customer_phone,
+                    customer_tg_id=customer.customer_tg_id,
                     description=data.get("description"),
                     distance_km=data.get("distance"),
                     price_rub=data.get("price"),

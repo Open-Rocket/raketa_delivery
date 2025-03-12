@@ -54,20 +54,16 @@ async def cmd_start_courier(message: Message, state: FSMContext):
     chat_id = message.chat.id
     current_state = CourierState.reg_state.state
 
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-
     is_reg = await rediska.is_reg(courier_bot_id, tg_id)
 
     if is_reg:
-        default_state = CourierState.default.state
-        await state.set_state(default_state)
-        await rediska.set_state(courier_bot_id, tg_id, default_state)
+        current_state = CourierState.default.state
         text = "▼ <b>Выберите действие ...</b>"
         new_message = await message.answer(
             text, parse_mode="HTML", disable_notification=True
         )
     else:
+        current_state = CourierState.reg_state.state
         photo_title = await title.get_title_courier("/start")
         text = (
             "Добро пожаловать в сервис доставки Ракета!\n"
@@ -89,6 +85,9 @@ async def cmd_start_courier(message: Message, state: FSMContext):
             parse_mode="HTML",
             disable_notification=True,
         )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     await handler.catch(
         bot=courier_bot,
@@ -320,7 +319,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_tou(courier_bot_id, tg_id, accept_tou)
     await rediska.set_reg(courier_bot_id, tg_id, True)
 
-    courier_name, courier_phone, courier_city, tou = await rediska.get_info(
+    courier_name, courier_phone, courier_city, tou = await rediska.get_user_info(
         courier_bot_id, tg_id
     )
     is_new_courier_add = await courier_data.set_courier(
@@ -509,11 +508,13 @@ async def get_location(message: Message, state: FSMContext):
         f"🔍 Хотите посмотреть заказы рядом?"
     )
 
-    reply_kb = await kb.get_courier_kb("near_orders")
+    reply_markup = await kb.get_courier_orders_near_kb(
+        available_orders=len(available_orders)
+    )
 
     new_message = await message.answer(
         text,
-        reply_markup=reply_kb,
+        reply_markup=reply_markup,
         disable_notification=True,
         parse_mode="HTML",
     )
@@ -561,7 +562,6 @@ async def show_nearby_orders(callback_query: CallbackQuery, state: FSMContext):
         )
         orders_data[order_id] = {"text": order_text, "index": index}
 
-    await state.clear()
     await state.update_data(
         orders_data=orders_data,
         order_ids=order_ids,
@@ -634,7 +634,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
     order_ids: list = data.get("order_ids", [])
-    current_order_id = data.get("current_order_id")
+    current_order_id = int(data.get("current_order_id"))
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
 
@@ -650,7 +650,8 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
 
     try:
         is_assigned = await order_data.assign_courier_to_order(
-            order_id=current_order_id, tg_id=tg_id
+            order_id=current_order_id,
+            tg_id=tg_id,
         )
 
         if not is_assigned:
@@ -729,7 +730,7 @@ async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
     active_count = len(await order_data.get_active_orders(tg_id))
     completed_count = len(await order_data.get_completed_orders(tg_id))
 
-    reply_kb = await kb.get_courier_orders_kb(active_count, completed_count)
+    reply_markup = await kb.get_courier_orders_kb(active_count, completed_count)
     text = (
         f"✎  <b>Мои заказы</b>\n\n"
         f"Здесь вы можете посмотреть статус ваших заказов, "
@@ -740,14 +741,14 @@ async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
     new_message = (
         await event.message.edit_text(
             text,
-            reply_markup=reply_kb,
+            reply_markup=reply_markup,
             disable_notification=True,
             parse_mode="HTML",
         )
         if is_callback
         else await event.answer(
             text,
-            reply_markup=reply_kb,
+            reply_markup=reply_markup,
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -798,8 +799,6 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
         return
 
     tg_id = callback_query.from_user.id
-    bot_id = callback_query.bot.id
-
     courier_orders = await get_orders_func(tg_id)
 
     orders_data = {}
@@ -839,23 +838,29 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
 
     first_order_id = list(orders_data.keys())[0]
     await state.update_data(
-        orders_data=orders_data, counter=0, current_order_id=first_order_id
+        orders_data=orders_data,
+        counter=0,
+        current_order_id=first_order_id,
     )
-    await rediska.save_fsm_state(state, bot_id, tg_id)
+    await rediska.save_fsm_state(
+        state,
+        courier_bot_id,
+        tg_id,
+    )
 
     if callback_query.data == "active_orders":
-        reply_kb = await kb.get_courier_kb(
+        reply_markup = await kb.get_courier_kb(
             "active_one" if len(orders_data) == 1 else "active_orders"
         )
     else:
-        reply_kb = await kb.get_courier_kb(
+        reply_markup = await kb.get_courier_kb(
             "one_my_order" if len(orders_data) == 1 else "completed_orders"
         )
 
     log.info(f"Отображение первого заказа: total_orders={len(orders_data)}")
     await callback_query.message.edit_text(
         orders_data[first_order_id]["text"],
-        reply_markup=reply_kb,
+        reply_markup=reply_markup,
         disable_notification=True,
         parse_mode="HTML",
     )
@@ -958,8 +963,8 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
 
         new_message = await callback_query.message.answer(
             f"Статус заказа №{current_order_id} обновлен на 'Завершен'. Заказчик уведомлен.",
-            parse_mode="HTML",
             disable_notification=False,
+            parse_mode="HTML",
         )
 
         await courier_data.change_order_active_count(tg_id, count=-1)

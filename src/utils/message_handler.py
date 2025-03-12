@@ -79,6 +79,5 @@ handler = MessageHandler2()
 
 
 __all__ = [
-    "MessageHandler",
     "handler",
 ]

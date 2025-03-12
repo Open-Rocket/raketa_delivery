@@ -37,7 +37,6 @@ from aiogram.types import Message, CallbackQuery, PreCheckoutQuery
 from src.utils import (
     CustomerState,
     CourierState,
-    MessageHandler,
     handler,
     kb,
     title,
@@ -91,5 +90,4 @@ __all__ = [
     "courier_bot",
     "customer_bot_id",
     "courier_bot_id",
-    "MessageHandler",
 ]

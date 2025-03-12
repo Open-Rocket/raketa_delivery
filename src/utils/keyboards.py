@@ -353,17 +353,6 @@ class Keyboard:
                 ]
             ),
             # ---
-            "near_orders": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Показать заказы рядом",
-                            callback_data="show_nearby_orders",
-                        )
-                    ]
-                ]
-            ),
-            # ---
             "pay_sub": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="Оплатить", callback_data="pay_sub")]
@@ -410,6 +399,23 @@ class Keyboard:
         )
 
         return my_orders_kb
+
+    @staticmethod
+    async def get_courier_orders_near_kb(available_orders: int) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для заказов рядом"""
+
+        near_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"Показать заказы рядом {available_orders}",
+                        callback_data="show_nearby_orders",
+                    )
+                ]
+            ]
+        )
+
+        return near_kb
 
 
 kb: Keyboard = Keyboard()
