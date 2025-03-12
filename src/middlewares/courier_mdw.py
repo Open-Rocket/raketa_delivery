@@ -6,7 +6,6 @@ from aiogram.types import (
     TelegramObject,
     CallbackQuery,
 )
-from src.config import log
 from src.confredis import RedisService
 from src.utils import CourierState
 
@@ -14,81 +13,39 @@ from src.utils import CourierState
 class CourierOuterMiddleware(BaseMiddleware):
 
     def __init__(self, rediska: RedisService):
-        super().__init__()
         self.rediska = rediska
 
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
+        event: Message | CallbackQuery,
         data: Dict[str, Any],
     ) -> Any:
         """Обработка внешних событий"""
 
         tg_id = event.from_user.id
         bot_id = event.bot.id
-        fsm_context = data.get("state")
+        fsm_context: FSMContext = data.get("state")
         state: FSMContext = await fsm_context.get_state()
         state_data = await fsm_context.get_data()
-
-        log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
 
         if not state_data:
             await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
-            log.info(f"is_fsm_restore_data: {True if state_data else False}")
 
         if state == None:
             state = await self.rediska.get_state(bot_id, tg_id)
-            log.info(
-                f"\n"
-                f"- Courier 🧍\n"
-                f"- Outer_mw\n"
-                f"- Courier state from redis: {state}"
-            )
+
             if state == None:
-                state_previous = state
                 state = CourierState.default.state
-                log.info(
-                    f"\n"
-                    f"- Courier 🧍\n"
-                    f"- Outer_mw\n"
-                    f"- Courier ID: {tg_id} visited the service for the first time\n"
-                    f"- Courier state previous: {state_previous}\n"
-                    f"- Courier state: {state}"
-                )
 
             await fsm_context.set_state(state)
 
         if isinstance(event, Message):
-            user_id = event.from_user.id
-            message_text = event.text
-
-            log.info(
-                f"\n"
-                f"- Courier 🧍\n"
-                f"- Outer_mw\n"
-                f"- Customer message: {message_text}\n"
-                f"- Courier ID: {user_id}\n"
-                f"- Courier state previous: {state}"
-            )
-
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result
 
         elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id
-            callback_data = event.data
-
-            log.info(
-                f"\n"
-                f"- Courier - 🧍\n"
-                f"- Outer_mw\n"
-                f"- Callback data: {callback_data}\n"
-                f"- Courier ID: {user_id}\n"
-                f"- Courier state previous: {state}"
-            )
-
             return await handler(event, data)
 
 

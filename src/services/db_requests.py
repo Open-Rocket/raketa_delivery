@@ -7,14 +7,11 @@ from src.models import (
     Order,
     Subscription,
 )
-from sqlalchemy import select, and_, func, update
-from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
 from src.config import moscow_time, log
-from .routing import route
 from geopy.distance import geodesic
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable

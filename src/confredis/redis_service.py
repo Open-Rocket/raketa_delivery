@@ -5,8 +5,6 @@ from .redis_config import RedisConfig
 from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
-from typing import Optional
-from src.config import log
 from aiogram.types import Message
 
 

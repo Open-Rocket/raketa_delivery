@@ -49,6 +49,9 @@ async def cmd_start_customer(message: Message, state: FSMContext):
     chat_id = message.chat.id
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
 
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
     if is_reg:
         current_state = CustomerState.default.state
         text = "▼ <b>Выберите действие ...</b>"
@@ -74,9 +77,6 @@ async def cmd_start_customer(message: Message, state: FSMContext):
             parse_mode="HTML",
             disable_notification=True,
         )
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     await handler.catch(
         bot=customer_bot,
@@ -293,6 +293,9 @@ async def cmd_order(message: Message, state: FSMContext):
     chat_id = message.chat.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
 
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
     if is_read_info:
         current_state = CustomerState.ai_voice_order.state
         text = (
@@ -322,9 +325,6 @@ async def cmd_order(message: Message, state: FSMContext):
             disable_notification=True,
             parse_mode="HTML",
         )
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     await handler.catch(
         bot=customer_bot,
@@ -600,10 +600,11 @@ async def change_name(message: Message, state: FSMContext):
     chat_id = message.chat.id
     customer_name = message.text
 
-    _ = await customer_data.update_customer_name(tg_id, customer_name)
-    _ = await rediska.set_name(customer_bot_id, tg_id, customer_name)
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    _ = await customer_data.update_customer_name(tg_id, customer_name)
+    _ = await rediska.set_name(customer_bot_id, tg_id, customer_name)
 
     text = (
         f"Имя было изменено на {customer_name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
@@ -631,10 +632,11 @@ async def change_phone(message: Message, state: FSMContext):
     chat_id = message.chat.id
     customer_phone = message.contact.phone_number
 
-    _ = await customer_data.update_customer_phone(tg_id, customer_phone)
-    _ = await rediska.set_phone(customer_bot_id, tg_id, customer_phone)
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    _ = await customer_data.update_customer_phone(tg_id, customer_phone)
+    _ = await rediska.set_phone(customer_bot_id, tg_id, customer_phone)
 
     text = (
         f"Номер был изменено на {customer_phone} 🎉\n\n"
@@ -662,6 +664,9 @@ async def change_city(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     chat_id = message.chat.id
 
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
 
@@ -669,26 +674,21 @@ async def change_city(message: Message, state: FSMContext):
         text = f"Введите корректное название города!\n<b>Ваш город:</b>"
 
         new_message = await message.answer(
-            text, disable_notification=True, parse_mode="HTML"
+            text,
+            disable_notification=True,
+            parse_mode="HTML",
         )
 
-        log.info(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
+    else:
 
-        await handler.delete_previous_message(message.chat.id)
-        await handler.handle_new_message(new_message, message)
+        _ = await customer_data.update_customer_city(tg_id, city)
+        _ = await rediska.set_city(customer_bot_id, tg_id, city)
 
-        return
+        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
-    _ = await customer_data.update_customer_city(tg_id, city)
-    _ = await rediska.set_city(customer_bot_id, tg_id, city)
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
-    text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-
-    new_message = await message.answer(
-        text, disable_notification=True, parse_mode="HTML"
-    )
+        new_message = await message.answer(
+            text, disable_notification=True, parse_mode="HTML"
+        )
 
     await handler.catch(
         bot=customer_bot,
@@ -705,7 +705,7 @@ async def change_city(message: Message, state: FSMContext):
 
 @customer_r.message(F.text == "/my_orders")
 @customer_r.callback_query(F.data == "back_myOrders")
-async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
+async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
 
     current_state = CustomerState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
@@ -760,6 +760,8 @@ async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
 )
 async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
 
+    tg_id = callback_query.from_user.id
+
     order_status_mapping = {
         "pending_orders": (
             order_data.get_pending_orders,
@@ -786,7 +788,6 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.answer("Ошибка запроса заказов.", show_alert=True)
         return
 
-    tg_id = callback_query.from_user.id
     customer_orders = await get_orders_func(tg_id)
 
     orders_data = {}
@@ -825,15 +826,18 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
         counter=0,
         current_order_id=first_order_id,
     )
+
     await state.set_state(state_status)
     await rediska.save_fsm_state(state, customer_bot_id, tg_id)
-    # await rediska.set_state(customer_bot_id, tg_id, state)
 
-    reply_kb = await kb.get_customer_kb(
-        "one_my_pending"
-        if len(orders_data) == 1 and callback_query.data == "pending_orders"
-        else "one_my_order" if len(orders_data) == 1 else callback_query.data
-    )
+    if callback_query.data == "pending_orders":
+        reply_kb = await kb.get_customer_kb(
+            "one_my_pending" if len(orders_data) == 1 else "my_pending"
+        )
+    else:
+        reply_kb = await kb.get_customer_kb(
+            "one_my_order" if len(orders_data) == 1 else "my_order"
+        )
 
     await callback_query.message.edit_text(
         orders_data[first_order_id]["text"],
@@ -870,9 +874,9 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     )
 
     current_order_id = order_ids[counter]
+
     await state.update_data(counter=counter, current_order_id=current_order_id)
     await rediska.save_fsm_state(state, bot_id, tg_id)
-    # await rediska.set_state(customer_bot_id, tg_id, state)
 
     try:
         await callback_query.message.edit_text(
@@ -1047,12 +1051,7 @@ async def process_order_logic(
 
     await state.set_state(current_state)
     await state.update_data(current_order_info=(prepare_dict, order_info))
-    # await rediska.set_fsm_state_and_data(
-    #     customer_bot_id,
-    #     tg_id,
-    #     current_state,
-    #     {"current_order_info": (prepare_dict, order_info)},
-    # )
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
     new_message = await message.answer(
@@ -1105,12 +1104,16 @@ async def handle_error_response(
 
 @customer_r.callback_query(F.data == "order_sent")
 async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
-    log.info(f"set_order_to_db was called!")
 
     tg_id = callback_query.from_user.id
 
     state_data = await state.get_data()
     current_order_info = state_data.get("current_order_info")
+
+    current_state = CustomerState.default.state
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     if current_order_info:
         data, order_forma = [*current_order_info]
@@ -1123,11 +1126,6 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
             show_alert=True,
         )
         return
-
-    current_state = CustomerState.default.state
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     try:
         order_number = await order_data.create_order(tg_id, data, order_forma)
@@ -1187,5 +1185,4 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_fallback.message()
 async def handle_unrecognized_message(message: Message):
-    log.info(f"Data to delete: {message.text}")
     await message.delete()
