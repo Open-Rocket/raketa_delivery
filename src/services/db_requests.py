@@ -820,4 +820,8 @@ courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
 
 
-__all__ = ["customer_data", "courier_data", "order_data"]
+__all__ = [
+    "customer_data",
+    "courier_data",
+    "order_data",
+]

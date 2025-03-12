@@ -8,6 +8,7 @@ from aiogram.enums import ContentType
 from datetime import datetime, timedelta
 from aiogram.types import LabeledPrice
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
+
 from src.services import (
     customer_data,
     courier_data,

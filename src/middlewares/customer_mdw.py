@@ -30,64 +30,23 @@ class CustomerOuterMiddleware(BaseMiddleware):
         state: FSMContext = await fsm_context.get_state()
         state_data = await fsm_context.get_data()
 
-        log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
-
         if not state_data:
-            await self.rediska.restore_state_and_data(fsm_context, bot_id, tg_id)
+            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
-            log.info(f"is_fsm_restore_data: {True if state_data else False}")
 
         if not state:
             state = await self.rediska.get_state(bot_id, tg_id)
-            log.info(
-                f"\n"
-                f"- Customer 🧍\n"
-                f"- Outer_mw\n"
-                f"- Customer state from redis: {state}"
-            )
+
             if state == None:
-                state_previous = state
                 state = CustomerState.default.state
-                log.info(
-                    f"\n"
-                    f"- Customer 🧍\n"
-                    f"- Outer_mw\n"
-                    f"- Customer ID: {tg_id} visited the service for the first time\n"
-                    f"- Customer state previous: {state_previous}\n"
-                    f"- Customer state: {state}"
-                )
 
             await fsm_context.set_state(state)
 
         if isinstance(event, Message):
-            user_id = event.from_user.id
-            message_text = event.text
-
-            log.info(
-                f"\n"
-                f"- Customer 🧍\n"
-                f"- Outer_mw\n"
-                f"- Customer message: {message_text}\n"
-                f"- Customer ID: {user_id}\n"
-                f"- Customer state previous: {state}"
-            )
-
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result
 
         elif isinstance(event, CallbackQuery):
-            user_id = event.from_user.id
-            callback_data = event.data
-
-            log.info(
-                f"\n"
-                f"- Customer - 🧍\n"
-                f"- Outer_mw\n"
-                f"- Callback data: {callback_data}\n"
-                f"- Customer ID: {user_id}\n"
-                f"- Customer state previous: {state}"
-            )
-
             return await handler(event, data)
 
 
@@ -98,11 +57,9 @@ async def _check_state_and_handle_message(
 
     message_text = event.text
 
-    # Обработка команды /start в любом состоянии
     if message_text == "/start":
         return await handler(event, data)
 
-    # Проверка на каждое состояние пользователя
     if state == CustomerState.reg_state.state:
         await event.delete()
         return
@@ -137,7 +94,6 @@ async def _check_state_and_handle_message(
         await event.delete()
         return
 
-    # Обработка сообщения в случае, если ни одно состояние не совпало
     return await handler(event, data)
 
 

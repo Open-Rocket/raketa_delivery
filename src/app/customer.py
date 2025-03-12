@@ -293,8 +293,6 @@ async def cmd_order(message: Message, state: FSMContext):
     chat_id = message.chat.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
 
-    log.info(f"is_read: {is_read_info}")
-
     if is_read_info:
         current_state = CustomerState.ai_voice_order.state
         text = (
@@ -490,8 +488,6 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
     _ = await rediska.set_read_info(customer_bot_id, tg_id, True)
-
-    log.info(f"\n" f"- Customer 🧍\n" f"- Is read info set: {is_set}")
 
     text = (
         "<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
@@ -795,6 +791,7 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
 
     orders_data = {}
     for index, order in enumerate(customer_orders, start=1):
+
         try:
             order_forma = (
                 zlib.decompress(order.order_forma).decode("utf-8")
@@ -816,7 +813,7 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
         orders_data[order.order_id] = {"text": base_info, "index": index - 1}
 
     if not orders_data:
-        log.info(f"Нет {status_text} заказов для пользователя tg_id={tg_id}")
+
         await callback_query.answer(
             f"У вас нет {status_text} заказов.", show_alert=True
         )
@@ -830,24 +827,24 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
     )
     await state.set_state(state_status)
     await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+    # await rediska.set_state(customer_bot_id, tg_id, state)
 
     reply_kb = await kb.get_customer_kb(
-        "one_my_order" if len(orders_data) == 1 else callback_query.data
+        "one_my_pending"
+        if len(orders_data) == 1 and callback_query.data == "pending_orders"
+        else "one_my_order" if len(orders_data) == 1 else callback_query.data
     )
 
-    log.info(f"Отображение первого заказа: total_orders={len(orders_data)}")
     await callback_query.message.edit_text(
         orders_data[first_order_id]["text"],
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
-    log.info("get_orders was successfully done!")
 
 
 @customer_r.callback_query(F.data.in_({"next_right_mo", "back_left_mo"}))
 async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
-    log.info("handle_order_navigation вызван!")
 
     tg_id = callback_query.from_user.id
     bot_id = callback_query.bot.id
@@ -875,6 +872,7 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     current_order_id = order_ids[counter]
     await state.update_data(counter=counter, current_order_id=current_order_id)
     await rediska.save_fsm_state(state, bot_id, tg_id)
+    # await rediska.set_state(customer_bot_id, tg_id, state)
 
     try:
         await callback_query.message.edit_text(
@@ -882,9 +880,7 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
             reply_markup=callback_query.message.reply_markup,
             parse_mode="HTML",
         )
-        log.info(
-            f"Переключение на заказ #{counter + 1}/{total_orders}, order_id={current_order_id}"
-        )
+
     except Exception as e:
         log.error(
             f"Ошибка при обновлении текста сообщения для заказа {current_order_id}: {e}"
@@ -970,7 +966,6 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
     F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
 )
 async def process_order(message: Message, state: FSMContext):
-    log.info("process_message was called!")
 
     wait_message = await message.answer(
         "Заказ обрабатывается, подождите ...", disable_notification=True
@@ -980,7 +975,6 @@ async def process_order(message: Message, state: FSMContext):
     start_time = time.perf_counter()
 
     if message.content_type == ContentType.VOICE:
-        log.info("content_type is Voice! Process to recognition voice start.")
 
         recognized_text = await recognizer.get_recognition_text(message)
 
@@ -988,14 +982,12 @@ async def process_order(message: Message, state: FSMContext):
             await handle_error_response(message, wait_message, "unrecognized")
             return
 
-        log.info("Voice was recognized")
         text_msg = recognized_text
     else:
-        log.info("content_type is Text")
         text_msg = message.text
 
     try:
-        log.info("Trying to process_order_logic.")
+
         await asyncio.wait_for(
             process_order_logic(text_msg, message, state, wait_message),
             timeout=120,
@@ -1055,19 +1047,17 @@ async def process_order_logic(
 
     await state.set_state(current_state)
     await state.update_data(current_order_info=(prepare_dict, order_info))
-    # await rediska.save_fsm_state(current_state, customer_bot_id, tg_id)
-    await rediska.set_fsm_state_and_data(
-        customer_bot_id,
-        tg_id,
-        current_state,
-        {"current_order_info": (prepare_dict, order_info)},
-    )
+    # await rediska.set_fsm_state_and_data(
+    #     customer_bot_id,
+    #     tg_id,
+    #     current_state,
+    #     {"current_order_info": (prepare_dict, order_info)},
+    # )
+    await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
     new_message = await message.answer(
         order_info, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
     )
-
-    log.info(f"Order form:\n\n{order_info}\n")
 
     await wait_message.delete()
 
@@ -1079,8 +1069,6 @@ async def process_order_logic(
         current_message=message,
         delete_previous=True,
     )
-
-    log.info("process_order_logic was successfully done!")
 
 
 async def handle_error_response(
@@ -1124,8 +1112,6 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     state_data = await state.get_data()
     current_order_info = state_data.get("current_order_info")
 
-    log.info(f"current_order_info: {current_order_info}")
-
     if current_order_info:
         data, order_forma = [*current_order_info]
         order_forma = zlib.compress(order_forma.encode("utf-8"))
@@ -1168,15 +1154,12 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
         delete_previous=False,
     )
 
-    log.info(f"set_order_to_db was successfully done!")
-
 
 # ---
 
 
 @customer_r.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
-    log.info(f"cancel_order was called!")
 
     current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
@@ -1197,8 +1180,6 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
         current_message=callback_query.message,
         delete_previous=False,
     )
-
-    log.info(f"cancel_order was successfully done!")
 
 
 # ---
