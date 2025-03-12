@@ -77,6 +77,108 @@ class RedisService:
 
     # ---
 
+    async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
+        """Сохраняет состояние FSM пользователя в Redis"""
+        key = RedisKey(bot_id, user_id, is_state=True)
+        await self.fsm_storage.set_state(key=key, state=state)
+
+    async def set_data(
+        self,
+        bot_id: int,
+        user_id: int,
+        data: dict | None,
+    ) -> None:
+        """Сохраняет данные FSM пользователя в Redis"""
+        key = RedisKey(bot_id, user_id, is_state=False)
+        await self.fsm_storage.set_state(key=key, state=json.dumps(data))
+
+    async def get_state(self, bot_id: int, user_id: int) -> str | None:
+        """Получает текущее состояние FSM пользователя из Redis"""
+        key = RedisKey(bot_id, user_id, is_state=True)
+        return await self.fsm_storage.get_state(key=key)
+
+    async def get_data(self, bot_id: int, user_id: int) -> dict | None:
+        """Получает данные FSM пользователя из Redis"""
+        key = RedisKey(bot_id, user_id, is_state=False)
+        raw_data = await self.fsm_storage.get_state(key=key)
+        return json.loads(raw_data) if raw_data else None
+
+    async def restore_state(self, bot_id: int, user_id: int, state: FSMContext) -> None:
+        """Восстанавливает состояние FSM из Redis в FSMContext"""
+        saved_state = await self.get_state(bot_id, user_id)
+        if saved_state:
+            await state.set_state(saved_state)
+
+    async def restore_state_and_data(
+        self, bot_id: int, user_id: int, state: FSMContext
+    ) -> None:
+        """Полностью восстанавливает состояние и данные FSM из Redis"""
+
+        # Восстанавливаем состояние FSM
+        fsm_state, fsm_data = await self.get_fsm_state_and_data(bot_id, user_id)
+
+        if fsm_state:
+            # Восстанавливаем состояние
+            await state.set_state(fsm_state)
+            log.info(f"FSM state restored for user {user_id}: {fsm_state}")
+        else:
+            log.warning(f"FSM state not found for user {user_id}.")
+            return  # Без состояния нет смысла загружать данные
+
+        if fsm_data:
+            # Восстанавливаем данные FSM
+            await state.set_data(fsm_data)
+            log.info(f"FSM data restored for user {user_id}: {fsm_data}")
+        else:
+            log.warning(f"No FSM data found for user {user_id}.")
+
+    # ---
+
+    async def load_fsm_state(self, bot_id: int, user_id: int) -> dict:
+        """Загружает состояние FSM из Redis"""
+        key = RedisKey(bot_id, user_id)
+        raw_data = await self.redis.get(f"state_data: {str(key)}")
+        return json.loads(raw_data) if raw_data else {}
+
+    async def restore_fsm_state(
+        self,
+        state: FSMContext,
+        bot_id: int,
+        user_id: int,
+    ) -> None:
+        """Восстанавливает состояние FSM из Redis"""
+        data = await self.load_fsm_state(bot_id, user_id)
+        await state.set_data(data)
+
+    async def restore_fsm_state_2(
+        self,
+        state: FSMContext,
+        bot_id: int,
+        user_id: int,
+    ) -> None:
+        """Полностью восстанавливает состояние и данные FSM из Redis"""
+
+        # Восстанавливаем состояние FSM
+        fsm_state, fsm_data = await self.get_fsm_state_and_data(bot_id, user_id)
+
+        if fsm_state:
+            # Восстанавливаем состояние
+            await state.set_state(fsm_state)
+            log.info(f"FSM state restored for user {user_id}: {fsm_state}")
+        else:
+            log.warning(f"FSM state not found for user {user_id}.")
+            return  # Без состояния нет смысла загружать данные
+
+        if fsm_data:
+            # Восстанавливаем данные FSM
+            await state.set_data(fsm_data)
+            log.info(f"FSM data restored for user {user_id}: {fsm_data}")
+        else:
+            log.warning(f"No FSM data found for user {user_id}.")
+
+    # ---
+    # ---
+
     async def set_message(self, bot_id: int, user_id: int, message: Message):
         """Сохраняет ID сообщения от пользователя в Redis."""
         key = f"user_message:{RedisKey(bot_id, user_id)}"
@@ -94,17 +196,6 @@ class RedisService:
         await self.redis.delete(key)
 
     # ---
-
-    async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
-        """Сохраняет состояние FSM пользователя в Redis"""
-        key = RedisKey(bot_id, user_id, is_state=True)
-        await self.fsm_storage.set_state(key=key, state=state)
-
-    async def get_state(self, bot_id: int, user_id: int) -> str | None:
-        """Получает текущее состояние FSM пользователя из Redis"""
-        key = RedisKey(bot_id, user_id)
-        return await self.fsm_storage.get_state(key=key)
-
     # ---
 
     async def set_name(self, bot_id: int, user_id: int, name: str) -> bool:
@@ -141,66 +232,6 @@ class RedisService:
         """Устанавливает статус ознакомления пользователя с оформлением заказа"""
         key = RedisKey(bot_id, user_id)
         await self.redis.hset(f"user_info:{key}", "read_info", int(value))
-        return True
-
-    # ---
-
-    async def save_fsm_state(
-        self, state: FSMContext, bot_id: int, user_id: int
-    ) -> None:
-        """Сохраняет состояние FSM в Redis"""
-        data = await state.get_data()
-        key = RedisKey(bot_id, user_id)
-        await self.redis.set(f"state_data: {str(key)}", json.dumps(data))
-
-    async def load_fsm_state(self, bot_id: int, user_id: int) -> dict:
-        """Загружает состояние FSM из Redis"""
-        key = RedisKey(bot_id, user_id)
-        raw_data = await self.redis.get(f"state_data: {str(key)}")
-        return json.loads(raw_data) if raw_data else {}
-
-    async def restore_fsm_state(
-        self,
-        state: FSMContext,
-        bot_id: int,
-        user_id: int,
-    ) -> None:
-        """Восстанавливает состояние FSM из Redis"""
-        data = await self.load_fsm_state(bot_id, user_id)
-        await state.set_data(data)
-
-    async def restore_fsm_state_2(
-        self,
-        state: FSMContext,
-        bot_id: int,
-        user_id: int,
-    ) -> None:
-        """Полностью восстанавливает состояние и данные FSM из Redis"""
-
-        fsm_state, fsm_data = await self.get_fsm_state_and_data(bot_id, user_id)
-
-        if fsm_state:
-            # Восстанавливаем состояние
-            await state.set_state(fsm_state)
-            log.info(f"FSM state restored for user {user_id}: {fsm_state}")
-        else:
-            log.warning(f"FSM state not found for user {user_id}.")
-            return  # Без состояния нет смысла загружать данные
-
-        if fsm_data:
-            # Восстанавливаем данные FSM
-            await state.set_data(fsm_data)
-            log.info(f"FSM data restored for user {user_id}: {fsm_data}")
-        else:
-            log.warning(f"No FSM data found for user {user_id}.")
-
-    async def reset_fsm_state(
-        self, state: FSMContext, bot_id: int, user_id: int
-    ) -> bool:
-        """Очищает данные в state"""
-        await state.clear()
-        key = RedisKey(bot_id, user_id)
-        await self.redis.set(f"state_data: {str(key)}", json.dumps({}))
         return True
 
     # ---

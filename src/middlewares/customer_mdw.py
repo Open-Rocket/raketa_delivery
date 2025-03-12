@@ -33,7 +33,7 @@ class CustomerOuterMiddleware(BaseMiddleware):
         log.info(f"\nfsm_state: {state}\nfsm_state_data: {state_data}")
 
         if not state_data:
-            await self.rediska.restore_fsm_state_2(fsm_context, bot_id, tg_id)
+            await self.rediska.restore_state_and_data(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
             log.info(f"is_fsm_restore_data: {True if state_data else False}")
 
