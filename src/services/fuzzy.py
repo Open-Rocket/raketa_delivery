@@ -29,8 +29,6 @@ class Cities:
         with open(cls._cache_path, "w", encoding="utf-8") as f:
             json.dump(cls._cities, f, ensure_ascii=False, indent=4)
 
-        log.info("Города загружены из JSON и сохранены в кэш")
-
     @classmethod
     async def _load_millions_cities_from_json(cls):
         """Загружает города-миллионники из JSON и сохраняет в кэш."""
@@ -48,8 +46,6 @@ class Cities:
 
         with open(cls._millions_cache_path, "w", encoding="utf-8") as f:
             json.dump(cls._millions_cities, f, ensure_ascii=False, indent=4)
-
-        log.info("Города-миллионники загружены из JSON и сохранены в кэш")
 
     @classmethod
     async def _load_small_cities_from_json(cls):
@@ -80,7 +76,6 @@ class Cities:
                 try:
                     with open(cls._cache_path, "r", encoding="utf-8") as f:
                         cls._cities = json.load(f)
-                    log.info("Города загружены из кэша")
                 except Exception as e:
                     log.error(f"Ошибка при загрузке из кэша: {e}")
                     await cls._load_cities_from_json()
@@ -97,7 +92,6 @@ class Cities:
                 try:
                     with open(cls._millions_cache_path, "r", encoding="utf-8") as f:
                         cls._millions_cities = json.load(f)
-                    log.info("Города-миллионники загружены из кэша")
                 except Exception as e:
                     log.error(f"Ошибка при загрузке из кэша: {e}")
                     await cls._load_millions_cities_from_json()
@@ -115,9 +109,7 @@ class Cities:
                 try:
                     with open(cls._small_cache_path, "r", encoding="utf-8") as f:
                         cls._small_cities = json.load(f)
-                    log.info("Малые города загружены из кэша")
                 except Exception as e:
-                    log.error(f"Ошибка при загрузке из кэша: {e}")
                     await cls._load_small_cities_from_json()
             else:
                 await cls._load_small_cities_from_json()
@@ -144,7 +136,6 @@ async def find_closest_city(city_name: str, cities: list):
 
     if result:
         matched_city, score = result
-        log.info(f"Найден город: {matched_city}, score={score}")
         return matched_city, score
     else:
         log.warning(f"Город не найден для текста: {city_name}")

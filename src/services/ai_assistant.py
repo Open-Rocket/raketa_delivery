@@ -1,4 +1,3 @@
-import re
 import json
 import httpx
 from openai import AsyncOpenAI, APIError, RateLimitError, APIConnectionError
@@ -21,8 +20,6 @@ class AssistantAi:
     async def _get_gpt_text(self, request: str, model="gpt-4o-mini"):
         """Отправляет инструкции для агента ИИ, в случае возникновения ошибок обрабатывает их."""
 
-        log.info(f"Начало выполнения _get_gpt_text:\nmodel={model}\nrequest={request}")
-
         try:
 
             completion = await self.client.chat.completions.create(
@@ -37,8 +34,6 @@ class AssistantAi:
             )
 
             response_text = completion.choices[0].message.content
-
-            log.info(f"Успешно получен ответ от GPT: response_text={response_text}")
 
             return response_text
 

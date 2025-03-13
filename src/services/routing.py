@@ -4,6 +4,7 @@ from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
 from src.config import YANDEX_API_KEY
 from src.services.fuzzy import cities
+from geopy.distance import geodesic
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -108,6 +109,13 @@ class RouteMaster:
         total_price = base_price_per_km * distance * total_coefficient
 
         return int(total_price + over_price)
+
+    @staticmethod
+    async def is_within_radius(
+        courier_coords: tuple, order_coords: tuple, radius_km: int
+    ) -> bool:
+        """Проверяет, находится ли заказ в радиусе курьера"""
+        return geodesic(courier_coords, order_coords).km <= radius_km
 
 
 route = RouteMaster()

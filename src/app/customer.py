@@ -49,9 +49,6 @@ async def cmd_start_customer(message: Message, state: FSMContext):
     chat_id = message.chat.id
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
 
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
     if is_reg:
         current_state = CustomerState.default.state
         text = "▼ <b>Выберите действие ...</b>"
@@ -78,6 +75,9 @@ async def cmd_start_customer(message: Message, state: FSMContext):
             disable_notification=True,
         )
 
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
     await handler.catch(
         bot=customer_bot,
         chat_id=chat_id,
@@ -90,6 +90,8 @@ async def cmd_start_customer(message: Message, state: FSMContext):
 
 @customer_r.callback_query(F.data == "reg")
 async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("✍️ Регистрация", show_alert=False)
 
     current_state = CustomerState.reg_Name.state
     tg_id = callback_query.from_user.id
@@ -241,6 +243,8 @@ async def data_city_customer(message: Message, state: FSMContext):
 @customer_r.callback_query(F.data == "accept_tou")
 async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
+    await callback_query.answer("✅ Принимаю", show_alert=False)
+
     current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -293,9 +297,6 @@ async def cmd_order(message: Message, state: FSMContext):
     chat_id = message.chat.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
 
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
     if is_read_info:
         current_state = CustomerState.ai_voice_order.state
         text = (
@@ -325,6 +326,9 @@ async def cmd_order(message: Message, state: FSMContext):
             disable_notification=True,
             parse_mode="HTML",
         )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     await handler.catch(
         bot=customer_bot,
@@ -481,6 +485,8 @@ async def cmd_become_courier(message: Message, state: FSMContext):
 @customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
+    await callback_query.answer("🤖 Оформить заказ", show_alert=False)
+
     current_state = CustomerState.ai_voice_order.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -516,6 +522,8 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 @customer_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
 
+    await callback_query.answer("Изменить имя:", show_alert=False)
+
     current_state = CustomerState.change_Name.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -540,6 +548,8 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("Изменить телефон:", show_alert=False)
 
     current_state = CustomerState.change_Phone.state
     tg_id = callback_query.from_user.id
@@ -566,6 +576,8 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
 
 @customer_r.callback_query(F.data == "set_my_city")
 async def set_city(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("Изменить город:", show_alert=False)
 
     current_state = CustomerState.change_City.state
     tg_id = callback_query.from_user.id
@@ -712,6 +724,9 @@ async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
     tg_id = event.from_user.id
     chat_id = event.message.chat.id if is_callback else event.chat.id
 
+    if is_callback:
+        await event.answer("🔙 Назад", show_alert=False)
+
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
@@ -816,9 +831,18 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
     if not orders_data:
 
         await callback_query.answer(
-            f"У вас нет {status_text} заказов.", show_alert=True
+            f"У вас нет {status_text} заказов.", show_alert=False
         )
         return
+    else:
+
+        if callback_query.data == "pending_orders":
+            text_answer = "📋 Ожидающие"
+        elif callback_query.data == "active_orders":
+            text_answer = "📋 Активные"
+        elif callback_query.data == "completed_orders":
+            text_answer = "📋 Завершенные"
+        await callback_query.answer(text_answer, show_alert=False)
 
     first_order_id = list(orders_data.keys())[0]
     await state.update_data(
@@ -832,11 +856,11 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
 
     if callback_query.data == "pending_orders":
         reply_kb = await kb.get_customer_kb(
-            "one_my_pending" if len(orders_data) == 1 else "my_pending"
+            "one_my_pending" if len(orders_data) == 1 else callback_query.data
         )
     else:
         reply_kb = await kb.get_customer_kb(
-            "one_my_order" if len(orders_data) == 1 else "my_order"
+            "one_my_order" if len(orders_data) == 1 else callback_query.data
         )
 
     await callback_query.message.edit_text(
@@ -867,11 +891,12 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     total_orders = len(orders_data)
     order_ids = list(orders_data.keys())
 
-    counter = (
-        (counter + 1) % total_orders
-        if callback_query.data == "next_right_mo"
-        else (counter - 1) % total_orders
-    )
+    if callback_query.data == "next_right_mo":
+        await callback_query.answer("следующий ⏩", show_alert=False)
+        counter = (counter + 1) % total_orders
+    else:
+        await callback_query.answer("⏪ предыдущий", show_alert=False)
+        counter = (counter - 1) % total_orders
 
     current_order_id = order_ids[counter]
 
@@ -896,7 +921,6 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
 
 @customer_r.callback_query(F.data == "cancel_my_order")
 async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
-    log.info("cancel_my_order вызван!")
 
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -909,6 +933,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.answer(
             "Не удалось найти заказ для отмены.", parse_mode="HTML"
         )
+        await callback_query.answer("😵😵😵", show_alert=False)
         return
 
     order = await order_data.get_order_by_id(current_order_id)
@@ -918,6 +943,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.answer(
             f"Заказ №{current_order_id} не найден.", parse_mode="HTML"
         )
+        await callback_query.answer("😵😵😵", show_alert=False)
         return
 
     if order.order_status != OrderStatus.PENDING:
@@ -931,7 +957,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         return
 
     try:
-        is_canceled = await order_data.update_order_status(
+        _ = await order_data.update_order_status(
             current_order_id, OrderStatus.CANCELLED
         )
         text = (
@@ -946,6 +972,8 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         await state.update_data(canceled_order_id=current_order_id)
         await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
+        await callback_query.answer("❌ Заказ отменен", show_alert=False)
+
         await handler.catch(
             bot=callback_query.bot,
             chat_id=chat_id,
@@ -955,11 +983,10 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
             delete_previous=False,
         )
 
-        log.info(f"Заказ {current_order_id} отменён, статус: {is_canceled}")
-        log.info("cancel_my_order успешно выполнен!")
     except Exception as e:
         log.error(f"Ошибка при отмене заказа {current_order_id}: {e}")
         await callback_query.answer("Ошибка при отмене заказа.", show_alert=True)
+        await callback_query.answer("😵😵😵", show_alert=False)
 
 
 # ---
@@ -1125,6 +1152,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
             disable_notification=True,
             show_alert=True,
         )
+        await callback_query.answer("😵😵😵", show_alert=False)
         return
 
     try:
@@ -1138,10 +1166,13 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     except Exception as e:
         log.error(f"Ошибка при создании заказа: {str(e)}")
         text = "Ошибка при создании заказа.\n" "Попробуйте повторить заказ."
+        await callback_query.answer("😵😵😵", show_alert=False)
 
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
+
+    await callback_query.answer("🧾 Заказ создан", show_alert=False)
 
     await handler.catch(
         bot=callback_query.bot,
@@ -1159,6 +1190,8 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
 @customer_r.callback_query(F.data == "cancel_order")
 async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 
+    await callback_query.answer("⃠ Заказ не размещен", show_alert=False)
+
     current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -1170,6 +1203,7 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     new_message = await callback_query.message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
+
     await handler.catch(
         bot=callback_query.bot,
         chat_id=chat_id,

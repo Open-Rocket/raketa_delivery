@@ -50,9 +50,6 @@ async def cmd_start_courier(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     chat_id = message.chat.id
 
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-
     is_reg = await rediska.is_reg(courier_bot_id, tg_id)
 
     if is_reg:
@@ -84,6 +81,9 @@ async def cmd_start_courier(message: Message, state: FSMContext):
             parse_mode="HTML",
             disable_notification=True,
         )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     await handler.catch(
         bot=courier_bot,
@@ -263,7 +263,11 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
         courier_bot_id, tg_id
     )
     _ = await courier_data.set_courier(
-        tg_id, courier_name, courier_phone, courier_city, tou
+        tg_id,
+        courier_name,
+        courier_phone,
+        courier_city,
+        tou,
     )
 
     _ = await courier_data.update_courier_subscription(tg_id, days=30)
@@ -296,6 +300,8 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
 @courier_r.callback_query(F.data == "super_go")
 async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("⭐️⭐️⭐️", show_alert=False)
 
     current_state = CourierState.default.state
     tg_id = callback_query.from_user.id
@@ -346,7 +352,7 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
 @courier_r.callback_query(F.data == "lets_go")
 async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
 
-    current_state = CourierState.default.state
+    current_state = CourierState.location.state
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
     current_active_orders_count = await courier_data.get_courier_active_orders_count(
@@ -399,7 +405,7 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
 )
 async def get_location(message: Message, state: FSMContext):
 
-    current_state = CourierState.location.state
+    current_state = CourierState.default.state
 
     tg_id = message.from_user.id
     chat_id = message.chat.id
@@ -415,6 +421,7 @@ async def get_location(message: Message, state: FSMContext):
 
     await state.set_state(current_state)
     await state.update_data(available_orders=available_orders)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, courier_bot_id, courier_tg_id)
 
     city_orders = await order_data.get_pending_orders_in_city(courier_city)
@@ -588,8 +595,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
 
         text = (
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
-            f"Подробности о заказе смотрите в меню 'Мои заказы'.\n"
-            f"Успешной доставки! 🚴"
+            f"<i>*Подробности в меню</i> <b>Мои заказы</b>\n"
         )
 
         new_message = await callback_query.message.answer(text=text, parse_mode="HTML")

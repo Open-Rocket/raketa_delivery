@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
 from src.config import moscow_time, log
-from geopy.distance import geodesic
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable
+from src.services.routing import route
 
 
 class CustomerData:
@@ -777,7 +777,7 @@ class OrderData:
                 try:
                     start_lat = float(order.starting_point[0])
                     start_lon = float(order.starting_point[1])
-                    if self.is_within_radius(
+                    if await route.is_within_radius(
                         (lat, lon), (start_lat, start_lon), radius_km
                     ):
                         order_forma = (
@@ -803,13 +803,6 @@ class OrderData:
                     continue
 
             return available_orders
-
-    @staticmethod
-    def is_within_radius(
-        courier_coords: tuple, order_coords: tuple, radius_km: int
-    ) -> bool:
-        """Проверяет, находится ли заказ в радиусе курьера"""
-        return geodesic(courier_coords, order_coords).km <= radius_km
 
 
 customer_data = CustomerData(async_session_factory)

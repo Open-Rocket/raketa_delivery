@@ -205,12 +205,14 @@ class Keyboard:
                 keyboard=[
                     [
                         KeyboardButton(
-                            text="Отправить локацию 🧭", request_location=True
+                            text="Отправить локацию 🧭",
+                            request_location=True,
                         )
                     ],
                 ],
                 resize_keyboard=True,
                 one_time_keyboard=True,
+                input_field_placeholder="LOCATION 📍",
             ),
             "/subs": InlineKeyboardMarkup(
                 inline_keyboard=[
