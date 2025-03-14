@@ -11,14 +11,19 @@ from src.config import (
     log,
 )
 
+from aiogram import types
+
 
 async def main():
+
+    customer_dp.update()
+    courier_dp.update()
 
     customer_dp["redis"] = rediska
     courier_dp["redis"] = rediska
 
-    customer_dp.message.middleware(CourierOuterMiddleware(rediska))
-    customer_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
+    customer_dp.message.middleware(CustomerOuterMiddleware(rediska))
+    customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska))
 
     courier_dp.message.middleware(CourierOuterMiddleware(rediska))
     courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
@@ -27,6 +32,7 @@ async def main():
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
     try:
+
         await asyncio.gather(
             customer_dp.start_polling(customer_bot, skip_updates=True),
             courier_dp.start_polling(courier_bot, skip_updates=True),

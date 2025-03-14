@@ -9,10 +9,10 @@ from aiogram.types import (
 from src.confredis import RedisService
 from src.config import log
 from src.utils import CourierState
+import asyncio
 
 
 class CourierOuterMiddleware(BaseMiddleware):
-
     def __init__(self, rediska: RedisService):
         self.rediska = rediska
 
@@ -27,29 +27,30 @@ class CourierOuterMiddleware(BaseMiddleware):
         tg_id = event.from_user.id
         bot_id = event.bot.id
         fsm_context: FSMContext = data.get("state")
-        state: FSMContext = await fsm_context.get_state()
 
-        if state == None:
+        state = await fsm_context.get_state()
+        state_data = await fsm_context.get_data()
+
+        if state is None:
             state = await self.rediska.get_state(bot_id, tg_id)
 
-            if state == None:
+            if state is None:
                 state = CourierState.default.state
 
-            await fsm_context.set_state(None)
             await fsm_context.set_state(state)
             data["state"] = fsm_context
-
-        state_data = await fsm_context.get_data()
 
         if not state_data:
             await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
 
         if isinstance(event, Message):
+
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result
 
         elif isinstance(event, CallbackQuery):
+
             return await handler(event, data)
 
 
