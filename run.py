@@ -2,6 +2,7 @@ import asyncio
 from src.confredis import rediska
 from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
+from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from src.config import (
     customer_bot,
     courier_bot,
@@ -15,6 +16,12 @@ async def main():
 
     customer_dp["redis"] = rediska
     courier_dp["redis"] = rediska
+
+    customer_dp.message.middleware(CourierOuterMiddleware(rediska))
+    customer_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
+
+    courier_dp.message.middleware(CourierOuterMiddleware(rediska))
+    courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
 
     customer_dp.include_routers(customer_r, customer_fallback)
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)

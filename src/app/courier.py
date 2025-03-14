@@ -38,8 +38,8 @@ from ._deps import (
 # ---
 
 
-courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
-courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
+# courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
+# courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
 
 
 # ---
@@ -123,6 +123,7 @@ async def data_name_courier(message: Message, state: FSMContext):
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
+
     _ = await rediska.set_name(courier_bot_id, tg_id, courier_name)
 
     reply_kb = await kb.get_courier_kb("phone_number")
@@ -272,7 +273,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 @courier_r.callback_query(F.data == "super_go")
 async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
 
-    current_state = CourierState.reg_tou.state
+    current_state = CourierState.default.state
     tg_id = callback_query.from_user.id
     moscow_time = await Time.get_moscow_time()
 
@@ -398,7 +399,7 @@ async def get_location(message: Message, state: FSMContext):
     )
 
     await message.answer(
-        text="",
+        text="Локация принята!",
         reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
     )

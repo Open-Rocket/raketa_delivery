@@ -37,8 +37,8 @@ from ._deps import (
 # ---
 
 
-customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
-customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
+# customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
+# customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 
 # ---

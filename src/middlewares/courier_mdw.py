@@ -45,8 +45,6 @@ class CourierOuterMiddleware(BaseMiddleware):
             await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
 
-        log.info(f"FSM перед вызовом хендлера: {state}")
-
         if isinstance(event, Message):
             result = await _check_state_and_handle_message(state, event, handler, data)
             return result
@@ -80,7 +78,6 @@ async def _check_state_and_handle_message(
             "/rules",
             "/make_order",
         ]:
-            log.info(f"MessageText: {message_text}")
             await event.delete()
             return
 
@@ -112,8 +109,6 @@ async def _check_state_and_handle_message(
     if state == CourierState.reg_Phone.state and not event.contact:
         await event.delete()
         return
-
-    log.info(f"State: {state}")
 
     return await handler(event, data)
 
