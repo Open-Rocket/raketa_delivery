@@ -74,7 +74,7 @@ class CustomerData:
         self,
         tg_id: int,
         new_phone: str,
-    ):
+    ) -> bool:
         """Обновляет номер пользователя в БД"""
 
         async with self.async_session_factory() as session:
@@ -525,7 +525,7 @@ class OrderData:
         self,
         order_id: int,
         new_status: OrderStatus,
-    ):
+    ) -> bool:
         """Обновляет статус заказа и время начала его выполнения"""
 
         async with self.async_session_factory() as session:
@@ -536,13 +536,15 @@ class OrderData:
             order.order_status = new_status
             order.started_at_moscow_time = await Time.get_moscow_time()
 
+            await session.flush()
             await session.commit()
+            return True
 
     async def update_order_status_and_completed_time(
         self,
         order_id: int,
         new_status: OrderStatus,
-    ):
+    ) -> bool:
         """Обновляет статус заказа и время завершения его выполнения"""
 
         async with self.async_session_factory() as session:
@@ -554,7 +556,9 @@ class OrderData:
             order.order_status = new_status
             order.completed_at_moscow_time = await Time.get_moscow_time()
 
+            await session.flush()
             await session.commit()
+            return True
 
     # ---
 

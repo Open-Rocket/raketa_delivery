@@ -86,8 +86,8 @@ async def cmd_start_customer(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -155,8 +155,8 @@ async def data_name_customer(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -180,6 +180,12 @@ async def data_phone_customer(message: Message, state: FSMContext):
         f"<b>Ваш город:</b>"
     )
 
+    await message.answer(
+        text=f"Номер принят {customer_phone}",
+        reply_markup=ReplyKeyboardRemove(),
+        disable_notification=True,
+    )
+
     new_message = await message.answer(
         text, disable_notification=True, parse_mode="HTML"
     )
@@ -189,8 +195,8 @@ async def data_phone_customer(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -229,8 +235,16 @@ async def data_city_customer(message: Message, state: FSMContext):
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
+    await message.answer(
+        text=f"Ваш город {city}",
+        disable_notification=True,
+    )
+
     new_message = await message.answer(
-        text, reply_markup=reply_kb, disable_notification=True, parse_mode="HTML"
+        text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
     )
 
     await handler.catch(
@@ -238,8 +252,8 @@ async def data_city_customer(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 

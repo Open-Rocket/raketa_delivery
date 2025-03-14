@@ -591,6 +591,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         return
 
     try:
+
         is_assigned = await order_data.assign_courier_to_order(
             order_id=current_order_id,
             tg_id=tg_id,
@@ -608,7 +609,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         )
 
         customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
-        notification_message = await customer_bot.send_message(
+        await customer_bot.send_message(
             chat_id=customer_tg_id,
             text=f"Ваш заказ №{current_order_id} был принят курьером!",
             parse_mode="HTML",
@@ -641,15 +642,6 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         )
 
         await callback_query.answer("✅ Заказ принят", show_alert=False)
-
-        await asyncio.sleep(900)
-        try:
-            await customer_bot.delete_message(
-                chat_id=customer_tg_id, message_id=notification_message.message_id
-            )
-        except Exception as e:
-            await callback_query.answer("😵😵😵", show_alert=False)
-            log.error(f"Ошибка при удалении сообщения: {e}")
 
     except Exception as e:
         log.error(f"Ошибка при принятии заказа {current_order_id}: {e}")
