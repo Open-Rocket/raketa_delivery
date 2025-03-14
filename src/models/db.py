@@ -31,7 +31,7 @@ from sqlalchemy import (
     Float,
     Integer,
 )
-from src.config import db_settings, moscow_time, utc_time
+from src.config import Time, db_settings
 
 
 load_dotenv()
@@ -44,10 +44,11 @@ intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
 stringData = Annotated[str, mapped_column(String(256), nullable=True)]
 intData = Annotated[int, mapped_column(Integer, nullable=True)]
+intDataUnique = Annotated[int, mapped_column(Integer, unique=True, nullable=True)]
 floatData = Annotated[float, mapped_column(Float, nullable=True)]
 coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
-datetimeData = Annotated[datetime, mapped_column(DateTime, default=utc_time)]
+datetimeData = Annotated[datetime, mapped_column(DateTime)]
 full_address_data = Annotated[list, mapped_column(JSONB, nullable=True)]
 
 
@@ -67,6 +68,7 @@ class Role(enum.Enum):
     undefined = "undefined"
     courier = "Курьер"
     customer = "Клиент"
+    agent = "Агент"
 
 
 class OrderStatus(enum.Enum):
@@ -84,7 +86,7 @@ class Customer(Base):
 
     customer_id: Mapped[intPK]
 
-    customer_tg_id: Mapped[intData]
+    customer_tg_id: Mapped[intDataUnique]
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_city: Mapped[stringData]
@@ -99,7 +101,7 @@ class Courier(Base):
 
     courier_id: Mapped[intPK]
 
-    courier_tg_id: Mapped[intData]
+    courier_tg_id: Mapped[intDataUnique]
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
@@ -127,23 +129,20 @@ class Order(Base):
         Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"), nullable=True
     )
 
-    created_at_moscow_time: Mapped[datetime] = mapped_column(
-        DateTime, default=moscow_time, nullable=True
-    )
-
-    started_at_moscow_time: Mapped[datetime] = mapped_column(
-        DateTime, default=moscow_time, nullable=True
-    )
-
-    completed_at_moscow_time: Mapped[datetime] = mapped_column(
-        DateTime, default=moscow_time, nullable=True
-    )
+    created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    started_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     order_city: Mapped[stringData]
+
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_tg_id: Mapped[intData]
+
     courier_tg_id: Mapped[intData]
+    courier_name: Mapped[stringData]
+    courier_phone: Mapped[stringData]
+
     delivery_object: Mapped[stringData]
     distance_km: Mapped[floatData]
     price_rub: Mapped[intData]

@@ -11,14 +11,14 @@ from sqlalchemy import select
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
-from src.config import moscow_time, log
+from src.config import Time, log
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable
 from src.services.routing import route
 
 
 class CustomerData:
-    def __init__(self, async_session_factory):
+    def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
     # ---
@@ -41,7 +41,7 @@ class CustomerData:
                     customer_phone=phone,
                     customer_city=city,
                     customer_accept_terms_of_use=tou,
-                    customer_registration_date=moscow_time,
+                    customer_registration_date=await Time.get_moscow_time(),
                 )
                 session.add(new_customer)
                 await session.flush()
@@ -62,59 +62,29 @@ class CustomerData:
         """Обновляет имя пользователя в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-                # Находим пользователя по tg_id
-                result = await session.execute(
-                    select(Customer).where(Customer.customer_tg_id == tg_id)
-                )
-                customer = result.scalar_one_or_none()
-
-                if not customer:
-                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
-                    return False
-
-                # Обновляем имя
-                customer.customer_name = new_name
-
-                # Сохраняем изменения
-                await session.commit()
-                log.info(f"Имя успешно обновлено для пользователя {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении имени: {e}")
+            customer = await session.get(Customer, tg_id)
+            if not customer:
                 return False
+
+            customer.customer_name = new_name
+            await session.commit()
+            return True
 
     async def update_customer_phone(
         self,
         tg_id: int,
         new_phone: str,
-    ) -> bool:
+    ):
         """Обновляет номер пользователя в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-                # Находим пользователя по tg_id
-                result = await session.execute(
-                    select(Customer).where(Customer.customer_tg_id == tg_id)
-                )
-                customer = result.scalar_one_or_none()
-
-                if not customer:
-                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
-                    return False
-
-                # Обновляем телефон
-                customer.customer_phone = new_phone
-
-                # Сохраняем изменения
-                await session.commit()
-                log.info(f"Телефон успешно обновлен для пользователя {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении телефона: {e}")
+            customer = await session.get(Customer, tg_id)
+            if not customer:
                 return False
+
+            customer.customer_phone = new_phone
+            await session.commit()
+            return True
 
     async def update_customer_city(
         self,
@@ -124,28 +94,13 @@ class CustomerData:
         """Обновляет город пользователя в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-                # Находим пользователя по tg_id
-                result = await session.execute(
-                    select(Customer).where(Customer.customer_tg_id == tg_id)
-                )
-                customer = result.scalar_one_or_none()
-
-                if not customer:
-                    log.error(f"Пользователь с tg_id={tg_id} не найден.")
-                    return False
-
-                # Обновляем город
-                customer.customer_city = new_city
-
-                # Сохраняем изменения
-                await session.commit()
-                log.info(f"Город успешно обновлен для пользователя {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении города: {e}")
+            customer = await session.get(Customer, tg_id)
+            if not customer:
                 return False
+
+            customer.customer_city = new_city
+            await session.commit()
+            return True
 
     # ---
 
@@ -188,7 +143,7 @@ class CourierData:
                     courier_phone=phone,
                     courier_city=city,
                     courier_accept_terms_of_use=tou,
-                    courier_registration_date=moscow_time,
+                    courier_registration_date=await Time.get_moscow_time(),
                 )
                 session.add(new_courier)
                 await session.flush()
@@ -227,35 +182,17 @@ class CourierData:
 
     # ---
 
-    async def update_courier_name(
-        self,
-        tg_id: int,
-        new_name: str,
-    ) -> bool:
+    async def update_courier_name(self, tg_id: int, new_name: str) -> bool:
         """Обновляет имя курьера в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-
-                result = await session.execute(
-                    select(Courier).where(Courier.courier_tg_id == tg_id)
-                )
-                courier = result.scalar_one_or_none()
-
-                if not courier:
-                    log.error(f"Курьер с tg_id={tg_id} не найден.")
-                    return False
-
-                courier.courier_name = new_name
-
-                await session.flush()
-                await session.commit()
-                log.info(f"Имя успешно обновлено для курьера {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении имени: {e}")
+            courier = await session.get(Courier, tg_id)
+            if not courier:
                 return False
+
+            courier.courier_name = new_name
+            await session.commit()
+            return True
 
     async def update_courier_phone(
         self,
@@ -265,27 +202,13 @@ class CourierData:
         """Обновляет номер курьера в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-
-                result = await session.execute(
-                    select(Courier).where(Courier.courier_tg_id == tg_id)
-                )
-                courier = result.scalar_one_or_none()
-
-                if not courier:
-                    log.error(f"Курьер с tg_id={tg_id} не найден.")
-                    return False
-
-                courier.courier_phone = new_phone
-
-                await session.flush()
-                await session.commit()
-                log.info(f"Телефон успешно обновлен для курьера {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении телефона: {e}")
+            courier = await session.get(Courier, tg_id)
+            if not courier:
                 return False
+
+            courier.courier_phone = new_phone
+            await session.commit()
+            return True
 
     async def update_courier_city(
         self,
@@ -295,30 +218,16 @@ class CourierData:
         """Обновляет город курьера в БД"""
 
         async with self.async_session_factory() as session:
-            try:
-
-                result = await session.execute(
-                    select(Courier).where(Courier.courier_tg_id == tg_id)
-                )
-                courier = result.scalar_one_or_none()
-
-                if not courier:
-                    log.error(f"Курьер с tg_id={tg_id} не найден.")
-                    return False
-
-                courier.courier_city = new_city
-
-                await session.flush()
-                await session.commit()
-                log.info(f"Город успешно обновлен для курьера {tg_id}.")
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении города: {e}")
+            courier = await session.get(Courier, tg_id)
+            if not courier:
                 return False
 
+            courier.courier_city = new_city
+            await session.commit()
+            return True
+
     async def update_courier_subscription(self, tg_id: int, days: int) -> bool:
-        """Продлевает подписку курьера на 30 дней, либо создаёт новую, если её нет."""
+        """Продлевает подписку курьера на days дней, либо создаёт новую, если её нет."""
 
         async with self.async_session_factory() as session:
             try:
@@ -331,7 +240,7 @@ class CourierData:
                     log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
-                now = moscow_time
+                now = await Time.get_moscow_time()
 
                 result = await session.execute(
                     select(Subscription).where(
@@ -496,7 +405,12 @@ class OrderData:
 
     # ---
 
-    async def create_order(self, tg_id: int, data: dict, order_forma: str) -> int:
+    async def create_order(
+        self,
+        tg_id: int,
+        data: dict,
+        order_forma: str,
+    ) -> int:
         """Создает новый заказ в БД"""
 
         async with self.async_session_factory() as session:
@@ -516,7 +430,7 @@ class OrderData:
                     description=data.get("description"),
                     distance_km=data.get("distance"),
                     price_rub=data.get("price"),
-                    created_at_moscow_time=data.get("order_time"),
+                    created_at_moscow_time=await Time.get_moscow_time(),
                     full_rout=data.get("yandex_maps_url"),
                     starting_point=data.get("starting_point"),
                     order_forma=order_forma,
@@ -558,13 +472,21 @@ class OrderData:
 
     async def assign_courier_to_order(self, order_id: int, tg_id: int) -> bool:
         """Назначает курьера на заказ"""
-
         async with self.async_session_factory() as session:
             order = await session.get(Order, order_id)
-            courier_id_query = await session.execute(
-                select(Courier.courier_id).where(Courier.courier_tg_id == tg_id)
+
+            courier_query = await session.execute(
+                select(
+                    Courier.courier_id, Courier.courier_name, Courier.courier_phone
+                ).where(Courier.courier_tg_id == tg_id)
             )
-            courier_id = courier_id_query.scalar()
+            courier_data = courier_query.first()
+
+            if not courier_data:
+                log.error(f"Курьер с tg_id={tg_id} не найден.")
+                return False
+
+            courier_id, courier_name, courier_phone = courier_data
 
             if not order:
                 return False
@@ -575,7 +497,8 @@ class OrderData:
 
             order.courier_id = courier_id
             order.courier_tg_id = tg_id
-            await session.flush()
+            order.courier_name = courier_name
+            order.courier_phone = courier_phone
             await session.commit()
             return True
 
@@ -599,49 +522,39 @@ class OrderData:
             return True
 
     async def update_order_status_and_started_time(
-        self, order_id: int, new_status: OrderStatus, started_time: datetime
-    ) -> bool:
+        self,
+        order_id: int,
+        new_status: OrderStatus,
+    ):
         """Обновляет статус заказа и время начала его выполнения"""
 
         async with self.async_session_factory() as session:
-            async with session.begin():
-                order = await session.get(Order, order_id)
-                if not order or order.order_status == new_status:
-                    return False
+            order = await session.get(Order, order_id)
+            if not order or order.order_status == new_status:
+                return False
 
-                if not order:
-                    log.error("Заказ не найден")
-                    return False
+            order.order_status = new_status
+            order.started_at_moscow_time = await Time.get_moscow_time()
 
-                order.order_status = new_status
-                order.started_at_moscow_time = started_time
-
-                await session.flush()
-                await session.commit()
-                return True
+            await session.commit()
 
     async def update_order_status_and_completed_time(
-        self, order_id: int, new_status: OrderStatus, completed_time: datetime
-    ) -> bool:
+        self,
+        order_id: int,
+        new_status: OrderStatus,
+    ):
         """Обновляет статус заказа и время завершения его выполнения"""
 
         async with self.async_session_factory() as session:
-            async with session.begin():
-                order = await session.execute(
-                    select(Order).where(Order.order_id == order_id)
-                )
-                order = order.scalars().first()
+            order = await session.get(Order, order_id)
+            if not order:
+                log.error("Заказ не найден")
+                return False
 
-                if not order:
-                    log.error("Заказ не найден")
-                    return False
+            order.order_status = new_status
+            order.completed_at_moscow_time = await Time.get_moscow_time()
 
-                order.order_status = new_status
-                order.completed_at_moscow_time = completed_time
-
-                await session.flush()
-                await session.commit()
-                return True
+            await session.commit()
 
     # ---
 

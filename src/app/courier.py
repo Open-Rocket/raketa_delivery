@@ -3,6 +3,7 @@ from ._deps import (
     CommandStart,
     FSMContext,
     ContentType,
+    ReplyKeyboardRemove,
     filters,
     Message,
     CallbackQuery,
@@ -12,8 +13,8 @@ from ._deps import (
     PreCheckoutQuery,
     LabeledPrice,
     zlib,
+    Time,
     handler,
-    moscow_time,
     courier_r,
     courier_fallback,
     courier_data,
@@ -34,12 +35,14 @@ from ._deps import (
 
 
 # ---
+# ---
 
 
 courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
 courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
 
 
+# ---
 # ---
 
 
@@ -97,6 +100,8 @@ async def cmd_start_courier(message: Message, state: FSMContext):
 
 @courier_r.callback_query(F.data == "reg")
 async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("✍️ Регистрация", show_alert=False)
 
     current_state = CourierState.reg_Name.state
     tg_id = callback_query.from_user.id
@@ -288,6 +293,8 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
         parse_mode="HTML",
     )
 
+    await callback_query.answer("✅ Принято", show_alert=False)
+
     await handler.catch(
         bot=courier_bot,
         chat_id=chat_id,
@@ -306,6 +313,7 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     current_state = CourierState.default.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
+    moscow_time = await Time.get_moscow_time()
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -345,6 +353,7 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# ---
 # ---
 
 
@@ -386,7 +395,10 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
 
     delete_previous = False
 
-    if isinstance(event, Message):
+    if isinstance(event, CallbackQuery):
+        delete_previous = False
+        await event.answer("🚀 Начать работу", show_alert=False)
+    else:
         delete_previous = True
 
     await handler.catch(
@@ -469,39 +481,44 @@ async def show_nearby_orders(callback_query: CallbackQuery, state: FSMContext):
             "Нет доступных заказов в вашем радиусе.",
             show_alert=True,
         )
-        return
 
-    orders_data = {}
-    order_ids = list(available_orders.keys())
-    for index, order_id in enumerate(order_ids, start=1):
-        order_forma = available_orders[order_id]["text"]
-        order_text = (
-            f"<b>{index}/{len(available_orders)}</b>\n"
-            f"<b>Заказ: №{order_id}</b>\n"
-            f"---------------------------------------------\n\n"
-            f"{order_forma}"
+    else:
+        len_available_orders = len(available_orders)
+        orders_data = {}
+        order_ids = list(available_orders.keys())
+        for index, order_id in enumerate(order_ids, start=1):
+            order_forma = available_orders[order_id]["text"]
+            order_text = (
+                f"<b>{index}/{len_available_orders}</b>\n"
+                f"<b>Заказ: №{order_id}</b>\n"
+                f"---------------------------------------------\n\n"
+                f"{order_forma}"
+            )
+            orders_data[order_id] = {"text": order_text, "index": index}
+
+        await state.set_state(current_state)
+        await state.update_data(
+            orders_data=orders_data,
+            order_ids=order_ids,
+            current_index=0,
+            current_order_id=order_ids[0],
         )
-        orders_data[order_id] = {"text": order_text, "index": index}
+        await rediska.save_fsm_state(state, bot_id, tg_id)
 
-    await state.set_state(current_state)
-    await state.update_data(
-        orders_data=orders_data,
-        order_ids=order_ids,
-        current_index=0,
-        current_order_id=order_ids[0],
-    )
-    await rediska.save_fsm_state(state, bot_id, tg_id)
+        first_order_id = order_ids[0]
+        reply_markup = await kb.get_courier_kb(
+            "one_order" if len(order_ids) == 1 else "available_orders"
+        )
 
-    first_order_id = order_ids[0]
-    reply_markup = await kb.get_courier_kb(
-        "one_order" if len(order_ids) == 1 else "available_orders"
-    )
+        await callback_query.answer(
+            f"📍 Заказы рядом {len_available_orders}", show_alert=False
+        )
 
-    await callback_query.message.edit_text(
-        orders_data[first_order_id]["text"],
-        reply_markup=reply_markup,
-        parse_mode="HTML",
-    )
+        await callback_query.message.edit_text(
+            orders_data[first_order_id]["text"],
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
 
 
 @courier_r.callback_query(F.data.in_({"next_right", "back_left"}))
@@ -525,8 +542,15 @@ async def handle_order_available_navigation(
 
     if callback_query.data == "next_right":
         new_index = (current_index + 1) % total_orders
+        await callback_query.answer(
+            f"{new_index+1}/{total_orders} ⏩", show_alert=False
+        )
+
     else:
         new_index = (current_index - 1) % total_orders
+        await callback_query.answer(
+            f"⏪ {new_index+1}/{total_orders}", show_alert=False
+        )
 
     new_order_id = order_ids[new_index]
     await state.set_state(current_state)
@@ -563,7 +587,7 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         return
 
     if current_order_id not in order_ids:
-        await callback_query.answer("Неверный id для заказа.", show_alert=True)
+        await callback_query.answer("Неверный id для заказа.", show_alert=False)
         return
 
     try:
@@ -581,7 +605,6 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
         await order_data.update_order_status_and_started_time(
             order_id=current_order_id,
             new_status=OrderStatus.IN_PROGRESS,
-            started_time=moscow_time,
         )
 
         customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
@@ -617,12 +640,15 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
             delete_previous=False,
         )
 
+        await callback_query.answer("✅ Заказ принят", show_alert=False)
+
         await asyncio.sleep(900)
         try:
             await customer_bot.delete_message(
                 chat_id=customer_tg_id, message_id=notification_message.message_id
             )
         except Exception as e:
+            await callback_query.answer("😵😵😵", show_alert=False)
             log.error(f"Ошибка при удалении сообщения: {e}")
 
     except Exception as e:
@@ -631,16 +657,20 @@ async def accept_order(callback_query: CallbackQuery, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @courier_r.message(F.text == "/my_orders")
 @courier_r.callback_query(F.data == "back_myOrders")
-async def handle_my_orders(event: Message | CallbackQuery, state: FSMContext):
+async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
 
     current_state = CourierState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
     tg_id = event.from_user.id
     chat_id = event.message.chat.id if is_callback else event.chat.id
+
+    if is_callback:
+        await event.answer("🔙 Назад", show_alert=False)
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -738,9 +768,17 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.answer(
             f"У вас нет {status_text} заказов.",
             disable_notification=True,
-            show_alert=True,
+            show_alert=False,
         )
         return
+
+    else:
+
+        if callback_query.data == "active_orders":
+            text_answer = "📋 Активные"
+        elif callback_query.data == "completed_orders":
+            text_answer = "📋 Завершенные"
+        await callback_query.answer(text_answer, show_alert=False)
 
     first_order_id = list(orders_data.keys())[0]
     await state.update_data(
@@ -794,8 +832,14 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     current_index = order_ids.index(current_order_id)
     if callback_query.data == "next_right_mo":
         new_index = (current_index + 1) % total_orders
+        await callback_query.answer(
+            f"{new_index+1}/{total_orders} ⏩", show_alert=False
+        )
     else:
         new_index = (current_index - 1) % total_orders
+        await callback_query.answer(
+            f"⏪ {new_index+1}/{total_orders}", show_alert=False
+        )
 
     next_order_id = order_ids[new_index]
 
@@ -809,6 +853,7 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     )
 
 
+# ---
 # ---
 
 
@@ -830,9 +875,29 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
     try:
 
         order = await order_data.get_order_by_id(current_order_id)
-        log.info(
-            f"Попытка завершить заказ {current_order_id}, его статус: {order.order_status}"
-        )
+
+        current_time = await Time.get_moscow_time()
+
+        execution_time_hours = (
+            current_time - order.started_at_moscow_time
+        ).total_seconds() / 3600
+        speed = order.distance_km / execution_time_hours
+
+        AVERAGE_SPEED_KMH = 8
+        SPEED_MULTIPLIER = 5
+
+        if speed > AVERAGE_SPEED_KMH * SPEED_MULTIPLIER:
+            log.warning(
+                f"Заказ {current_order_id} завершён слишком быстро (скорость {speed:.2f} км/ч)"
+            )
+            await callback_query.answer(
+                f"‼️Внимание‼️\n\n"
+                f"Вы пытаетесь завершить заказ слишком рано.\n"
+                f"Подобные действия рассматриваются как нарушение правил.\n"
+                f"При повторных попытках возможны штрафные санкции и блокировка профиля!",
+                show_alert=True,
+            )
+            return
 
         if order.order_status != OrderStatus.IN_PROGRESS:
             await callback_query.message.answer(
@@ -844,22 +909,16 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             new_status=OrderStatus.COMPLETED,
-            completed_time=moscow_time,
         )
-
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 
-        notification_text = (
-            f"Ваш заказ №{current_order_id} был успешно доставлен курьером!\n"
-            f"Спасибо, что воспользовались нашим сервисом.\n\n"
-            f"<i>*Сообщение удалится через 15 минут</i>"
-        )
+        notification_text = f"Ваш заказ №{current_order_id} был доставлен курьером!\n"
         notification_message = await customer_bot.send_message(
             chat_id=customer_tg_id, text=notification_text, parse_mode="HTML"
         )
 
         new_message = await callback_query.message.answer(
-            f"Статус заказа №{current_order_id} обновлен на 'Завершен'. Заказчик уведомлен.",
+            f"<b>✅ Заказ №{current_order_id} доставлен</b>!",
             disable_notification=False,
             parse_mode="HTML",
         )
@@ -867,6 +926,8 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
         await courier_data.change_order_active_count(tg_id, count=-1)
         await state.set_state(current_state)
         await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+        await callback_query.answer("👍 Заказ завершен", show_alert=False)
 
         await handler.catch(
             bot=courier_bot,
@@ -876,8 +937,6 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
             current_message=callback_query.message,
             delete_previous=False,
         )
-
-        log.info(f"complete_order was successfully done!")
 
         await asyncio.sleep(900)
         try:
@@ -895,6 +954,7 @@ async def complete_order(callback_query: CallbackQuery, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @courier_r.message(F.text == "/profile")
@@ -903,6 +963,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     current_state = CourierState.default.state
     tg_id = message.from_user.id
     chat_id = message.chat.id
+    moscow_time = await Time.get_moscow_time()
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -947,6 +1008,8 @@ async def cmd_profile(message: Message, state: FSMContext):
 @courier_r.callback_query(F.data == "set_my_name")
 async def set_name(callback_query: CallbackQuery, state: FSMContext):
 
+    await callback_query.answer("Изменить имя:", show_alert=False)
+
     current_state = CourierState.change_Name.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -973,6 +1036,8 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
 
 @courier_r.callback_query(F.data == "set_my_phone")
 async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("Изменить телефон:", show_alert=False)
 
     current_state = CourierState.change_Phone.state
     tg_id = callback_query.from_user.id
@@ -1002,7 +1067,8 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
 
 @courier_r.callback_query(F.data == "set_my_city")
 async def set_city(callback_query: CallbackQuery, state: FSMContext):
-    log.info(f"set_city was called!")
+
+    await callback_query.answer("Изменить город:", show_alert=False)
 
     current_state = CourierState.change_City.state
     tg_id = callback_query.from_user.id
@@ -1028,6 +1094,7 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# ---
 # ---
 
 
@@ -1143,6 +1210,7 @@ async def change_city(message: Message, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @courier_r.message(F.text == "/faq")
@@ -1245,10 +1313,13 @@ async def cmd_make_order(message: Message, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @courier_r.callback_query(F.data == "my_statistic")
-async def show_courier_statistic(callback_query: CallbackQuery, state: FSMContext):
+async def get_courier_statistic(callback_query: CallbackQuery, state: FSMContext):
+
+    await callback_query.answer("📊 Статистика", show_alert=False)
 
     current_state = CourierState.default.state
     tg_id = callback_query.from_user.id
@@ -1268,7 +1339,7 @@ async def show_courier_statistic(callback_query: CallbackQuery, state: FSMContex
         f"📊 <b>Ваша статистика</b>\n\n"
         f"Всего заказов: {total_orders}\n"
         f"Завершенные заказы: {completed_orders}\n"
-        f"Среднее время выполнения: {average_execution_time:.2f} секунд\n"
+        f"Среднее время выполнения: {average_execution_time / 60:.2f} мин\n"
         f"Средняя скорость: {average_speed:.2f} км/ч\n"
         f"Общая сумма заработка: {total_money_earned} руб.\n"
     )
@@ -1281,6 +1352,7 @@ async def show_courier_statistic(callback_query: CallbackQuery, state: FSMContex
 
 
 # ---
+# ---
 
 
 @payment_r.message(F.text == "/subs")
@@ -1289,8 +1361,11 @@ async def payment_invoice(event: Message | CallbackQuery):
 
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
+    moscow_time = await Time.get_moscow_time()
 
     if isinstance(event, Message):
+
+        await event.answer("💵 Оформить подписку", show_alert=False)
 
         await handler._delete_previous_message(
             bot=courier_bot,
@@ -1448,6 +1523,7 @@ async def successful_payment(message: Message):
     )
 
 
+# ---
 # ---
 
 

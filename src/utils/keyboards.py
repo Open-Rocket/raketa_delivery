@@ -62,7 +62,7 @@ class Keyboard:
                     [KeyboardButton(text="Поделиться номером", request_contact=True)],
                 ],
                 resize_keyboard=True,
-                one_time_keyboard=False,
+                one_time_keyboard=True,
                 input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
             ),
             # ---

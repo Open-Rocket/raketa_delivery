@@ -8,6 +8,7 @@ from aiogram.enums import ContentType
 from datetime import datetime, timedelta
 from aiogram.types import LabeledPrice
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
+from aiogram.types import ReplyKeyboardRemove
 
 from src.services import (
     customer_data,
@@ -21,11 +22,11 @@ from src.services import (
 from src.models import OrderStatus
 from src.confredis import rediska
 from src.config import (
+    Time,
     customer_bot,
     courier_bot,
     customer_bot_id,
     courier_bot_id,
-    moscow_time,
     customer_r,
     courier_r,
     payment_r,
@@ -65,7 +66,6 @@ __all__ = [
     "recognizer",
     "OrderStatus",
     "rediska",
-    "moscow_time",
     "timedelta",
     "customer_r",
     "courier_r",
@@ -91,4 +91,6 @@ __all__ = [
     "courier_bot",
     "customer_bot_id",
     "courier_bot_id",
+    "Time",
+    "ReplyKeyboardRemove",
 ]

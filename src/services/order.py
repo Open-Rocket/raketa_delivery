@@ -4,7 +4,7 @@ import speech_recognition as sr
 from pydub import AudioSegment
 from aiogram.types import Message
 from aiogram.enums import ContentType
-from src.config import log, moscow_time
+from src.config import log
 from .routing import route
 
 

@@ -9,12 +9,13 @@ from ._deps import (
     OrderStatus,
     CustomerState,
     CustomerOuterMiddleware,
+    ReplyKeyboardRemove,
     time,
+    Time,
     zlib,
     handler,
     customer_bot,
     customer_bot_id,
-    moscow_time,
     customer_r,
     customer_fallback,
     kb,
@@ -33,12 +34,14 @@ from ._deps import (
 
 
 # ---
+# ---
 
 
 customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
 customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
 
 
+# ---
 # ---
 
 
@@ -243,8 +246,6 @@ async def data_city_customer(message: Message, state: FSMContext):
 @customer_r.callback_query(F.data == "accept_tou")
 async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
-    await callback_query.answer("✅ Принимаю", show_alert=False)
-
     current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
@@ -277,6 +278,8 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
         text, disable_notification=True, parse_mode="HTML"
     )
 
+    await callback_query.answer("✅ Принято", show_alert=False)
+
     await handler.catch(
         bot=customer_bot,
         chat_id=chat_id,
@@ -287,6 +290,7 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# ---
 # ---
 
 
@@ -335,8 +339,8 @@ async def cmd_order(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -374,8 +378,8 @@ async def cmd_profile(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -404,8 +408,8 @@ async def cmd_faq(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -439,8 +443,8 @@ async def cmd_rules(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -474,18 +478,19 @@ async def cmd_become_courier(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
+# ---
 # ---
 
 
 @customer_r.callback_query(F.data == "ai_order")
 async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
-    await callback_query.answer("🤖 Оформить заказ", show_alert=False)
+    await callback_query.answer("🤖 ИИ ассистент готов принять заказ", show_alert=False)
 
     current_state = CustomerState.ai_voice_order.state
     tg_id = callback_query.from_user.id
@@ -517,6 +522,7 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @customer_r.callback_query(F.data == "set_my_name")
@@ -541,7 +547,7 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=callback_query.message,
+        current_message=None,
         delete_previous=False,
     )
 
@@ -569,7 +575,7 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=callback_query.message,
+        current_message=None,
         delete_previous=False,
     )
 
@@ -596,11 +602,12 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=callback_query.message,
+        current_message=None,
         delete_previous=False,
     )
 
 
+# ---
 # ---
 
 
@@ -631,8 +638,8 @@ async def change_name(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -656,7 +663,10 @@ async def change_phone(message: Message, state: FSMContext):
     )
 
     new_message = await message.answer(
-        text, disable_notification=True, parse_mode="HTML"
+        text,
+        disable_notification=True,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="HTML",
     )
 
     await handler.catch(
@@ -664,8 +674,8 @@ async def change_phone(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -707,11 +717,12 @@ async def change_city(message: Message, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
+# ---
 # ---
 
 
@@ -765,8 +776,10 @@ async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
         chat_id=chat_id,
         user_id=tg_id,
         new_message=new_message,
-        current_message=None if isinstance(event, CallbackQuery) else event,
-        delete_previous=False if is_callback else True,
+        # current_message=None if isinstance(event, CallbackQuery) else event,
+        # delete_previous=False if is_callback else True,
+        current_message=None,
+        delete_previous=False,
     )
 
 
@@ -820,9 +833,14 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
             )
             order_forma = "-"
 
+        courier_name = order.courier_name if order.courier_name else "..."
+        courier_phone = order.courier_phone if order.courier_phone else "..."
         base_info = (
             f"<b>{index}/{len(customer_orders)}</b>\n"
             f"<b>Заказ: №{order.order_id}</b>\n"
+            f"---------------------------------------------\n"
+            f"<b>Курьер: </b>{courier_name}\n"
+            f"<b>Телефон: </b>{courier_phone}\n"
             f"---------------------------------------------\n"
             f"{order_forma}"
         )
@@ -892,11 +910,11 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
     order_ids = list(orders_data.keys())
 
     if callback_query.data == "next_right_mo":
-        await callback_query.answer("следующий ⏩", show_alert=False)
         counter = (counter + 1) % total_orders
+        await callback_query.answer(f"{counter+1}/{total_orders} ⏩", show_alert=False)
     else:
-        await callback_query.answer("⏪ предыдущий", show_alert=False)
         counter = (counter - 1) % total_orders
+        await callback_query.answer(f"⏪ {counter+1}/{total_orders}", show_alert=False)
 
     current_order_id = order_ids[counter]
 
@@ -990,6 +1008,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
 
 
 # ---
+# ---
 
 
 @customer_r.message(
@@ -1047,6 +1066,7 @@ async def process_order_logic(
     customer_name = await rediska.get_name(customer_bot_id, tg_id)
     customer_phone = await rediska.get_phone(customer_bot_id, tg_id)
     customer_city = await rediska.get_city(customer_bot_id, tg_id)
+    moscow_time = await Time.get_moscow_time()
 
     try:
         city, addresses, delivery_object, description = await assistant.process_order(
@@ -1092,9 +1112,11 @@ async def process_order_logic(
         chat_id=message.chat.id,
         user_id=message.from_user.id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
+
+    log.info("process_order_logic done!")
 
 
 async def handle_error_response(
@@ -1102,10 +1124,11 @@ async def handle_error_response(
 ):
     """Функция для обработки и отправки сообщения об ошибке."""
     error_messages = {
-        "general": "⚠ Ошибка при обработке заказа.\nПопробуйте снова",
-        "unrecognized": "Мы не смогли определить ваш заказ.\nПопробуйте переформулировать заказ более четко и повторить попытку.",
-        "timeout": "⚠ Время обработки заказа превышено. Попробуйте снова.",
-        "moderation_failed": "⚠ Оформление заказа не удалось! Модерация не прошла.",
+        "general": "<b>¡ Ошибка при обработке заказа.</b>\n\nПопробуйте снова",
+        "unrecognized": "<b>¡ Мы не смогли определить ваш заказ.</b>\n\n"
+        "Попробуйте переформулировать заказ более четко и повторить попытку.",
+        "timeout": "<b>¡ Время обработки заказа превышено.</b>\n\nПопробуйте снова.",
+        "moderation_failed": "<b>¡ Оформление заказа не удалось!</b>\n\nМодерация не прошла.",
     }
 
     new_message = await message.answer(
@@ -1120,12 +1143,13 @@ async def handle_error_response(
         chat_id=message.chat.id,
         user_id=message.from_user.id,
         new_message=new_message,
-        current_message=message,
-        delete_previous=True,
+        current_message=None,
+        delete_previous=False,
     )
     log.warning(f"Error response sent: {error_key}")
 
 
+# ---
 # ---
 
 
@@ -1156,7 +1180,11 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
         return
 
     try:
-        order_number = await order_data.create_order(tg_id, data, order_forma)
+        order_number = await order_data.create_order(
+            tg_id=tg_id,
+            data=data,
+            order_forma=order_forma,
+        )
         text = (
             f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
             f"Мы ищем курьера для вашего заказа 🔎\n\n"
@@ -1184,6 +1212,7 @@ async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# ---
 # ---
 
 
@@ -1214,6 +1243,7 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
+# ---
 # ---
 
 

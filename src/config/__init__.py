@@ -1,4 +1,4 @@
-from .clock import moscow_time, utc_time
+from .clock import Time
 from .db import db_settings
 from .logger import log
 from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY
@@ -26,8 +26,7 @@ from .bots import (
 __all__ = [
     "log",
     "db_settings",
-    "moscow_time",
-    "utc_time",
+    "Time",
     "PROXY",
     "OPENAI_API_KEY",
     "AI_ASSISTANT_ID",
