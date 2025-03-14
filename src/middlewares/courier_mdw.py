@@ -7,6 +7,7 @@ from aiogram.types import (
     CallbackQuery,
 )
 from src.confredis import RedisService
+from src.config import log
 from src.utils import CourierState
 
 
@@ -27,11 +28,6 @@ class CourierOuterMiddleware(BaseMiddleware):
         bot_id = event.bot.id
         fsm_context: FSMContext = data.get("state")
         state: FSMContext = await fsm_context.get_state()
-        state_data = await fsm_context.get_data()
-
-        if not state_data:
-            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
-            state_data = await fsm_context.get_data()
 
         if state == None:
             state = await self.rediska.get_state(bot_id, tg_id)
@@ -39,7 +35,17 @@ class CourierOuterMiddleware(BaseMiddleware):
             if state == None:
                 state = CourierState.default.state
 
+            await fsm_context.set_state(None)
             await fsm_context.set_state(state)
+            data["state"] = fsm_context
+
+        state_data = await fsm_context.get_data()
+
+        if not state_data:
+            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
+            state_data = await fsm_context.get_data()
+
+        log.info(f"FSM перед вызовом хендлера: {state}")
 
         if isinstance(event, Message):
             result = await _check_state_and_handle_message(state, event, handler, data)
@@ -53,6 +59,30 @@ async def _check_state_and_handle_message(
     state: str, event: Message, handler: Callable, data: Dict[str, Any]
 ) -> Any:
     message_text = event.text
+
+    if state in (
+        CourierState.reg_state.state,
+        CourierState.reg_Name.state,
+        CourierState.reg_Phone.state,
+        CourierState.reg_City.state,
+        CourierState.reg_tou.state,
+        CourierState.change_Name.state,
+        CourierState.change_Phone.state,
+        CourierState.change_City.state,
+    ):
+        if message_text in [
+            "/run",
+            "/my_orders",
+            "/profile",
+            "/start",
+            "/subs",
+            "/faq",
+            "/rules",
+            "/make_order",
+        ]:
+            log.info(f"MessageText: {message_text}")
+            await event.delete()
+            return
 
     if state == CourierState.location.state:
         return await handler(event, data)
@@ -70,19 +100,6 @@ async def _check_state_and_handle_message(
     if message_text == "/subs":
         return await handler(event, data)
 
-    if state in (
-        CourierState.reg_Name.state,
-        CourierState.reg_Phone.state,
-        CourierState.reg_City.state,
-        CourierState.reg_tou.state,
-        CourierState.change_Name.state,
-        CourierState.change_Phone.state,
-        CourierState.change_City.state,
-    ):
-        if message_text in ["/my_orders", "/location", "/start"]:
-            await event.delete()
-            return
-
     if state in {CourierState.location.state, CourierState.myOrders.state}:
         if message_text not in ["/my_orders", "/location", "/start"]:
             await event.delete()
@@ -95,6 +112,8 @@ async def _check_state_and_handle_message(
     if state == CourierState.reg_Phone.state and not event.contact:
         await event.delete()
         return
+
+    log.info(f"State: {state}")
 
     return await handler(event, data)
 

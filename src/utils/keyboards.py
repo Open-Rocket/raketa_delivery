@@ -372,7 +372,11 @@ class Keyboard:
             # ---
             "super_go": InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="Супер 🌟", callback_data="super_go")]
+                    [
+                        InlineKeyboardButton(
+                            text="Активировать 🌟", callback_data="super_go"
+                        )
+                    ]
                 ]
             ),
         }
