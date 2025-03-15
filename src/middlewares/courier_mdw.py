@@ -1,3 +1,5 @@
+import re
+import emoji
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
@@ -38,7 +40,6 @@ class CourierOuterMiddleware(BaseMiddleware):
                 state = CourierState.default.state
 
             await fsm_context.set_state(state)
-            data["state"] = fsm_context
 
         if not state_data:
             await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
@@ -57,7 +58,28 @@ class CourierOuterMiddleware(BaseMiddleware):
 async def _check_state_and_handle_message(
     state: str, event: Message, handler: Callable, data: Dict[str, Any]
 ) -> Any:
-    message_text = event.text
+    """Проверка состояния курьера и обработка сообщения"""
+
+    if state in (
+        CourierState.reg_Name.state,
+        CourierState.reg_City.state,
+        CourierState.change_Name.state,
+        CourierState.change_City.state,
+    ):
+        if event.content_type != "text":
+            await event.delete()
+            return
+
+        if emoji.emoji_count(event.text) > 0:
+
+            text_without_emojis = emoji.replace_emoji(event.text, replace="")
+            text_only_chars = re.sub(r"\s", "", text_without_emojis)
+
+            if not text_only_chars:
+                await event.delete()
+                return
+
+            return await handler(event, data)
 
     if state in (
         CourierState.reg_state.state,
@@ -69,11 +91,11 @@ async def _check_state_and_handle_message(
         CourierState.change_Phone.state,
         CourierState.change_City.state,
     ):
-        if message_text in [
+        if event.text in [
+            "/start",
             "/run",
             "/my_orders",
             "/profile",
-            "/start",
             "/subs",
             "/faq",
             "/rules",
@@ -82,32 +104,18 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
-    if state == CourierState.location.state:
-        return await handler(event, data)
-
-    if state in (
-        CourierState.myOrders.state,
-        CourierState.myOrders_completed.state,
-        CourierState.myOrders_active.state,
+    if (
+        state
+        in (
+            CourierState.reg_Phone.state,
+            CourierState.change_Phone.state,
+        )
+        and not event.contact
     ):
-        return await handler(event, data)
-
-    if message_text == "/start":
-        return await handler(event, data)
-
-    if message_text == "/subs":
-        return await handler(event, data)
-
-    if state in {CourierState.location.state, CourierState.myOrders.state}:
-        if message_text not in ["/my_orders", "/location", "/start"]:
-            await event.delete()
-            return
-
-    if state == CourierState.reg_state.state:
         await event.delete()
         return
 
-    if state == CourierState.reg_Phone.state and not event.contact:
+    if state == CourierState.reg_state.state:
         await event.delete()
         return
 

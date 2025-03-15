@@ -38,14 +38,6 @@ from ._deps import (
 # ---
 
 
-# courier_r.message.outer_middleware(CourierOuterMiddleware(rediska))
-# courier_r.callback_query.outer_middleware(CourierOuterMiddleware(rediska))
-
-
-# ---
-# ---
-
-
 @courier_r.message(CommandStart())
 async def cmd_start_courier(message: Message, state: FSMContext):
 
@@ -100,9 +92,9 @@ async def data_reg_courier(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     text = (
-        "Пройдите небольшую регистрацию.\n"
-        "Это не займет много времени.\n\n"
-        "<b>Как вас зовут?</b>"
+        f"Пройдите небольшую регистрацию.\n"
+        f"Это не займет много времени.\n\n"
+        f"<b>Как вас зовут?</b>\n\n"
     )
 
     await callback_query.message.answer(
@@ -175,24 +167,23 @@ async def data_phone_courier(message: Message, state: FSMContext):
 @courier_r.message(filters.StateFilter(CourierState.reg_City))
 async def data_city_courier(message: Message, state: FSMContext):
 
-    current_state = CourierState.reg_City.state
-
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
 
     if not city:
 
-        text = f"Введите корректное название города!\n\n<b>Ваш город:</b>"
+        current_state = CourierState.reg_City.state
+
         await message.answer(
-            text,
+            text=f"Введите корректное название города!\n\n<b>Ваш город:</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
 
-        log.warning(f"city name was uncorrectable: {city}\n")
-
     else:
+
+        current_state = CourierState.reg_tou.state
 
         _ = await rediska.set_city(courier_bot_id, tg_id, city)
 
@@ -208,8 +199,9 @@ async def data_city_courier(message: Message, state: FSMContext):
         )
 
         await message.answer(
-            text=f"Ваш город {city}",
+            text=(f"Ваш город {city}\n\n"),
             disable_notification=True,
+            parse_mode="HTML",
         )
 
         await message.answer(
@@ -280,9 +272,7 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
-    courier_name, courier_phone, courier_city, end_date = (
-        await courier_data.get_courier_full_info(tg_id)
-    )
+    _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
 
     if end_date and end_date >= moscow_time:
         remaining_days = (end_date - moscow_time).days
@@ -294,16 +284,10 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     else:
         subscription_status = "<b>Подписка:</b> Не активна\n\n"
 
-    text = (
-        f"Имя: {courier_name}\n"
-        f"Номер: {courier_phone}\n"
-        f"Город: {courier_city}\n"
-        f"{subscription_status}"
-        f"▼ <b>Выберите действие ...</b>"
-    )
+    text = f"{subscription_status}" f"▼ <b>Выберите действие ...</b>"
     await callback_query.message.answer(
         text,
-        disable_notification=True,
+        disable_notification=False,
         parse_mode="HTML",
     )
     await callback_query.answer("⭐️⭐️⭐️", show_alert=False)

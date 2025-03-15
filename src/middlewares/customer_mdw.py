@@ -1,3 +1,5 @@
+import re
+import emoji
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
@@ -29,10 +31,6 @@ class CustomerOuterMiddleware(BaseMiddleware):
         state: FSMContext = await fsm_context.get_state()
         state_data = await fsm_context.get_data()
 
-        if not state_data:
-            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
-            state_data = await fsm_context.get_data()
-
         if not state:
             state = await self.rediska.get_state(bot_id, tg_id)
 
@@ -40,6 +38,10 @@ class CustomerOuterMiddleware(BaseMiddleware):
                 state = CustomerState.default.state
 
             await fsm_context.set_state(state)
+
+        if not state_data:
+            await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
+            state_data = await fsm_context.get_data()
 
         if isinstance(event, Message):
             result = await _check_state_and_handle_message(state, event, handler, data)
@@ -54,24 +56,42 @@ async def _check_state_and_handle_message(
 ) -> Any:
     """Проверка состояния пользователя и обработка сообщения"""
 
-    message_text = event.text
-
-    if message_text == "/start":
-        return await handler(event, data)
-
-    if state == CustomerState.reg_state.state:
-        await event.delete()
-        return
-
     if state in (
         CustomerState.reg_Name.state,
         CustomerState.reg_City.state,
-        CustomerState.reg_tou.state,
+        CustomerState.change_Name.state,
+        CustomerState.change_City.state,
     ):
-        if message_text in [
+        if event.content_type != "text":
+            await event.delete()
+            return
+
+        if emoji.emoji_count(event.text) > 0:
+
+            text_without_emojis = emoji.replace_emoji(event.text, replace="")
+            text_only_chars = re.sub(r"\s", "", text_without_emojis)
+
+            if not text_only_chars:
+                await event.delete()
+                return
+
+            return await handler(event, data)
+
+    if state in (
+        CustomerState.reg_state.state,
+        CustomerState.reg_Name.state,
+        CustomerState.reg_Phone.state,
+        CustomerState.reg_City.state,
+        CustomerState.reg_tou.state,
+        CustomerState.change_Name.state,
+        CustomerState.change_Phone.state,
+        CustomerState.change_City.state,
+    ):
+        if event.text in [
+            "/start",
             "/order",
-            "/profile",
             "/my_orders",
+            "/profile",
             "/faq",
             "/rules",
             "/become_courier",
@@ -79,15 +99,23 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
+    if event.text == "/start":
+        return await handler(event, data)
+
+    if state == CustomerState.reg_state.state:
+        await event.delete()
+        return
+
     if (
-        state == CustomerState.reg_Phone.state
-        or state == CustomerState.change_Phone.state
+        state
+        in (
+            CustomerState.reg_Phone.state,
+            CustomerState.change_Phone.state,
+        )
+        and not event.contact
     ):
-        if event.content_type == "contact":
-            return await handler(event, data)
-        else:
-            await event.delete()
-            return
+        await event.delete()
+        return
 
     if state == CustomerState.assistant_run.state:
         await event.delete()

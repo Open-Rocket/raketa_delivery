@@ -37,14 +37,6 @@ from ._deps import (
 # ---
 
 
-# customer_r.message.outer_middleware(CustomerOuterMiddleware(rediska))
-# customer_r.callback_query.outer_middleware(CustomerOuterMiddleware(rediska))
-
-
-# ---
-# ---
-
-
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext):
 
@@ -165,25 +157,23 @@ async def data_phone_customer(message: Message, state: FSMContext):
 @customer_r.message(filters.StateFilter(CustomerState.reg_City))
 async def data_city_customer(message: Message, state: FSMContext):
 
-    current_state = CustomerState.reg_tou.state
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
 
     if not city:
 
-        current_state = CustomerState.change_City.state
-        text = f"Введите корректное название города!\n<b>Ваш город:</b>"
+        current_state = CustomerState.reg_City.state
+
         await message.answer(
-            text,
+            text=f"Введите корректное название города!\n<b>Ваш город:</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
 
-        log.warning(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
-
     else:
 
+        current_state = CustomerState.reg_tou.state
         _ = await rediska.set_city(customer_bot_id, tg_id, city)
 
         reply_kb = await kb.get_customer_kb("accept_tou")
@@ -198,8 +188,9 @@ async def data_city_customer(message: Message, state: FSMContext):
         )
 
         await message.answer(
-            text=f"Ваш город {city}",
+            text=(f"Ваш город {city}\n\n"),
             disable_notification=True,
+            parse_mode="HTML",
         )
 
         await message.answer(
