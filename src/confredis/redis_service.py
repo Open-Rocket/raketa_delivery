@@ -6,6 +6,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from aiogram.types import Message
+from src.config import log
 
 
 class RedisKey:
@@ -39,10 +40,13 @@ class RedisService:
 
     # ---
 
-    async def set_state(self, bot_id: int, user_id: int, state: State) -> None:
+    async def set_state(self, bot_id: int, user_id: int, state: State):
         """Сохраняет состояние FSM пользователя в Redis"""
         key = RedisKey(bot_id, user_id, is_state=True)
-        await self.fsm_storage.set_state(key=key, state=state)
+        try:
+            await self.fsm_storage.set_state(key=key, state=state)
+        except Exception as e:
+            log.error(f"Ошибка записи состояния в Redis: {e}")
 
     async def save_fsm_state(
         self, state: FSMContext, bot_id: int, user_id: int
@@ -94,40 +98,56 @@ class RedisService:
     # ---
 
     async def set_name(self, bot_id: int, user_id: int, name: str) -> bool:
-        """Сохраняет имя и телефон пользователя в Redis"""
+        """Сохраняет имя пользователя в Redis и возвращает статус операции"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", mapping={"name": name})
-        return True
+        try:
+            # raise Exception("TestException")
+            await self.redis.hset(f"user_info:{key}", mapping={"name": name})
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи имени в Redis: {e}")
+            return False
 
     async def set_phone(self, bot_id: int, user_id: int, phone: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", mapping={"phone": phone})
-        return True
+        try:
+            await self.redis.hset(f"user_info:{key}", mapping={"phone": phone})
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи телефона в Redis: {e}")
+            return False
 
     async def set_city(self, bot_id: int, user_id: int, city: str) -> bool:
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", mapping={"city": city})
-        return True
-
-    async def set_tou(self, bot_id: int, user_id: int, tou: str) -> bool:
-        """Сохраняет имя и телефон пользователя в Redis"""
-        key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", mapping={"tou": tou})
-        return True
+        try:
+            await self.redis.hset(f"user_info:{key}", mapping={"city": city})
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи города в Redis: {e}")
+            return False
 
     async def set_reg(self, bot_id: int, user_id: int, value: bool) -> bool:
         """Устанавливает статус регистрации пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", "is_reg", int(value))
-        return True
+        try:
+            # raise Exception("TestException")
+            await self.redis.hset(f"user_info:{key}", "is_reg", int(value))
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи статуса регистрации в Redis: {e}")
+            return False
 
     async def set_read_info(self, bot_id: int, user_id: int, value: bool) -> bool:
         """Устанавливает статус ознакомления пользователя с оформлением заказа"""
         key = RedisKey(bot_id, user_id)
-        await self.redis.hset(f"user_info:{key}", "read_info", int(value))
-        return True
+        try:
+            await self.redis.hset(f"user_info:{key}", "read_info", int(value))
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи статуса ознакомления с информацией в Redis: {e}")
+            return False
 
     # ---
 
@@ -172,35 +192,37 @@ class RedisService:
                 None,
                 None,
                 None,
-                None,
             )
         return (
             user_data.get(b"name", b"").decode("utf-8"),
             user_data.get(b"phone", b"").decode("utf-8"),
             user_data.get(b"city", b"").decode("utf-8"),
-            user_data.get(b"tou", b"").decode("utf-8"),
         )
 
     # ---
 
-    async def is_reg(self, bot_id: int, user_id: int) -> bool:
+    async def is_reg(self, bot_id: int, user_id: int) -> bool | None:
         """Получает статус регистрации пользователя из Redis"""
         key = RedisKey(bot_id, user_id)
-        is_reg = await self.redis.hget(f"user_info:{key}", "is_reg")
-
-        if is_reg is not None:
+        try:
+            is_reg = await self.redis.hget(f"user_info:{key}", "is_reg")
+            if is_reg is None:
+                return False
             return bool(int(is_reg.decode("utf-8")))
-        else:
-            return False
+        except Exception as e:
+            log.error(f"Ошибка чтения статуса регистрации из Redis: {e}")
+            return None
 
     async def is_read_info(self, bot_id: int, user_id: int) -> bool:
         """Получает значение is_read из Redis"""
         key = RedisKey(bot_id, user_id)
-        is_read = await self.redis.hget(f"user_info:{key}", "read_info")
-
-        if is_read is not None:
+        try:
+            is_read = await self.redis.hget(f"user_info:{key}", "read_info")
+            if is_read is None:
+                return False
             return bool(int(is_read.decode("utf-8")))
-        else:
+        except Exception as e:
+            log.error(f"Ошибка чтения статуса ознакомления с информацией из Redis: {e}")
             return False
 
     # ---

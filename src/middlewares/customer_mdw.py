@@ -2,14 +2,17 @@ import re
 import emoji
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
-from typing import Callable, Dict, Any, Awaitable
+from typing import Callable, Dict, Awaitable
 from aiogram.types import (
     Message,
     TelegramObject,
     CallbackQuery,
+    ContentType,
 )
 from src.confredis import RedisService
 from src.utils import CustomerState
+from src.config import customer_bot
+from aiogram.types import ReplyKeyboardRemove
 
 
 class CustomerOuterMiddleware(BaseMiddleware):
@@ -19,10 +22,10 @@ class CustomerOuterMiddleware(BaseMiddleware):
 
     async def __call__(
         self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[TelegramObject, Dict], Awaitable],
         event: Message | CallbackQuery,
-        data: Dict[str, Any],
-    ) -> Any:
+        data: Dict,
+    ):
         """Обработка внешних событий"""
 
         tg_id = event.from_user.id
@@ -44,7 +47,9 @@ class CustomerOuterMiddleware(BaseMiddleware):
             state_data = await fsm_context.get_data()
 
         if isinstance(event, Message):
-            result = await _check_state_and_handle_message(state, event, handler, data)
+            result = await _check_state_and_handle_message(
+                fsm_context, state, event, handler, data
+            )
             return result
 
         elif isinstance(event, CallbackQuery):
@@ -52,9 +57,40 @@ class CustomerOuterMiddleware(BaseMiddleware):
 
 
 async def _check_state_and_handle_message(
-    state: str, event: Message, handler: Callable, data: Dict[str, Any]
-) -> Any:
+    fsm_context: FSMContext,
+    state: str,
+    event: Message,
+    handler: Callable,
+    data: Dict,
+):
     """Проверка состояния пользователя и обработка сообщения"""
+
+    if state == CustomerState.assistant_run.state:
+        await event.delete()
+        return
+
+    if state in (CustomerState.reg_Phone.state,):
+        if event.text in [
+            "/start",
+        ]:
+
+            return await handler(event, data)
+
+    if state in (
+        CustomerState.change_Name.state,
+        CustomerState.change_City.state,
+    ):
+        if event.text in [
+            "/order",
+            "/my_orders",
+            "/profile",
+            "/faq",
+            "/rules",
+            "/become_courier",
+        ]:
+
+            await fsm_context.set_state(CustomerState.default.state)
+            return await handler(event, data)
 
     if state in (
         CustomerState.reg_Name.state,
@@ -62,7 +98,7 @@ async def _check_state_and_handle_message(
         CustomerState.change_Name.state,
         CustomerState.change_City.state,
     ):
-        if event.content_type != "text":
+        if event.content_type != ContentType.TEXT:
             await event.delete()
             return
 
@@ -83,12 +119,8 @@ async def _check_state_and_handle_message(
         CustomerState.reg_Phone.state,
         CustomerState.reg_City.state,
         CustomerState.reg_tou.state,
-        CustomerState.change_Name.state,
-        CustomerState.change_Phone.state,
-        CustomerState.change_City.state,
     ):
         if event.text in [
-            "/start",
             "/order",
             "/my_orders",
             "/profile",
@@ -99,27 +131,33 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
-    if event.text == "/start":
-        return await handler(event, data)
+    if state in (CustomerState.reg_Phone.state,):
+        if not event.contact or event.contact.user_id != event.from_user.id:
+            await event.delete()
+            return
 
-    if state == CustomerState.reg_state.state:
-        await event.delete()
-        return
+    if state in (CustomerState.change_Phone.state,):
 
-    if (
-        state
-        in (
-            CustomerState.reg_Phone.state,
-            CustomerState.change_Phone.state,
-        )
-        and not event.contact
-    ):
-        await event.delete()
-        return
+        if event.text in [
+            "/order",
+            "/my_orders",
+            "/profile",
+            "/faq",
+            "/rules",
+            "/become_courier",
+        ]:
+            await customer_bot.send_message(
+                chat_id=event.from_user.id,
+                text="-",
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+            )
 
-    if state == CustomerState.assistant_run.state:
-        await event.delete()
-        return
+            return await handler(event, data)
+
+        if not event.contact or event.contact.user_id != event.from_user.id:
+            await event.delete()
+            return
 
     return await handler(event, data)
 

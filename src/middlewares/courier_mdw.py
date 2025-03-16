@@ -91,8 +91,8 @@ async def _check_state_and_handle_message(
         CourierState.change_Phone.state,
         CourierState.change_City.state,
     ):
+
         if event.text in [
-            "/start",
             "/run",
             "/my_orders",
             "/profile",
@@ -104,20 +104,13 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
-    if (
-        state
-        in (
-            CourierState.reg_Phone.state,
-            CourierState.change_Phone.state,
-        )
-        and not event.contact
+    if state in (
+        CourierState.reg_Phone.state,
+        CourierState.change_Phone.state,
     ):
-        await event.delete()
-        return
-
-    if state == CourierState.reg_state.state:
-        await event.delete()
-        return
+        if not event.contact or event.contact.user_id != event.from_user.id:
+            await event.delete()
+            return
 
     return await handler(event, data)
 

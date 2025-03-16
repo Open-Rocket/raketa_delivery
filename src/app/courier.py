@@ -32,7 +32,9 @@ from ._deps import (
     find_closest_city,
     customer_bot,
 )
-
+import aiogram
+from aiogram.types import ReplyKeyboardMarkup
+import datetime
 
 # ---
 # ---
@@ -56,16 +58,10 @@ async def cmd_start_courier(message: Message, state: FSMContext):
         current_state = CourierState.reg_state.state
         photo_title = await title.get_title_courier("/start")
         text = (
-            "Добро пожаловать в сервис доставки Ракета!\n"
-            "Стань частью сообщества, где ты сам управляешь своими доходами и работаешь на своих условиях.\n\n"
-            "Почему мы?\n\n"
-            "◉ <b>Зарабатывай больше</b>: \n"
-            "Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого заказа. Чем больше работаешь, тем больше зарабатываешь.\n\n"
-            "◉ <b>Свобода выбора</b>: \n"
-            "Твоя работа — на твоих условиях. Бери заказы в любое время и работай так, как удобно тебе.\n\n"
-            "◉ <b>Прозрачность</b>: \n"
-            "Каждый заработанный рубль — твой. Никаких посредников, штрафов и скрытых условиях.\n\n"
-            "Присоединяйся к Ракете и начинай зарабатывать больше уже сегодня!"
+            "Добро пожаловать в сервис доставки <b>Ракета!</b>\n\n"
+            "◉ <b>Наши условия:</b>\n"
+            "<b>Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого выполненного заказа.</b>\n\n"
+            "Присоединяйся и начинай зарабатывать больше уже сегодня!"
         )
         reply_kb = await kb.get_courier_kb("/start")
         await message.answer_photo(
@@ -227,10 +223,9 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
-    await rediska.set_tou(courier_bot_id, tg_id, accept_tou)
     await rediska.set_reg(courier_bot_id, tg_id, True)
 
-    courier_name, courier_phone, courier_city, tou = await rediska.get_user_info(
+    courier_name, courier_phone, courier_city = await rediska.get_user_info(
         courier_bot_id, tg_id
     )
     _ = await courier_data.set_courier(
@@ -238,7 +233,7 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
         courier_name,
         courier_phone,
         courier_city,
-        tou,
+        accept_tou,
     )
 
     _ = await courier_data.update_courier_subscription(tg_id, days=30)
@@ -246,10 +241,8 @@ async def courier_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     reply_kb = await kb.get_courier_kb("super_go")
 
     text = (
-        "Вы успешно зарегистрировались! 🎉\n\n"
-        "Вам доступен 30-дневный бесплатный период! 🚀\n"
-        "Работайте в удобное время, принимайте заказы и зарабатывайте! 💸\n"
-        "Попробуйте все возможности сервиса уже сейчас! ✨"
+        f"<b>Как новому курьеру вам доступен\n30-дневный бесплатный период!</b> 🚀\n\n"
+        f"Попробуйте все возможности сервиса и начинайте зарабатывать уже сейчас! ✨"
     )
 
     await callback_query.message.answer(
@@ -272,7 +265,9 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
-    _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
+    courier_name, courier_phone, courier_city, end_date = (
+        await courier_data.get_courier_full_info(tg_id)
+    )
 
     if end_date and end_date >= moscow_time:
         remaining_days = (end_date - moscow_time).days
@@ -284,7 +279,14 @@ async def courier_super_go(callback_query: CallbackQuery, state: FSMContext):
     else:
         subscription_status = "<b>Подписка:</b> Не активна\n\n"
 
-    text = f"{subscription_status}" f"▼ <b>Выберите действие ...</b>"
+    text = (
+        f"Вы успешно зарегистрировались! 🎉\n\n"
+        f"Имя: {courier_name}\n"
+        f"Номер: {courier_phone}\n"
+        f"Город: {courier_city}\n"
+        f"{subscription_status}"
+        f"▼ <b>Выберите действие ...</b>"
+    )
     await callback_query.message.answer(
         text,
         disable_notification=False,
@@ -351,10 +353,9 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
     filters.StateFilter(CourierState.location),
 )
 async def get_location(message: Message, state: FSMContext):
-
     current_state = CourierState.default.state
-
     tg_id = message.from_user.id
+    chat_id = message.chat.id
     courier_tg_id = message.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
 
@@ -378,7 +379,7 @@ async def get_location(message: Message, state: FSMContext):
         f"🔍 Хотите посмотреть заказы рядом?"
     )
 
-    reply_markup = await kb.get_courier_orders_near_kb(
+    reply_kb = await kb.get_courier_orders_near_kb(
         available_orders=len(available_orders)
     )
 
@@ -388,12 +389,107 @@ async def get_location(message: Message, state: FSMContext):
         disable_notification=True,
     )
 
-    await message.answer(
+    text_message = await message.answer(
         text=text,
-        reply_markup=reply_markup,
+        reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    if message.location.live_period:
+        asyncio.create_task(
+            _update_location_periodically(
+                start_time=await Time.get_moscow_time(),
+                live_period=message.location.live_period,  # Передаём live_period
+                chat_id=chat_id,
+                lat=my_lat,
+                lon=my_lon,
+                courier_city=courier_city,
+                message=message,  # Это стартовое сообщение с локацией
+                text_message=text_message,
+                previous_text=text,
+                previous_markup=reply_kb,
+            )
+        )
+
+
+async def _update_location_periodically(
+    start_time: datetime.datetime,
+    live_period: int,
+    chat_id: int,
+    lat: float,
+    lon: float,
+    courier_city: str,
+    message: Message,
+    text_message: Message,
+    previous_text: str,
+    previous_markup: ReplyKeyboardMarkup = None,
+):
+    """Фоновая задача для периодического обновления данных о заказах рядом с курьером"""
+
+    last_lat, last_lon = lat, lon  # Сохраняем последние координаты
+    no_data_count = 0  # Счётчик, сколько раз подряд не приходили новые данные
+
+    while True:
+        log.info(f"📍 Обновление заказов для курьера {chat_id} ...")
+
+        elapsed_time = (await Time.get_moscow_time() - start_time).total_seconds()
+
+        # ✅ Если трансляция локации завершена – выходим
+        if elapsed_time > live_period:
+            log.info(
+                f"❌ Трансляция локации завершена для курьера {chat_id}. Останавливаем обновление."
+            )
+            break
+
+        # ✅ Проверяем, приходят ли новые данные о локации
+        if not message or not message.location:
+            no_data_count += 1  # Увеличиваем счётчик "нет данных"
+        else:
+            no_data_count = 0  # Если данные поступили, сбрасываем счётчик
+
+        # ✅ Если новых данных не было 3 раза подряд (30 сек), значит трансляция завершена
+        if no_data_count >= 3:
+            log.warning(
+                f"⚠️ Курьер {chat_id} остановил передачу локации. Завершаем процесс обновления."
+            )
+            break
+
+        new_lat = message.location.latitude
+        new_lon = message.location.longitude
+
+        # ✅ Даже если координаты не изменились, но данные пришли – обновляем заказы
+        available_orders = await order_data.get_available_orders(
+            new_lat, new_lon, radius_km=5
+        )
+        city_orders = await order_data.get_pending_orders_in_city(courier_city)
+
+        text = (
+            f"<b>📋 Заказы</b>\n\n"
+            f"Всего заказов в городе <b>{courier_city}</b>: <b>{len(city_orders)}</b>\n"
+            f"Заказов рядом с вами: <b>{len(available_orders)}</b>\n\n"
+            f"🔍 Хотите посмотреть заказы рядом?"
+        )
+
+        reply_markup = await kb.get_courier_orders_near_kb(len(available_orders))
+
+        if text != previous_text or reply_markup != previous_markup:
+            try:
+                await courier_bot.edit_message_text(
+                    text=text,
+                    chat_id=chat_id,
+                    message_id=text_message.message_id,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML",
+                )
+
+                previous_text = text
+                previous_markup = reply_markup
+
+            except Exception as e:
+                log.error(f"Ошибка в процессе получения данных о заказах: {e}")
+
+        await asyncio.sleep(10)  # Проверяем каждые 10 секунд
 
 
 @courier_r.callback_query(F.data == "show_nearby_orders")
@@ -869,6 +965,7 @@ async def cmd_profile(message: Message, state: FSMContext):
     text = (
         f"👤 <b>Профиль курьера</b>\n\n"
         f"Посмотрите или измените данные о себе.\n\n"
+        f"• Номер нужен для связи с заказчиком.\n\n"
         f"<b>Имя:</b> {courier_name}\n"
         f"<b>Номер:</b> {courier_phone}\n"
         f"<b>Город:</b> {courier_city}\n\n"

@@ -72,7 +72,7 @@ class MessageHandler2:
                 )
                 await rediska.delete_message(bot.id, user_id)
             except Exception as e:
-                log.error(f"Failed to delete the previous message: {e}")
+                log.error(f"Ошибка удаления предыдущего сообщения: {e}")
 
 
 handler = MessageHandler2()

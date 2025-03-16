@@ -39,27 +39,43 @@ from ._deps import (
 
 @customer_r.message(CommandStart())
 async def cmd_start_customer(message: Message, state: FSMContext):
-
     tg_id = message.from_user.id
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
 
-    if is_reg:
+    if is_reg is None:
+        current_state = CustomerState.reg_state.state
+        text = (
+            f"‼️ Произошла ошибка при проверке регистрации, попробуйте чуть позже еще раз!!\n\n"
+            f"\n\n/start"
+        )
+        new_message = await message.answer(
+            text=text,
+            parse_mode="HTML",
+            disable_notification=True,
+        )
+    elif is_reg:
         current_state = CustomerState.default.state
+        new_message = None
         text = "▼ <b>Выберите действие ...</b>"
-        await message.answer(text, parse_mode="HTML", disable_notification=True)
+        await message.answer(
+            text=text,
+            parse_mode="HTML",
+            disable_notification=True,
+        )
+
     else:
         current_state = CustomerState.reg_state.state
         photo_title = await title.get_title_customer("/start")
         text = (
-            f"Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
-            f"Почему выбирают нас?\n\n"
-            f"◉ Низкие цены:\n"
-            f"Наши пешие курьеры находятся рядом с вами, что снижает стоимость и ускоряет доставку.\n\n"
-            f"◉ Простота и удобство:\n"
-            f"С помощью технологий ИИ вы можете быстро оформить заказ и сразу отправить его на выполнение."
+            "Raketa — современный сервис доставки с минимальными ценами и удобством использования.\n\n"
+            "Почему выбирают нас?\n\n"
+            "◉ Низкие цены:\n"
+            "Мы не берем комиссию с курьеров, что позволяет нам снижать цену доставки для клиентов.\n\n"
+            "◉ Простота и удобство:\n"
+            "С помощью ИИ вы можете легко и быстро оформить заказ и сразу отправить его на выполнение."
         )
         reply_kb = await kb.get_customer_kb("/start")
-        await message.answer_photo(
+        new_message = await message.answer_photo(
             photo=photo_title,
             caption=text,
             reply_markup=reply_kb,
@@ -70,6 +86,16 @@ async def cmd_start_customer(message: Message, state: FSMContext):
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
+    if new_message:
+        await handler.catch(
+            bot=customer_bot,
+            chat_id=message.chat.id,
+            user_id=tg_id,
+            new_message=new_message,
+            current_message=message,
+            delete_previous=True,
+        )
+
 
 @customer_r.callback_query(F.data == "reg")
 async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
@@ -79,105 +105,186 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     current_state = CustomerState.reg_Name.state
     tg_id = callback_query.from_user.id
 
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
     text = (
         "Пройдите небольшую регистрацию.\n"
         "Это не займет много времени.\n\n"
         "<b>Как вас зовут?</b>"
     )
-    await callback_query.message.answer(
-        text, disable_notification=True, parse_mode="HTML"
+    new_message = await callback_query.message.answer(
+        text,
+        disable_notification=True,
+        parse_mode="HTML",
     )
 
-    await callback_query.message.delete()
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=customer_bot,
+        chat_id=callback_query.message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
 
 
 @customer_r.message(filters.StateFilter(CustomerState.reg_Name))
 async def data_name_customer(message: Message, state: FSMContext):
-
     current_state = CustomerState.reg_Phone.state
     tg_id = message.from_user.id
     customer_name = message.text
+    is_set_name = await rediska.set_name(customer_bot_id, tg_id, customer_name)
 
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-    _ = await rediska.set_name(customer_bot_id, tg_id, customer_name)
+    if not is_set_name:
+        new_message = await message.answer(
+            text=(
+                f"‼️ Произошла ошибка при сохранении имени, попробуйте ввести имя чуть позже еще раз!\n\n"
+                f"<b>Ваше имя:</b>"
+            ),
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+    else:
+        reply_kb = await kb.get_customer_kb("phone_number")
+        text = (
+            f"Привет, {customer_name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
+            f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
+            f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
+            f"<i>*Отправка номера возможно только по клику на кнопку 'Поделится номером'!</i>\n\n"
+            f"<b>Ваш номер:</b>"
+        )
+        new_message = await message.answer(
+            text,
+            disable_notification=True,
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
 
-    reply_kb = await kb.get_customer_kb("phone_number")
-    text = (
-        f"Привет, {customer_name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
-        f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
-        f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
-        f"<i>*Отправка номера возможно только по клику на кнопку 'Поделится номером'!</i>\n\n"
-        f"<b>Ваш номер:</b>"
-    )
-
-    await message.answer(
-        text,
-        disable_notification=True,
-        reply_markup=reply_kb,
-        parse_mode="HTML",
+    await handler.catch(
+        bot=customer_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
     )
 
 
 @customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
 async def data_phone_customer(message: Message, state: FSMContext):
-
     current_state = CustomerState.reg_City.state
     tg_id = message.from_user.id
     customer_phone = message.contact.phone_number
+    is_set_phone = await rediska.set_phone(customer_bot_id, tg_id, customer_phone)
 
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-    _ = await rediska.set_phone(customer_bot_id, tg_id, customer_phone)
+    if not is_set_phone:
+        reply_kb = await kb.get_customer_kb("phone_number")
+        new_message = await message.answer(
+            text=(
+                f"‼️ Произошла ошибка при сохранении номера, попробуйте ввести номер чуть позже еще раз!\n\n"
+                f"<b>Ваш номер:</b>"
+            ),
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+    else:
+        text = (
+            f"Последний шаг!\n\n"
+            f"Для того чтобы каждый раз не указывать город доставки, "
+            f"скажите в каком городе вы будете в основном делать заказы "
+            f"и он автоматически будет подставляться.\n\n"
+            f"<b>Ваш город:</b>"
+        )
+        new_message = await message.answer(
+            text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
 
-    text = (
-        f"Последний шаг!\n\n"
-        f"Для того чтобы каждый раз не указывать город доставки, "
-        f"скажите в каком городе вы будете в основном делать заказы "
-        f"и он автоматически будет подставляться.\n\n"
-        f"<b>Ваш город:</b>"
-    )
-
-    await message.answer(
-        text=f"Номер принят {customer_phone}",
-        reply_markup=ReplyKeyboardRemove(),
-        disable_notification=True,
-    )
-
-    await message.answer(
-        text,
-        disable_notification=True,
-        parse_mode="HTML",
+    await handler.catch(
+        bot=customer_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
     )
 
 
 @customer_r.message(filters.StateFilter(CustomerState.reg_City))
 async def data_city_customer(message: Message, state: FSMContext):
-
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
 
     if not city:
-
-        current_state = CustomerState.reg_City.state
-
-        await message.answer(
+        new_message = await message.answer(
             text=f"Введите корректное название города!\n<b>Ваш город:</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
-
     else:
-
         current_state = CustomerState.reg_tou.state
-        _ = await rediska.set_city(customer_bot_id, tg_id, city)
+        is_set_city = await rediska.set_city(customer_bot_id, tg_id, city)
 
+        if not is_set_city:
+
+            new_message = await message.answer(
+                text=(
+                    f"‼️ Произошла ошибка при сохранении города, попробуйте ввести город чуть позже еще раз!\n\n"
+                    f"<b>Ваш город:</b>"
+                ),
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+        else:
+            reply_kb = await kb.get_customer_kb("accept_tou")
+            tou_text = (
+                f"Начиная использование сервиса, вы соглашаетесь с "
+                f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+                f"Пользовательским соглашением и правилами использования</a>, а также "
+                f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+                f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+                f"отправкой или получением посылок, должны соответствовать законодательству "
+                f"вашего государства и общепринятым этическим нормам.</i>\n\n"
+            )
+            new_message = await message.answer(
+                text=tou_text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=customer_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
+    )
+
+
+@customer_r.callback_query(F.data == "accept_tou")
+async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
+    tg_id = callback_query.from_user.id
+    accept_tou = (
+        "Пользовательское соглашение и правила использования сервиса - Принимаю"
+    )
+    is_set_reg = await rediska.set_reg(customer_bot_id, tg_id, True)
+
+    if not is_set_reg:
         reply_kb = await kb.get_customer_kb("accept_tou")
-        text = (
+        tou_text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
             f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
@@ -186,61 +293,227 @@ async def data_city_customer(message: Message, state: FSMContext):
             f"отправкой или получением посылок, должны соответствовать законодательству "
             f"вашего государства и общепринятым этическим нормам.</i>\n\n"
         )
-
-        await message.answer(
-            text=(f"Ваш город {city}\n\n"),
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-        await message.answer(
-            text,
+        new_message = await callback_query.message.answer(
+            text=(
+                f"<b>‼️ Произошла ошибка при сохранении данных, попробуйте позже еще раз!</b>\n\n"
+                f"{tou_text}"
+            ),
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+    else:
+        current_state = CustomerState.default.state
+        customer_name, customer_phone, customer_city = await rediska.get_user_info(
+            customer_bot_id, tg_id
+        )
+
+        _ = await customer_data.set_customer(
+            tg_id, customer_name, customer_phone, customer_city, accept_tou
+        )
+
+        await callback_query.answer("✅ Принято", show_alert=False)
+
+        text = (
+            "Вы успешно зарегистрировались! 🎉\n\n"
+            f"Имя: {customer_name}\n"
+            f"Номер: {customer_phone}\n"
+            f"Город: {customer_city}\n\n"
+            f"▼ <b>Выберите действие ...</b>"
+        )
+
+        new_message = await callback_query.message.answer(
+            text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=customer_bot,
+        chat_id=callback_query.message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
+
+
+# ---
+# ---
+
+
+@customer_r.message(
+    filters.StateFilter(CustomerState.ai_voice_order),
+    F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
+)
+async def process_order(message: Message, state: FSMContext):
+
+    start_time = time.perf_counter()
+
+    current_state = CustomerState.assistant_run.state
+    tg_id = message.from_user.id
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
+    wait_message = await message.answer(
+        "Заказ обрабатывается, подождите ...",
+        disable_notification=True,
+    )
 
-@customer_r.callback_query(F.data == "accept_tou")
-async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
+    if message.content_type == ContentType.VOICE:
+
+        recognized_text = await recognizer.get_recognition_text(message)
+
+        if not recognized_text:
+            await _handle_error_response(
+                message,
+                wait_message,
+                "unrecognized",
+                state,
+            )
+            return
+
+        text_msg = recognized_text
+    else:
+        text_msg = message.text
+
+    try:
+
+        await asyncio.wait_for(
+            process_order_logic(
+                text_msg,
+                message,
+                state,
+                wait_message,
+            ),
+            timeout=120,
+        )
+    except asyncio.TimeoutError:
+        await _handle_error_response(
+            message,
+            wait_message,
+            "timeout",
+            state,
+        )
+        log.error("Error: asyncio.TimeoutError")
+    except Exception as e:
+        await _handle_error_response(
+            message,
+            wait_message,
+            "general",
+            state,
+        )
+        log.error(f"Error: {e}")
+
+    execution_time = time.perf_counter() - start_time
+    log.info(f"Execution time process_message: {execution_time:.4f} sec")
+
+
+async def process_order_logic(
+    text_msg: str,
+    message: Message,
+    state: FSMContext,
+    wait_message: Message,
+):
+    log.info("process_order_logic was called!")
+
+    current_state = CustomerState.assistant_run.state
+
+    tg_id = message.from_user.id
+    customer_name = await rediska.get_name(customer_bot_id, tg_id)
+    customer_phone = await rediska.get_phone(customer_bot_id, tg_id)
+    customer_city = await rediska.get_city(customer_bot_id, tg_id)
+    moscow_time = await Time.get_moscow_time()
+
+    try:
+        city, addresses, delivery_object, description = await assistant.process_order(
+            text_msg, customer_city
+        )
+
+        if city == "N":
+            await _handle_error_response(
+                message,
+                wait_message,
+                "moderation_failed",
+                state,
+            )
+            return
+
+        log.info("request was successfully done")
+    except Exception as e:
+        await _handle_error_response(
+            message,
+            wait_message,
+            "general",
+            state,
+        )
+        log.error(f"Error: {e}")
+        return
+
+    prepare_dict = await formatter._prepare_data(
+        moscow_time,
+        city,
+        customer_name,
+        customer_phone,
+        addresses,
+        delivery_object,
+        description,
+    )
+
+    order_info = await formatter.format_order_form(prepare_dict)
+    reply_kb = await kb.get_customer_kb("voice_order_accept")
+
+    await state.set_state(current_state)
+    await state.update_data(current_order_info=(prepare_dict, order_info))
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+    await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+
+    await wait_message.delete()
+
+    await message.answer(
+        text=order_info,
+        reply_markup=reply_kb,
+        disable_notification=False,
+        parse_mode="HTML",
+    )
+
+    log.info("process_order_logic done!")
+
+
+async def _handle_error_response(
+    message: Message, wait_message: Message, error_key: str, state: FSMContext
+):
+    """Функция для обработки и отправки сообщения об ошибке."""
 
     current_state = CustomerState.default.state
-    tg_id = callback_query.from_user.id
-
-    accept_tou = (
-        "Пользовательское соглашение и правила использования сервиса - Принимаю"
-    )
+    tg_id = message.from_user.id
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
-    await rediska.set_tou(customer_bot_id, tg_id, accept_tou)
-    await rediska.set_reg(customer_bot_id, tg_id, True)
 
-    customer_name, customer_phone, customer_city, tou = await rediska.get_user_info(
-        customer_bot_id, tg_id
+    error_messages = {
+        "general": "<b>! Ошибка при обработке заказа!</b>\n\nПопробуйте снова",
+        "timeout": "<b>! Превышено время ожидания!</b>\n\nПопробуйте снова",
+        "unrecognized": "<b>! Не удалось распознать голосовое сообщение!</b>\n\nПопробуйте снова",
+        "moderation_failed": "<b>! Модерация не прошла!</b>\n\nПопробуйте снова",
+    }
+
+    reply_kb = await kb.get_customer_kb("rerecord")
+
+    await wait_message.delete()
+
+    await message.answer(
+        error_messages[error_key],
+        reply_markup=reply_kb,
+        disable_notification=False,
+        parse_mode="HTML",
     )
 
-    _ = await customer_data.set_customer(
-        tg_id, customer_name, customer_phone, customer_city, tou
-    )
-
-    text = (
-        "Вы успешно зарегистрировались! 🎉\n\n"
-        f"Имя: {customer_name}\n"
-        f"Номер: {customer_phone}\n"
-        f"Город: {customer_city}\n\n"
-        f"▼ <b>Выберите действие ...</b>"
-    )
-    await callback_query.message.answer(
-        text, disable_notification=True, parse_mode="HTML"
-    )
-
-    await callback_query.answer("✅ Принято", show_alert=False)
-
-    await callback_query.message.delete()
+    log.warning(f"Error response sent: {error_key}")
 
 
 # ---
@@ -265,7 +538,6 @@ async def cmd_order(message: Message, state: FSMContext):
             disable_notification=True,
             parse_mode="HTML",
         )
-
     else:
         current_state = CustomerState.default.state
         photo_title = await title.get_title_customer(message.text)
@@ -474,96 +746,6 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
         disable_notification=True,
         parse_mode="HTML",
     )
-
-
-# ---
-# ---
-
-
-@customer_r.message(filters.StateFilter(CustomerState.change_Name))
-async def change_name(message: Message, state: FSMContext):
-
-    current_state = CustomerState.default.state
-    tg_id = message.from_user.id
-
-    name = message.text
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
-    _ = await customer_data.update_customer_name(tg_id, name)
-    _ = await rediska.set_name(customer_bot_id, tg_id, name)
-
-    text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-
-    await message.answer(
-        text,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-
-@customer_r.message(filters.StateFilter(CustomerState.change_Phone))
-async def change_phone(message: Message, state: FSMContext):
-
-    current_state = CustomerState.default.state
-    tg_id = message.from_user.id
-    phone = message.contact.phone_number
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-
-    _ = await customer_data.update_customer_phone(tg_id, phone)
-    _ = await rediska.set_phone(customer_bot_id, tg_id, phone)
-
-    text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-
-    await message.answer(
-        text,
-        disable_notification=True,
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="HTML",
-    )
-
-
-@customer_r.message(filters.StateFilter(CustomerState.change_City))
-async def change_city(message: Message, state: FSMContext):
-
-    tg_id = message.from_user.id
-
-    russian_cities = await cities.get_cities()
-    city, _ = await find_closest_city(message.text, russian_cities)
-
-    if not city:
-
-        current_state = CustomerState.change_City.state
-        text = f"Введите корректное название города!\n\n<b>Ваш город:</b>"
-        await message.answer(
-            text,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-        log.warning(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
-
-    else:
-
-        current_state = CustomerState.default.state
-        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-
-        _ = await customer_data.update_customer_city(tg_id, city)
-        _ = await rediska.set_city(customer_bot_id, tg_id, city)
-
-        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
-
-        await message.answer(
-            text,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 # ---
@@ -798,10 +980,26 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         log.warning(
             f"Заказ {current_order_id} не в статусе PENDING: {order.order_status}"
         )
-        await callback_query.answer(
-            f"Заказ №{current_order_id} нельзя отменить, так как он не в статусе ожидания. Текущий статус: {order.order_status}.",
-            parse_mode="HTML",
-        )
+
+        if order.order_status == OrderStatus.CANCELLED:
+            await callback_query.message.answer(
+                f"Заказ №{current_order_id} уже отменен.", disable_notification=False
+            )
+
+            await callback_query.message.delete()
+
+            return
+
+        if order.order_status == OrderStatus.IN_PROGRESS:
+            await callback_query.message.answer(
+                f"Заказ №{current_order_id} уже в работе.",
+                show_alert=False,
+            )
+
+            await callback_query.message.delete()
+
+            return
+
         return
 
     try:
@@ -815,7 +1013,7 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
         )
         await callback_query.message.answer(
             text,
-            disable_notification=True,
+            disable_notification=False,
             parse_mode="HTML",
         )
 
@@ -838,128 +1036,90 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@customer_r.message(
-    filters.StateFilter(CustomerState.ai_voice_order),
-    F.content_type.in_([ContentType.VOICE, ContentType.TEXT]),
-)
-async def process_order(message: Message, state: FSMContext):
+@customer_r.message(filters.StateFilter(CustomerState.change_Name))
+async def change_name(message: Message, state: FSMContext):
 
-    wait_message = await message.answer(
-        "Заказ обрабатывается, подождите ...", disable_notification=True
-    )
-
-    text_msg = None
-    start_time = time.perf_counter()
-
-    if message.content_type == ContentType.VOICE:
-
-        recognized_text = await recognizer.get_recognition_text(message)
-
-        if not recognized_text:
-            await handle_error_response(message, wait_message, "unrecognized")
-            return
-
-        text_msg = recognized_text
-    else:
-        text_msg = message.text
-
-    try:
-
-        await asyncio.wait_for(
-            process_order_logic(text_msg, message, state, wait_message),
-            timeout=120,
-        )
-    except asyncio.TimeoutError:
-        await handle_error_response(message, wait_message, "timeout")
-        log.error("Error: asyncio.TimeoutError")
-    except Exception as e:
-        await handle_error_response(message, wait_message, "general")
-        log.error(f"Error: {e}")
-
-    execution_time = time.perf_counter() - start_time
-    log.info(f"Execution time process_message: {execution_time:.4f} sec")
-
-
-async def process_order_logic(
-    text_msg: str,
-    message: Message,
-    state: FSMContext,
-    wait_message: Message,
-):
-    log.info("process_order_logic was called!")
-
-    current_state = CustomerState.assistant_run.state
+    current_state = CustomerState.default.state
     tg_id = message.from_user.id
-    customer_name = await rediska.get_name(customer_bot_id, tg_id)
-    customer_phone = await rediska.get_phone(customer_bot_id, tg_id)
-    customer_city = await rediska.get_city(customer_bot_id, tg_id)
-    moscow_time = await Time.get_moscow_time()
 
-    try:
-        city, addresses, delivery_object, description = await assistant.process_order(
-            text_msg, customer_city
-        )
-
-        if city == "N":
-            await handle_error_response(message, wait_message, "moderation_failed")
-            return
-
-        log.info("request was successfully done")
-    except Exception as e:
-        await handle_error_response(message, wait_message, "general")
-        log.error(f"Error: {e}")
-        return
-
-    prepare_dict = await formatter._prepare_data(
-        moscow_time,
-        city,
-        customer_name,
-        customer_phone,
-        addresses,
-        delivery_object,
-        description,
-    )
-
-    order_info = await formatter.format_order_form(prepare_dict)
-    reply_kb = await kb.get_customer_kb("voice_order_accept")
+    name = message.text
 
     await state.set_state(current_state)
-    await state.update_data(current_order_info=(prepare_dict, order_info))
     await rediska.set_state(customer_bot_id, tg_id, current_state)
-    await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
-    await wait_message.delete()
+    _ = await customer_data.update_customer_name(tg_id, name)
+    _ = await rediska.set_name(customer_bot_id, tg_id, name)
+
+    text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
     await message.answer(
-        text=order_info,
-        reply_markup=reply_kb,
-        disable_notification=False,
+        text,
+        disable_notification=True,
         parse_mode="HTML",
     )
 
-    log.info("process_order_logic done!")
 
+@customer_r.message(filters.StateFilter(CustomerState.change_Phone))
+async def change_phone(message: Message, state: FSMContext):
 
-async def handle_error_response(
-    message: Message, wait_message: Message, error_key: str
-):
-    """Функция для обработки и отправки сообщения об ошибке."""
-    error_messages = {
-        "general": "<b>¡ Ошибка при обработке заказа.</b>\n\nПопробуйте снова",
-        "moderation_failed": "<b>¡ Оформление заказа не удалось!</b>\n\nМодерация не прошла.",
-    }
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+    phone = message.contact.phone_number
 
-    reply_kb = await kb.get_customer_kb("rerecord")
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
-    await wait_message.delete()
+    _ = await customer_data.update_customer_phone(tg_id, phone)
+    _ = await rediska.set_phone(customer_bot_id, tg_id, phone)
+
+    text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
     await message.answer(
-        error_messages[error_key],
-        reply_markup=reply_kb,
-        disable_notification=False,
+        text,
+        disable_notification=True,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="HTML",
     )
 
-    log.warning(f"Error response sent: {error_key}")
+
+@customer_r.message(filters.StateFilter(CustomerState.change_City))
+async def change_city(message: Message, state: FSMContext):
+
+    tg_id = message.from_user.id
+
+    russian_cities = await cities.get_cities()
+    city, _ = await find_closest_city(message.text, russian_cities)
+
+    if not city:
+
+        current_state = CustomerState.change_City.state
+        text = f"Введите корректное название города!\n\n<b>Ваш город:</b>"
+        await message.answer(
+            text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        log.warning(f"city name was uncorrectable: {city}\n" f"text message: {text}\n")
+
+    else:
+
+        current_state = CustomerState.default.state
+        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+
+        _ = await customer_data.update_customer_city(tg_id, city)
+        _ = await rediska.set_city(customer_bot_id, tg_id, city)
+
+        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+
+        await message.answer(
+            text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 # ---

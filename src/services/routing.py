@@ -82,7 +82,7 @@ class RouteMaster:
         city_coefficient = 1.0
 
         if city in millions_cities:
-            city_coefficient = 1.2
+            city_coefficient = 1.045
 
         if city in small_cities:
             city_coefficient = 0.9
@@ -97,9 +97,9 @@ class RouteMaster:
             time_coefficient = 1.07
 
         if distance <= 5:
-            distance_coefficient = 1.0
-        elif 5 < distance <= 10:
             distance_coefficient = 0.9
+        elif 5 < distance <= 10:
+            distance_coefficient = 1.0
         elif 10 < distance <= 20:
             distance_coefficient = 0.8
         else:
