@@ -31,8 +31,7 @@ class CustomerData:
         city: str,
         tou: str,
     ) -> bool:
-        """Добавляет в БД нового пользователя"""
-
+        """Добавляет в БД нового клиента"""
         async with self.async_session_factory() as session:
             try:
                 new_customer = Customer(
@@ -54,58 +53,31 @@ class CustomerData:
 
     # ---
 
-    async def update_customer_name(
-        self,
-        tg_id: int,
-        new_name: str,
-    ) -> bool:
-        """Обновляет имя пользователя в БД"""
-
+    async def update_customer_name(self, tg_id: int, new_name: str):
+        """Обновляет имя клиента в БД"""
         async with self.async_session_factory() as session:
             customer = await session.get(Customer, tg_id)
-            if not customer:
-                return False
-
             customer.customer_name = new_name
             await session.commit()
-            return True
 
-    async def update_customer_phone(
-        self,
-        tg_id: int,
-        new_phone: str,
-    ) -> bool:
-        """Обновляет номер пользователя в БД"""
-
+    async def update_customer_phone(self, tg_id: int, new_phone: str):
+        """Обновляет номер клиента в БД"""
         async with self.async_session_factory() as session:
             customer = await session.get(Customer, tg_id)
-            if not customer:
-                return False
-
             customer.customer_phone = new_phone
             await session.commit()
-            return True
 
-    async def update_customer_city(
-        self,
-        tg_id: int,
-        new_city: str,
-    ) -> bool:
-        """Обновляет город пользователя в БД"""
-
+    async def update_customer_city(self, tg_id: int, new_city: str):
+        """Обновляет город клиента в БД"""
         async with self.async_session_factory() as session:
             customer = await session.get(Customer, tg_id)
-            if not customer:
-                return False
-
             customer.customer_city = new_city
             await session.commit()
-            return True
 
     # ---
 
     async def get_customer_info(self, tg_id: int) -> tuple:
-        """Возвращает имя, номер и город пользователя из БД"""
+        """Возвращает имя, номер и город клиента из БД"""
         async with self.async_session_factory() as session:
             customer = await session.scalar(
                 select(Customer).where(Customer.customer_tg_id == tg_id)

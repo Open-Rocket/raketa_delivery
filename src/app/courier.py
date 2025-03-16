@@ -400,12 +400,12 @@ async def get_location(message: Message, state: FSMContext):
         asyncio.create_task(
             _update_location_periodically(
                 start_time=await Time.get_moscow_time(),
-                live_period=message.location.live_period,  # Передаём live_period
+                live_period=message.location.live_period,
                 chat_id=chat_id,
                 lat=my_lat,
                 lon=my_lon,
                 courier_city=courier_city,
-                message=message,  # Это стартовое сообщение с локацией
+                message=message,
                 text_message=text_message,
                 previous_text=text,
                 previous_markup=reply_kb,

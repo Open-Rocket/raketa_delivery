@@ -5,6 +5,8 @@ from math import cos, radians, sin, sqrt, atan2
 from src.config import YANDEX_API_KEY
 from src.services.fuzzy import cities
 from geopy.distance import geodesic
+from src.config import log
+from src.confredis import rediska
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -12,13 +14,49 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class RouteMaster:
 
-    @staticmethod
-    async def get_coordinates(address: str) -> tuple[str, str] | tuple[None, None]:
-        """Получает координаты по адресу через API Яндекса"""
+    YANDEX_API_KEYS = [
+        YANDEX_API_KEY,
+        "your_yandex_api_key_2",
+        "your_yandex_api_key_3",
+    ]
 
+    @staticmethod
+    async def get_coordinates(address: str) -> tuple:
+        """Попытка получить координаты через Яндекс с несколькими ключами"""
+
+        counter = await rediska.get_yandex_api_counter()
+
+        while counter < len(RouteMaster.YANDEX_API_KEYS):
+            coordinates = await RouteMaster._get_coordinates_from_yandex(
+                address,
+                counter,
+            )
+            if coordinates != (None, None):
+                return coordinates
+            counter += 1
+            await rediska.set_yandex_api_counter(counter)
+
+        return None, None
+
+    @staticmethod
+    async def _get_coordinates_from_yandex(
+        address: str,
+        counter: int,
+    ) -> tuple:
+        """Попытка получить координаты через Яндекс API с конкретным ключом"""
+
+        api_key = RouteMaster.YANDEX_API_KEYS[counter]
         base_url = "https://geocode-maps.yandex.ru/1.x/"
-        params = {"apikey": YANDEX_API_KEY, "geocode": address, "format": "json"}
-        response = requests.get(base_url, params=params)
+        params = {"apikey": api_key, "geocode": address, "format": "json"}
+
+        try:
+            response = requests.get(base_url, params=params)
+            response.raise_for_status()  # Поднимет исключение, если статус не 2xx
+        except requests.RequestException as e:
+            log.error(
+                f"Error while getting coordinates from Yandex with key {api_key}: {e}"
+            )
+            return (None, None)
 
         if response.status_code == 200:
             json_data = response.json()
@@ -27,11 +65,13 @@ class RouteMaster:
             ]["Point"]["pos"]
             longitude, latitude = pos.split()
             return latitude, longitude
-        return None, None
+
+        return (None, None)
 
     @staticmethod
     async def calculate_total_distance(
-        coordinates, adjustment_factor: int = 1.34
+        coordinates,
+        adjustment_factor: int = 1.34,
     ) -> int:
         """Рассчитывает общее расстояние между набором координат с учётом погрешности"""
 
@@ -54,7 +94,10 @@ class RouteMaster:
         return total_distance * adjustment_factor
 
     @staticmethod
-    async def get_rout(pickup_coords: tuple, delivery_coords: list) -> str:
+    async def get_rout(
+        pickup_coords: tuple,
+        delivery_coords: list,
+    ) -> str:
         """Генерирует URL маршрута на Яндекс.Картах."""
 
         route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
@@ -64,7 +107,10 @@ class RouteMaster:
 
     @staticmethod
     async def get_price(
-        distance: int, order_time: datetime, city=None, over_price=0
+        distance: int,
+        order_time: datetime,
+        city=None,
+        over_price=0,
     ) -> int:
         """
         Рассчитывает стоимость доставки.
@@ -112,7 +158,9 @@ class RouteMaster:
 
     @staticmethod
     async def is_within_radius(
-        courier_coords: tuple, order_coords: tuple, radius_km: int
+        courier_coords: tuple,
+        order_coords: tuple,
+        radius_km: int,
     ) -> bool:
         """Проверяет, находится ли заказ в радиусе курьера"""
         return geodesic(courier_coords, order_coords).km <= radius_km

@@ -97,36 +97,33 @@ class RedisService:
 
     # ---
 
-    async def set_name(self, bot_id: int, user_id: int, name: str) -> bool:
+    async def set_name(self, bot_id: int, user_id: int, name: str):
         """Сохраняет имя пользователя в Redis и возвращает статус операции"""
         key = RedisKey(bot_id, user_id)
         try:
             # raise Exception("TestException")
             await self.redis.hset(f"user_info:{key}", mapping={"name": name})
-            return True
+
         except Exception as e:
             log.error(f"Ошибка записи имени в Redis: {e}")
-            return False
 
-    async def set_phone(self, bot_id: int, user_id: int, phone: str) -> bool:
+    async def set_phone(self, bot_id: int, user_id: int, phone: str):
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         try:
             await self.redis.hset(f"user_info:{key}", mapping={"phone": phone})
-            return True
+
         except Exception as e:
             log.error(f"Ошибка записи телефона в Redis: {e}")
-            return False
 
-    async def set_city(self, bot_id: int, user_id: int, city: str) -> bool:
+    async def set_city(self, bot_id: int, user_id: int, city: str):
         """Сохраняет имя и телефон пользователя в Redis"""
         key = RedisKey(bot_id, user_id)
         try:
             await self.redis.hset(f"user_info:{key}", mapping={"city": city})
-            return True
+
         except Exception as e:
             log.error(f"Ошибка записи города в Redis: {e}")
-            return False
 
     async def set_reg(self, bot_id: int, user_id: int, value: bool) -> bool:
         """Устанавливает статус регистрации пользователя в Redis"""
@@ -139,15 +136,13 @@ class RedisService:
             log.error(f"Ошибка записи статуса регистрации в Redis: {e}")
             return False
 
-    async def set_read_info(self, bot_id: int, user_id: int, value: bool) -> bool:
+    async def set_read_info(self, bot_id: int, user_id: int, value: bool):
         """Устанавливает статус ознакомления пользователя с оформлением заказа"""
         key = RedisKey(bot_id, user_id)
         try:
             await self.redis.hset(f"user_info:{key}", "read_info", int(value))
-            return True
         except Exception as e:
             log.error(f"Ошибка записи статуса ознакомления с информацией в Redis: {e}")
-            return False
 
     # ---
 
@@ -211,7 +206,7 @@ class RedisService:
             return bool(int(is_reg.decode("utf-8")))
         except Exception as e:
             log.error(f"Ошибка чтения статуса регистрации из Redis: {e}")
-            return None
+            return False
 
     async def is_read_info(self, bot_id: int, user_id: int) -> bool:
         """Получает значение is_read из Redis"""
@@ -226,6 +221,24 @@ class RedisService:
             return False
 
     # ---
+
+    async def set_yandex_api_counter(self, value: int):
+        """Сохраняет счётчик использования ключей Яндекс API"""
+        try:
+            await self.redis.set("yandex_api_counter", value)
+        except Exception as e:
+            log.error(f"Ошибка записи счётчика использования ключей Яндекс API: {e}")
+
+    async def get_yandex_api_counter(self) -> int:
+        """Получает счётчик использования ключей Яндекс API"""
+        try:
+            counter = await self.redis.get("yandex_api_counter")
+            if counter is None:
+                return 0
+            return int(counter) if counter else 0
+        except Exception as e:
+            log.error(f"Ошибка чтения счётчика использования ключей Яндекс API: {e}")
+            return None
 
 
 async def create_redis_service() -> RedisService:

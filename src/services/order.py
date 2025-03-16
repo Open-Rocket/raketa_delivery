@@ -12,9 +12,9 @@ class OrderFormatter:
     @staticmethod
     async def _prepare_data(
         time: datetime,
-        city: str,
         customer_name: str,
         customer_phone: str,
+        city: str,
         addresses: list[str],
         delivery_object: str,
         description: str,
@@ -38,8 +38,8 @@ class OrderFormatter:
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])
 
-        if len(coordinates) < 2:
-            return {}
+            else:
+                return {}
 
         yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
         distance = round(await route.calculate_total_distance(coordinates), 2)
@@ -112,7 +112,7 @@ class MessageRecognizer:
             return await self._process_audio_data(audio_data)
         return message.text
 
-    async def _process_audio_data(self, audio_data: bytes) -> str:
+    async def _process_audio_data(self, audio_data: bytes) -> str | bool:
         """Распознаёт речь из аудиофайла."""
 
         r = sr.Recognizer()
@@ -132,7 +132,7 @@ class MessageRecognizer:
                 sr.RequestError,
             ) as e:
                 log.error(f"_process_audio_data ERROR: {e}")
-                return f"Не удалось распознать речь"
+                return False
 
 
 formatter = OrderFormatter()
