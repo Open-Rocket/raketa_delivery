@@ -40,7 +40,8 @@ class CourierState(StatesGroup):
     change_City = State()
 
     location = State()
-    available_orders = State()
+    nearby_Orders = State()
+    city_Orders = State()
     myOrders = State()
     myOrders_active = State()
     myOrders_completed = State()

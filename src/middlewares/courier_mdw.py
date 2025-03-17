@@ -11,7 +11,8 @@ from aiogram.types import (
 from src.confredis import RedisService
 from src.config import log
 from src.utils import CourierState
-import asyncio
+from src.config import courier_bot
+from aiogram.types import ReplyKeyboardRemove, ContentType
 
 
 class CourierOuterMiddleware(BaseMiddleware):
@@ -47,7 +48,13 @@ class CourierOuterMiddleware(BaseMiddleware):
 
         if isinstance(event, Message):
 
-            result = await _check_state_and_handle_message(state, event, handler, data)
+            result = await _check_state_and_handle_message(
+                fsm_context,
+                state,
+                event,
+                handler,
+                data,
+            )
             return result
 
         elif isinstance(event, CallbackQuery):
@@ -56,9 +63,36 @@ class CourierOuterMiddleware(BaseMiddleware):
 
 
 async def _check_state_and_handle_message(
-    state: str, event: Message, handler: Callable, data: Dict[str, Any]
-) -> Any:
+    fsm_context: FSMContext,
+    state: str,
+    event: Message,
+    handler: Callable,
+    data: Dict,
+):
     """Проверка состояния курьера и обработка сообщения"""
+
+    if state in (CourierState.reg_Phone.state,):
+        if event.text in [
+            "/start",
+        ]:
+            return await handler(event, data)
+
+    if state in (
+        CourierState.change_Name.state,
+        CourierState.change_City.state,
+    ):
+        if event.text in [
+            "/run",
+            "/my_orders",
+            "/profile",
+            "/subs",
+            "/faq",
+            "/rules",
+            "/make_order",
+        ]:
+
+            await fsm_context.set_state(CourierState.default.state)
+            return await handler(event, data)
 
     if state in (
         CourierState.reg_Name.state,
@@ -66,7 +100,7 @@ async def _check_state_and_handle_message(
         CourierState.change_Name.state,
         CourierState.change_City.state,
     ):
-        if event.content_type != "text":
+        if event.content_type != ContentType.TEXT:
             await event.delete()
             return
 
@@ -87,11 +121,7 @@ async def _check_state_and_handle_message(
         CourierState.reg_Phone.state,
         CourierState.reg_City.state,
         CourierState.reg_tou.state,
-        CourierState.change_Name.state,
-        CourierState.change_Phone.state,
-        CourierState.change_City.state,
     ):
-
         if event.text in [
             "/run",
             "/my_orders",
@@ -104,10 +134,35 @@ async def _check_state_and_handle_message(
             await event.delete()
             return
 
+    if state in (CourierState.reg_Phone.state,):
+        if not event.contact or event.contact.user_id != event.from_user.id:
+            await event.delete()
+            return
+
     if state in (
-        CourierState.reg_Phone.state,
+        CourierState.location.state,
         CourierState.change_Phone.state,
     ):
+
+        if event.text in [
+            "/profile",
+            "/subs",
+            "/faq",
+            "/rules",
+            "/make_order",
+        ]:
+            await courier_bot.send_message(
+                chat_id=event.from_user.id,
+                text="-",
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+            )
+
+            return await handler(event, data)
+
+        if event.content_type == ContentType.LOCATION:
+            return await handler(event, data)
+
         if not event.contact or event.contact.user_id != event.from_user.id:
             await event.delete()
             return

@@ -48,7 +48,11 @@ class CustomerOuterMiddleware(BaseMiddleware):
 
         if isinstance(event, Message):
             result = await _check_state_and_handle_message(
-                fsm_context, state, event, handler, data
+                fsm_context,
+                state,
+                event,
+                handler,
+                data,
             )
             return result
 

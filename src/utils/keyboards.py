@@ -211,8 +211,6 @@ class Keyboard:
                     ],
                 ],
                 resize_keyboard=True,
-                one_time_keyboard=True,
-                input_field_placeholder="LOCATION 📍",
             ),
             "/subs": InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -407,16 +405,23 @@ class Keyboard:
         return my_orders_kb
 
     @staticmethod
-    async def get_courier_orders_near_kb(available_orders: int) -> InlineKeyboardMarkup:
+    async def get_courier_orders_full_kb(
+        city_orders_len: int,
+        available_orders_len: int,
+    ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для заказов рядом"""
 
         near_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text=f"Показать заказы рядом {available_orders}",
+                        text=f"Заказы в городе {city_orders_len}",
+                        callback_data="show_city_orders",
+                    ),
+                    InlineKeyboardButton(
+                        text=f"Заказы рядом {available_orders_len}",
                         callback_data="show_nearby_orders",
-                    )
+                    ),
                 ]
             ]
         )

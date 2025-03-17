@@ -38,7 +38,10 @@ from ._deps import (
 
 
 @customer_r.message(CommandStart())
-async def cmd_start_customer(message: Message, state: FSMContext):
+async def cmd_start_customer(
+    message: Message,
+    state: FSMContext,
+):
 
     tg_id = message.from_user.id
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
@@ -135,8 +138,8 @@ async def data_name_customer(message: Message, state: FSMContext):
     )
     new_message = await message.answer(
         text=text,
-        disable_notification=True,
         reply_markup=reply_kb,
+        disable_notification=True,
         parse_mode="HTML",
     )
 
@@ -168,6 +171,7 @@ async def data_phone_customer(message: Message, state: FSMContext):
         f"и он автоматически будет подставляться.\n\n"
         f"<b>Ваш город:</b>"
     )
+
     new_message = await message.answer(
         text=text,
         disable_notification=True,
@@ -194,18 +198,20 @@ async def data_city_customer(message: Message, state: FSMContext):
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
-    text = (f"Введите корректное название города!\n<b>Ваш город:</b>",)
 
     if not city:
+
         new_message = await message.answer(
-            text=text,
+            text=f"Введите корректное название города!\n\n<b>Ваш город:</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
+
     else:
+
         current_state = CustomerState.reg_tou.state
         reply_kb = await kb.get_customer_kb("accept_tou")
-        tou_text = (
+        text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
             f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
@@ -215,7 +221,7 @@ async def data_city_customer(message: Message, state: FSMContext):
             f"вашего государства и общепринятым этическим нормам.</i>\n\n"
         )
         new_message = await message.answer(
-            text=tou_text,
+            text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
@@ -269,6 +275,7 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
     )
 
     if is_set_reg and is_set_customer_to_db:
+
         current_state = CustomerState.default.state
         await callback_query.answer("✅ Принято", show_alert=False)
         text = (
@@ -286,7 +293,9 @@ async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
 
         await state.set_state(current_state)
         await rediska.set_state(customer_bot_id, tg_id, current_state)
+
     else:
+
         new_message = await callback_query.message.answer(
             text=(
                 f"<b>‼️ Произошла ошибка при сохранении данных, попробуйте позже еще раз!</b>\n\n"
@@ -603,7 +612,7 @@ async def cmd_order(message: Message, state: FSMContext):
         current_state = CustomerState.ai_voice_order.state
         text = (
             f"<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
-            f"заказ будет оформлен в считанные секунды.</i>"
+            f"заказ будет оформлен в считанные секунды.</i>\n\n"
             f"ゞ <b>Опишите ваш заказ ...</b>"
         )
         await message.answer(

@@ -604,19 +604,6 @@ class OrderData:
 
     # ---
 
-    async def get_pending_orders_in_city(self, city: str) -> list:
-        """Возвращает все ожидающие заказы в указанном городе"""
-
-        async with self.async_session_factory() as session:
-            query = await session.execute(
-                select(Order).where(
-                    Order.order_city == city, Order.order_status == OrderStatus.PENDING
-                )
-            )
-            return query.scalars().all()
-
-    # ---
-
     async def get_customer_tg_id(self, order_id: int) -> Optional[int]:
         """Возвращает Telegram ID заказчика по ID заказа"""
 
@@ -650,12 +637,11 @@ class OrderData:
 
     # ---
 
-    async def get_available_orders(
+    async def get_nearby_orders(
         self,
         lat: float,
         lon: float,
         radius_km: int,
-        city: str,
     ) -> dict:
         """Возвращает доступные заказы в заданном радиусе в виде словаря."""
 
@@ -663,9 +649,10 @@ class OrderData:
             query = await session.execute(
                 select(Order).where(Order.order_status == OrderStatus.PENDING)
             )
-            all_orders = query.scalars().all()
 
+            all_orders = query.scalars().all()
             available_orders = {}
+
             for order in all_orders:
                 try:
                     start_lat = float(order.starting_point[0])
@@ -696,6 +683,33 @@ class OrderData:
                     continue
 
             return available_orders
+
+    async def get_pending_orders_in_city(self, city: str) -> list:
+        """Возвращает все ожидающие заказы в указанном городе"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order).where(
+                    Order.order_city == city, Order.order_status == OrderStatus.PENDING
+                )
+            )
+
+            city_orders = query.scalars().all()
+            city_orders_dict = {}
+
+            for order in city_orders:
+                order_forma = (
+                    zlib.decompress(order.order_forma).decode("utf-8")
+                    if order.order_forma
+                    else "-"
+                )
+                city_orders_dict[order.order_id] = {
+                    "text": order_forma,
+                    "starting_point": order.starting_point,
+                    "status": order.order_status.value,
+                    "distance_km": order.distance_km,
+                }
+
+            return city_orders_dict
 
 
 customer_data = CustomerData(async_session_factory)
