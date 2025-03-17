@@ -651,7 +651,11 @@ class OrderData:
     # ---
 
     async def get_available_orders(
-        self, lat: float, lon: float, radius_km: int
+        self,
+        lat: float,
+        lon: float,
+        radius_km: int,
+        city: str,
     ) -> dict:
         """Возвращает доступные заказы в заданном радиусе в виде словаря."""
 

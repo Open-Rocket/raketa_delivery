@@ -353,9 +353,21 @@ async def cmd_run(event: Message | CallbackQuery, state: FSMContext):
     filters.StateFilter(CourierState.location),
 )
 async def get_location(message: Message, state: FSMContext):
+
+    if message.location.live_period:
+
+        await message.answer(
+            text="Локация не принята!\n\nПожалуйста, отправьте статичную локацию.",
+            reply_markup=ReplyKeyboardRemove(),
+            disable_notification=True,
+        )
+
+        await message.delete()
+
+        return
+
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-    chat_id = message.chat.id
     courier_tg_id = message.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
 
@@ -389,107 +401,12 @@ async def get_location(message: Message, state: FSMContext):
         disable_notification=True,
     )
 
-    text_message = await message.answer(
+    await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
-
-    if message.location.live_period:
-        asyncio.create_task(
-            _update_location_periodically(
-                start_time=await Time.get_moscow_time(),
-                live_period=message.location.live_period,
-                chat_id=chat_id,
-                lat=my_lat,
-                lon=my_lon,
-                courier_city=courier_city,
-                message=message,
-                text_message=text_message,
-                previous_text=text,
-                previous_markup=reply_kb,
-            )
-        )
-
-
-async def _update_location_periodically(
-    start_time: datetime.datetime,
-    live_period: int,
-    chat_id: int,
-    lat: float,
-    lon: float,
-    courier_city: str,
-    message: Message,
-    text_message: Message,
-    previous_text: str,
-    previous_markup: ReplyKeyboardMarkup = None,
-):
-    """Фоновая задача для периодического обновления данных о заказах рядом с курьером"""
-
-    last_lat, last_lon = lat, lon  # Сохраняем последние координаты
-    no_data_count = 0  # Счётчик, сколько раз подряд не приходили новые данные
-
-    while True:
-        log.info(f"📍 Обновление заказов для курьера {chat_id} ...")
-
-        elapsed_time = (await Time.get_moscow_time() - start_time).total_seconds()
-
-        # ✅ Если трансляция локации завершена – выходим
-        if elapsed_time > live_period:
-            log.info(
-                f"❌ Трансляция локации завершена для курьера {chat_id}. Останавливаем обновление."
-            )
-            break
-
-        # ✅ Проверяем, приходят ли новые данные о локации
-        if not message or not message.location:
-            no_data_count += 1  # Увеличиваем счётчик "нет данных"
-        else:
-            no_data_count = 0  # Если данные поступили, сбрасываем счётчик
-
-        # ✅ Если новых данных не было 3 раза подряд (30 сек), значит трансляция завершена
-        if no_data_count >= 3:
-            log.warning(
-                f"⚠️ Курьер {chat_id} остановил передачу локации. Завершаем процесс обновления."
-            )
-            break
-
-        new_lat = message.location.latitude
-        new_lon = message.location.longitude
-
-        # ✅ Даже если координаты не изменились, но данные пришли – обновляем заказы
-        available_orders = await order_data.get_available_orders(
-            new_lat, new_lon, radius_km=5
-        )
-        city_orders = await order_data.get_pending_orders_in_city(courier_city)
-
-        text = (
-            f"<b>📋 Заказы</b>\n\n"
-            f"Всего заказов в городе <b>{courier_city}</b>: <b>{len(city_orders)}</b>\n"
-            f"Заказов рядом с вами: <b>{len(available_orders)}</b>\n\n"
-            f"🔍 Хотите посмотреть заказы рядом?"
-        )
-
-        reply_markup = await kb.get_courier_orders_near_kb(len(available_orders))
-
-        if text != previous_text or reply_markup != previous_markup:
-            try:
-                await courier_bot.edit_message_text(
-                    text=text,
-                    chat_id=chat_id,
-                    message_id=text_message.message_id,
-                    reply_markup=reply_markup,
-                    parse_mode="HTML",
-                )
-
-                previous_text = text
-                previous_markup = reply_markup
-
-            except Exception as e:
-                log.error(f"Ошибка в процессе получения данных о заказах: {e}")
-
-        await asyncio.sleep(10)  # Проверяем каждые 10 секунд
 
 
 @courier_r.callback_query(F.data == "show_nearby_orders")
