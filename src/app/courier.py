@@ -47,6 +47,7 @@ async def cmd_start_courier(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает команду /start для курьера."""
 
     tg_id = message.from_user.id
     is_reg = await rediska.is_reg(courier_bot_id, tg_id)
@@ -99,12 +100,12 @@ async def data_reg_courier(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на регистрацию курьера."""
 
     await callback_query.answer("✍️ Регистрация", show_alert=False)
 
     current_state = CourierState.reg_Name.state
     tg_id = callback_query.from_user.id
-
     text = (
         f"Пройдите небольшую регистрацию.\n"
         f"Это не займет много времени.\n\n"
@@ -137,6 +138,7 @@ async def data_name_courier(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает имя курьера. CourierState.reg_Name"""
 
     current_state = CourierState.reg_Phone.state
     tg_id = message.from_user.id
@@ -178,6 +180,7 @@ async def data_phone_courier(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает номер телефона курьера. CourierState.reg_Phone"""
 
     current_state = CourierState.reg_City.state
     tg_id = message.from_user.id
@@ -216,13 +219,13 @@ async def data_city_courier(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает город курьера. CourierState.reg_City"""
 
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
 
     if not city:
-
         await message.answer(
             text=f"Введите корректное название города!\n\n<b>Ваш город:</b>",
             disable_notification=True,
@@ -230,7 +233,6 @@ async def data_city_courier(
         )
 
     else:
-
         current_state = CourierState.reg_tou.state
         reply_kb = await kb.get_courier_kb("accept_tou")
         text = (
@@ -271,6 +273,7 @@ async def courier_accept_tou(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает принятие пользовательского соглашения. CourierState.reg_tou"""
 
     current_state = CourierState.reg_tou.state
     tg_id = callback_query.from_user.id
@@ -358,6 +361,7 @@ async def courier_super_go(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на активацию бесплатного периода. CourierState.super_go"""
 
     await callback_query.answer("⭐️⭐️⭐️", show_alert=False)
 
@@ -373,15 +377,14 @@ async def courier_super_go(
     )
 
     if end_date and end_date >= moscow_time:
-
         remaining_days = (end_date - moscow_time).days
         subscription_status = (
             f"<b>Подписка:</b> Активна 🚀\n\n"
             f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
             f"🕒 Осталось дней: {remaining_days}\n\n"
         )
-    else:
 
+    else:
         subscription_status = "<b>Подписка:</b> Не активна\n\n"
 
     text = (
@@ -426,6 +429,7 @@ async def cmd_run(
     event: Message | CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
 
     if isinstance(event, CallbackQuery):
         await event.answer("🚀 Начать работу", show_alert=False)
@@ -481,6 +485,7 @@ async def get_location(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает получение локации курьера. CourierState.location"""
 
     if message.location.live_period:
         await message.answer(
@@ -553,6 +558,7 @@ async def show_nearby_orders(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр заказов в радиусе курьера. show_nearby_orders"""
 
     current_state = CourierState.nearby_Orders.state
 
@@ -616,7 +622,7 @@ async def show_city_orders(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Обрабатывает запрос на просмотр всех заказов в городе."""
+    """Обрабатывает запрос на просмотр всех заказов в городе. show_city_orders"""
 
     current_state = CourierState.city_Orders.state
 
@@ -684,6 +690,7 @@ async def handle_order_all_navigation_nearby(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает навигацию по заказам в радиусе курьера. next_right, back_left"""
 
     current_state = CourierState.nearby_Orders.state
     tg_id = callback_query.from_user.id
@@ -740,6 +747,7 @@ async def handle_order_all_navigation_city(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает навигацию по заказам в городе курьера. next_right, back_left"""
 
     current_state = CourierState.city_Orders.state
     tg_id = callback_query.from_user.id
@@ -798,6 +806,7 @@ async def accept_order(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на принятие заказа курьером. accept_order"""
 
     current_state = CourierState.default.state
 
@@ -891,6 +900,7 @@ async def cmd_my_orders(
     event: Message | CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр заказов курьера. /my_orders, back_myOrders"""
 
     current_state = CourierState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
@@ -946,6 +956,7 @@ async def get_my_orders(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр заказов курьера. active_orders, completed_orders"""
 
     tg_id = callback_query.from_user.id
 
@@ -1056,6 +1067,7 @@ async def handle_order_navigation(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает навигацию по заказам курьера. next_right_mo, back_left_mo"""
 
     tg_id = callback_query.from_user.id
 
@@ -1107,6 +1119,7 @@ async def complete_order(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на завершение заказа курьером. order_delivered"""
 
     data = await state.get_data()
     current_order_id = data.get("current_order_id")
@@ -1200,6 +1213,7 @@ async def cmd_profile(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр профиля курьера. /profile"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1245,6 +1259,7 @@ async def set_name(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на изменение имени курьера. set_my_name"""
 
     await callback_query.answer("Изменить имя:", show_alert=False)
 
@@ -1269,6 +1284,7 @@ async def set_phone(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на изменение телефона курьера. set_my_phone"""
 
     await callback_query.answer("Изменить телефон:", show_alert=False)
 
@@ -1295,6 +1311,7 @@ async def set_city(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на изменение города курьера. set_my_city"""
 
     await callback_query.answer("Изменить город:", show_alert=False)
 
@@ -1325,6 +1342,7 @@ async def change_name(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает изменение имени курьера. CourierState.change_Name"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1354,6 +1372,7 @@ async def change_phone(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает изменение телефона курьера. CourierState.change_Phone"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1383,6 +1402,7 @@ async def change_city(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает изменение города курьера. CourierState.change_City"""
 
     tg_id = message.from_user.id
 
@@ -1428,6 +1448,7 @@ async def cmd_faq(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр FAQ. /faq"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1455,6 +1476,7 @@ async def cmd_rules(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр правил сервиса. /rules"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1487,6 +1509,7 @@ async def cmd_make_order(
     message: Message,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на переход в бота для клиентов. /make_order"""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1520,6 +1543,7 @@ async def get_courier_statistic(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обрабатывает запрос на просмотр статистики курьера. my_statistic"""
 
     await callback_query.answer("📊 Статистика", show_alert=False)
 
@@ -1568,6 +1592,7 @@ async def get_courier_statistic(
 async def payment_invoice(
     event: Message | CallbackQuery,
 ):
+    """Обрабатывает запрос на оплату подписки. /subs, pay_sub"""
 
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
@@ -1612,6 +1637,7 @@ async def payment_invoice(
 async def extend_subscription(
     event: CallbackQuery,
 ):
+    """Обрабатывает запрос на продление подписки. extend_sub"""
 
     chat_id = event.message.chat.id
 
@@ -1625,6 +1651,7 @@ async def _send_payment_invoice(
     chat_id: int,
     event: Message | CallbackQuery,
 ):
+    """Отправляет инвойс для оплаты подписки."""
 
     prices = [
         LabeledPrice(
@@ -1661,6 +1688,8 @@ async def _send_payment_invoice(
 async def pre_checkout_query(
     pre_checkout_query: PreCheckoutQuery,
 ):
+    """Обрабатывает запрос на предварительную проверку оплаты."""
+
     try:
         if (
             pre_checkout_query.currency == "RUB"
@@ -1690,6 +1719,7 @@ async def pre_checkout_query(
 async def successful_payment(
     message: Message,
 ):
+    """Обрабатывает успешную оплату подписки."""
 
     tg_id = message.from_user.id
 
@@ -1718,5 +1748,6 @@ async def successful_payment(
 async def handle_unrecognized_message(
     message: Message,
 ):
-    log.info(f"DeleteMessageText: {message.text}")
+    """Обрабатывает нераспознанные сообщения."""
+
     await message.delete()

@@ -37,11 +37,14 @@ from ._deps import (
 # ---
 
 
-@customer_r.message(CommandStart())
+@customer_r.message(
+    CommandStart(),
+)
 async def cmd_start_customer(
     message: Message,
     state: FSMContext,
 ):
+    """Обработчик команды /start для клиента."""
 
     tg_id = message.from_user.id
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
@@ -89,8 +92,14 @@ async def cmd_start_customer(
         )
 
 
-@customer_r.callback_query(F.data == "reg")
-async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "reg",
+)
+async def data_reg_customer(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'reg' для клиента."""
 
     await callback_query.answer("✍️ Регистрация", show_alert=False)
 
@@ -102,6 +111,7 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
         "Это не займет много времени.\n\n"
         "<b>Как вас зовут?</b>"
     )
+
     new_message = await callback_query.message.answer(
         text=text,
         disable_notification=True,
@@ -121,13 +131,20 @@ async def data_reg_customer(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-@customer_r.message(filters.StateFilter(CustomerState.reg_Name))
-async def data_name_customer(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.reg_Name,
+    ),
+)
+async def data_name_customer(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик состояния 'CustomerState.reg_Name'."""
 
     current_state = CustomerState.reg_Phone.state
     tg_id = message.from_user.id
     customer_name = message.text
-
     reply_kb = await kb.get_customer_kb("phone_number")
     text = (
         f"Привет, {customer_name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
@@ -157,8 +174,16 @@ async def data_name_customer(message: Message, state: FSMContext):
     )
 
 
-@customer_r.message(filters.StateFilter(CustomerState.reg_Phone))
-async def data_phone_customer(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.reg_Phone,
+    ),
+)
+async def data_phone_customer(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик состояния 'CustomerState.reg_Phone'."""
 
     current_state = CustomerState.reg_City.state
     tg_id = message.from_user.id
@@ -192,8 +217,16 @@ async def data_phone_customer(message: Message, state: FSMContext):
     )
 
 
-@customer_r.message(filters.StateFilter(CustomerState.reg_City))
-async def data_city_customer(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.reg_City,
+    ),
+)
+async def data_city_customer(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик состояния 'CustomerState.reg_City'."""
 
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
@@ -241,8 +274,14 @@ async def data_city_customer(message: Message, state: FSMContext):
     )
 
 
-@customer_r.callback_query(F.data == "accept_tou")
-async def customer_accept_tou(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "accept_tou",
+)
+async def customer_accept_tou(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'accept_tou' для клиента."""
 
     tg_id = callback_query.from_user.id
     accept_tou = (
@@ -328,6 +367,7 @@ async def process_order(
     message: Message,
     state: FSMContext,
 ):
+    """Обработчик заказа клиента."""
 
     start_time = time.perf_counter()
 
@@ -362,7 +402,7 @@ async def process_order(
     try:
 
         await asyncio.wait_for(
-            process_order_logic(
+            _process_order_logic(
                 text_msg,
                 message,
                 state,
@@ -391,12 +431,13 @@ async def process_order(
     log.info(f"Execution time process_message: {execution_time:.4f} sec")
 
 
-async def process_order_logic(
+async def _process_order_logic(
     text_msg: str,
     message: Message,
     state: FSMContext,
     wait_message: Message,
 ):
+    """Логика обработки заказа клиента."""
 
     current_state = CustomerState.assistant_run.state
     tg_id = message.from_user.id
@@ -515,11 +556,15 @@ async def _handle_error_response(
 # ---
 
 
-@customer_r.callback_query(F.data == "order_sent")
+@customer_r.callback_query(
+    F.data == "order_sent",
+)
 async def set_order_to_db(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
+    """Обработчик коллбэка 'order_sent' для клиента. Добавляет заказ в БД."""
+
     current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
     state_data = await state.get_data()
@@ -578,8 +623,14 @@ async def set_order_to_db(
 # ---
 
 
-@customer_r.callback_query(F.data == "cancel_order")
-async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "cancel_order",
+)
+async def cancel_order(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'cancel_order' для клиента. Отменяет заказ."""
 
     await callback_query.answer("⃠ Заказ не размещен", show_alert=False)
 
@@ -602,8 +653,14 @@ async def cancel_order(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@customer_r.message(F.text == "/order")
-async def cmd_order(message: Message, state: FSMContext):
+@customer_r.message(
+    F.text == "/order",
+)
+async def cmd_order(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /order для клиента."""
 
     tg_id = message.from_user.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
@@ -642,8 +699,14 @@ async def cmd_order(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.callback_query(F.data == "ai_order")
-async def data_ai(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "ai_order",
+)
+async def data_ai(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'ai_order' для клиента."""
 
     await callback_query.answer("🤖 ИИ ассистент готов принять заказ", show_alert=False)
 
@@ -672,8 +735,14 @@ async def data_ai(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@customer_r.message(F.text == "/profile")
-async def cmd_profile(message: Message, state: FSMContext):
+@customer_r.message(
+    F.text == "/profile",
+)
+async def cmd_profile(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /profile для клиента."""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -706,8 +775,14 @@ async def cmd_profile(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.message(F.text == "/faq")
-async def cmd_faq(message: Message, state: FSMContext):
+@customer_r.message(
+    F.text == "/faq",
+)
+async def cmd_faq(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /faq для клиента."""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -728,8 +803,14 @@ async def cmd_faq(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.message(F.text == "/rules")
-async def cmd_rules(message: Message, state: FSMContext):
+@customer_r.message(
+    F.text == "/rules",
+)
+async def cmd_rules(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /rules для клиента."""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -755,8 +836,14 @@ async def cmd_rules(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.message(F.text == "/become_courier")
-async def cmd_become_courier(message: Message, state: FSMContext):
+@customer_r.message(
+    F.text == "/become_courier",
+)
+async def cmd_become_courier(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /become_courier для клиента."""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -784,9 +871,17 @@ async def cmd_become_courier(message: Message, state: FSMContext):
 # ---
 
 
-@customer_r.message(F.text == "/my_orders")
-@customer_r.callback_query(F.data == "back_myOrders")
-async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
+@customer_r.message(
+    F.text == "/my_orders",
+)
+@customer_r.callback_query(
+    F.data == "back_myOrders",
+)
+async def cmd_my_orders(
+    event: Message | CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик команды /my_orders для клиента."""
 
     current_state = CustomerState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
@@ -831,9 +926,19 @@ async def cmd_my_orders(event: Message | CallbackQuery, state: FSMContext):
 
 
 @customer_r.callback_query(
-    F.data.in_({"pending_orders", "active_orders", "completed_orders"})
+    F.data.in_(
+        {
+            "pending_orders",
+            "active_orders",
+            "completed_orders",
+        },
+    )
 )
-async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
+async def get_my_orders(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка для просмотра заказов клиента. pending_orders, active_orders, completed_orders"""
 
     tg_id = callback_query.from_user.id
 
@@ -936,8 +1041,19 @@ async def get_my_orders(callback_query: CallbackQuery, state: FSMContext):
     )
 
 
-@customer_r.callback_query(F.data.in_({"next_right_mo", "back_left_mo"}))
-async def handle_order_navigation(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data.in_(
+        {
+            "next_right_mo",
+            "back_left_mo",
+        },
+    ),
+)
+async def handle_order_navigation(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка для навигации по заказам клиента. next_right_mo, back_left_mo"""
 
     tg_id = callback_query.from_user.id
     bot_id = callback_query.bot.id
@@ -985,8 +1101,14 @@ async def handle_order_navigation(callback_query: CallbackQuery, state: FSMConte
         )
 
 
-@customer_r.callback_query(F.data == "cancel_my_order")
-async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "cancel_my_order",
+)
+async def cancel_my_order(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'cancel_my_order' для клиента. Отменяет заказ."""
 
     tg_id = callback_query.from_user.id
 
@@ -1075,8 +1197,14 @@ async def cancel_my_order(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@customer_r.callback_query(F.data == "set_my_name")
-async def set_name(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "set_my_name",
+)
+async def set_name(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'set_my_name' для клиента. Изменяет имя клиента."""
 
     await callback_query.answer("Изменить имя:", show_alert=False)
 
@@ -1094,8 +1222,14 @@ async def set_name(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.callback_query(F.data == "set_my_phone")
-async def set_phone(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "set_my_phone",
+)
+async def set_phone(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'set_my_phone' для клиента. Изменяет телефон клиента."""
 
     await callback_query.answer("Изменить телефон:", show_alert=False)
 
@@ -1115,8 +1249,14 @@ async def set_phone(callback_query: CallbackQuery, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.callback_query(F.data == "set_my_city")
-async def set_city(callback_query: CallbackQuery, state: FSMContext):
+@customer_r.callback_query(
+    F.data == "set_my_city",
+)
+async def set_city(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'set_my_city' для клиента. Изменяет город клиента."""
 
     await callback_query.answer("Изменить город:", show_alert=False)
 
@@ -1138,8 +1278,16 @@ async def set_city(callback_query: CallbackQuery, state: FSMContext):
 # ---
 
 
-@customer_r.message(filters.StateFilter(CustomerState.change_Name))
-async def change_name(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.change_Name,
+    ),
+)
+async def change_name(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик изменения имени клиента. CustomerState.change_Name"""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -1161,8 +1309,16 @@ async def change_name(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.message(filters.StateFilter(CustomerState.change_Phone))
-async def change_phone(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.change_Phone,
+    ),
+)
+async def change_phone(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик изменения телефона клиента. CustomerState.change_Phone"""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
@@ -1184,8 +1340,16 @@ async def change_phone(message: Message, state: FSMContext):
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-@customer_r.message(filters.StateFilter(CustomerState.change_City))
-async def change_city(message: Message, state: FSMContext):
+@customer_r.message(
+    filters.StateFilter(
+        CustomerState.change_City,
+    ),
+)
+async def change_city(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик изменения города клиента. CustomerState.change_City"""
 
     tg_id = message.from_user.id
 
@@ -1227,5 +1391,9 @@ async def change_city(message: Message, state: FSMContext):
 
 
 @customer_fallback.message()
-async def handle_unrecognized_message(message: Message):
+async def handle_unrecognized_message(
+    message: Message,
+):
+    """Обработчик нераспознанных сообщений клиента."""
+
     await message.delete()
