@@ -171,6 +171,14 @@ class Subscription(Base):
     couriers = relationship("Courier", back_populates="subscription")
 
 
+class FreePeriod(Base):
+    __tablename__ = "freeperiod"
+
+    freePeriod_id: Mapped[intPK]
+
+    days: Mapped[int] = mapped_column(Integer, default=10)
+
+
 __all__ = [
     "async_session_factory",
     "Customer",
@@ -178,6 +186,7 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Subscription",
+    "FreePeriod",
     "engine",
     "Base",
 ]

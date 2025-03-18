@@ -71,6 +71,17 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния курьера и обработка сообщения"""
 
+    if event.text == "/restart":
+        await fsm_context.set_state(CourierState.default.state)
+        await courier_bot.send_message(
+            chat_id=event.from_user.id,
+            text="Бот был перезапущен!\n\n▼ <b>Выберите действие ...</b>",
+            reply_markup=ReplyKeyboardRemove(),
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+        return
+
     if state in (CourierState.reg_Phone.state,):
         if event.text in [
             "/start",
@@ -145,6 +156,7 @@ async def _check_state_and_handle_message(
     ):
 
         if event.text in [
+            "/start",
             "/profile",
             "/subs",
             "/faq",

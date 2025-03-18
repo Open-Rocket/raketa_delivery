@@ -69,6 +69,17 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния пользователя и обработка сообщения"""
 
+    if event.text == "/restart":
+        await fsm_context.set_state(CustomerState.default.state)
+        await customer_bot.send_message(
+            chat_id=event.from_user.id,
+            text="Бот был перезапущен!\n\n▼ <b>Выберите действие ...</b>",
+            reply_markup=ReplyKeyboardRemove(),
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+        return
+
     if state == CustomerState.assistant_run.state:
         await event.delete()
         return
@@ -143,6 +154,7 @@ async def _check_state_and_handle_message(
     if state in (CustomerState.change_Phone.state,):
 
         if event.text in [
+            "/start",
             "/order",
             "/my_orders",
             "/profile",

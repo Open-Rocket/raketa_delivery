@@ -8,7 +8,6 @@ from ._deps import (
     CallbackQuery,
     OrderStatus,
     CustomerState,
-    CustomerOuterMiddleware,
     ReplyKeyboardRemove,
     time,
     Time,

@@ -1,11 +1,12 @@
 from .db import (
     async_session_factory,
+    engine,
     Customer,
     Courier,
     OrderStatus,
     Subscription,
+    FreePeriod,
     Order,
-    engine,
     Base,
 )
 
@@ -17,6 +18,7 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Subscription",
+    "FreePeriod",
     "engine",
     "Base",
 ]

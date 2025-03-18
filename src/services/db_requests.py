@@ -3,6 +3,7 @@ from src.models import (
     async_session_factory,
     Customer,
     Courier,
+    FreePeriod,
     OrderStatus,
     Order,
     Subscription,
@@ -231,7 +232,7 @@ class CourierData:
                 else:
 
                     new_subscription = Subscription(
-                        end_date=now + timedelta(days=30),
+                        end_date=now + timedelta(days=days),
                         courier_id=courier.courier_id,
                     )
                     session.add(new_subscription)
@@ -369,6 +370,39 @@ class CourierData:
             )
             active_order_count = query.scalar()
             return active_order_count if active_order_count else 0
+
+    # ---
+
+    async def update_free_period(self, days: int):
+        """Обновляет количество дней бесплатного периода."""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(select(FreePeriod))
+                free_period = result.scalar_one_or_none()
+
+                if free_period:
+                    free_period.days = days
+                else:
+                    free_period = FreePeriod(days=days)
+                    session.add(free_period)
+
+                await session.commit()
+
+            except Exception as e:
+                log.error(f"Ошибка при обновлении бесплатного периода: {e}")
+                await session.rollback()
+
+    async def get_free_period(self) -> int:
+        """Получает количество дней бесплатного периода."""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(select(FreePeriod))
+                free_period = result.scalar_one_or_none()
+                return free_period.days if free_period else 10
+
+            except Exception as e:
+                log.error(f"Ошибка при получении бесплатного периода: {e}")
+                return 10
 
 
 class OrderData:

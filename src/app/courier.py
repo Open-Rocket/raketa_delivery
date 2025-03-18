@@ -1,5 +1,4 @@
 from ._deps import (
-    asyncio,
     CommandStart,
     FSMContext,
     ContentType,
@@ -9,11 +8,12 @@ from ._deps import (
     CallbackQuery,
     OrderStatus,
     CourierState,
-    CourierOuterMiddleware,
     PreCheckoutQuery,
     LabeledPrice,
     zlib,
     Time,
+    courier_bot,
+    courier_bot_id,
     handler,
     courier_r,
     courier_fallback,
@@ -21,7 +21,6 @@ from ._deps import (
     payment_r,
     kb,
     title,
-    courier_bot,
     courier_bot_id,
     order_data,
     rediska,
@@ -32,9 +31,7 @@ from ._deps import (
     find_closest_city,
     customer_bot,
 )
-import aiogram
-from aiogram.types import ReplyKeyboardMarkup
-import datetime
+
 
 # ---
 # ---
@@ -71,7 +68,7 @@ async def cmd_start_courier(
             "Присоединяйся и начинай зарабатывать больше уже сегодня!"
         )
         reply_kb = await kb.get_courier_kb("/start")
-        await message.answer_photo(
+        new_message = await message.answer_photo(
             photo=photo_title,
             caption=text,
             reply_markup=reply_kb,
@@ -84,7 +81,7 @@ async def cmd_start_courier(
 
     if new_message:
         await handler.catch(
-            bot=customer_bot,
+            bot=courier_bot,
             chat_id=message.chat.id,
             user_id=tg_id,
             new_message=new_message,
@@ -122,7 +119,7 @@ async def data_reg_courier(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=callback_query.message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -164,7 +161,7 @@ async def data_name_courier(
     await rediska.set_name(courier_bot_id, tg_id, courier_name)
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -203,7 +200,7 @@ async def data_phone_courier(
     await rediska.set_phone(courier_bot_id, tg_id, courier_phone)
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -257,7 +254,7 @@ async def data_city_courier(
         await rediska.set_city(courier_bot_id, tg_id, city)
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -315,7 +312,8 @@ async def courier_accept_tou(
         await callback_query.answer("✅ Принято", show_alert=False)
 
         reply_kb = await kb.get_courier_kb("super_go")
-        free_period = 30
+        free_period = await courier_data.get_free_period()
+
         text = (
             f"<b>Как новому курьеру вам доступен\n{free_period}-дневный бесплатный период!</b> 🚀\n\n"
             f"Попробуйте все возможности сервиса и начинайте зарабатывать уже сейчас! ✨"
@@ -329,7 +327,6 @@ async def courier_accept_tou(
         )
 
         await state.set_state(current_state)
-        await state.update_data(free_period=free_period)
         await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     else:
@@ -345,7 +342,7 @@ async def courier_accept_tou(
         )
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=callback_query.message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -365,12 +362,15 @@ async def courier_super_go(
 
     await callback_query.answer("⭐️⭐️⭐️", show_alert=False)
 
-    _ = await courier_data.update_courier_subscription(tg_id, days=free_period)
-
     current_state = CourierState.default.state
     tg_id = callback_query.from_user.id
-    free_period = await state.get_data("free_period")
+
+    free_period = await courier_data.get_free_period()
     moscow_time = await Time.get_moscow_time()
+
+    log.info(f"free_period: {free_period}")
+
+    _ = await courier_data.update_courier_subscription(tg_id, days=free_period)
 
     courier_name, courier_phone, courier_city, end_date = (
         await courier_data.get_courier_full_info(tg_id)
@@ -406,7 +406,7 @@ async def courier_super_go(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     await handler.catch(
-        bot=customer_bot,
+        bot=courier_bot,
         chat_id=callback_query.message.chat.id,
         user_id=tg_id,
         new_message=new_message,
@@ -431,12 +431,108 @@ async def cmd_run(
 ):
     """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
 
-    if isinstance(event, CallbackQuery):
-        await event.answer("🚀 Начать работу", show_alert=False)
+    tg_id = event.from_user.id
+    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+
+    is_read_info = await rediska.is_read_info(courier_bot_id, tg_id)
+
+    if is_read_info:
+
+        if isinstance(event, CallbackQuery):
+            await event.answer("🚀 Начать работу", show_alert=False)
+
+        current_state = CourierState.location.state
+        current_active_orders_count = (
+            await courier_data.get_courier_active_orders_count(tg_id)
+        )
+
+        reply_kb = await kb.get_courier_kb("/run")
+
+        if current_active_orders_count < 3:
+
+            text = (
+                f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
+                f"<i>*Доступно только с мобильных устройств</i>\n\n"
+                f"<i>*После принятий заказа отправьте пожалуйста транслируемую геолокацию заказчику, для того чтобы он мог видеть где находится его заказ</i>"
+            )
+
+            await event.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+        else:
+
+            current_state = CourierState.default.state
+
+            text = (
+                "Вы уже выполняете максимальное количество заказов.\n\n"
+                "Пожалуйста, завершите текущие заказы, чтобы начать новые."
+            )
+
+            await event.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+    else:
+
+        current_state = CourierState.default.state
+
+        ttl = await title.get_title_courier("first_run")
+
+        text = (
+            "Отправьте свою локацию, выберите заказ, примите его и выполняйте.\n"
+            "Все заработанные деньги ваши!\n\n"
+            "⚠️ Важно:\n\n"
+            "‼️ Частые нарушения правил могут привести к бану аккаунта.\n\n"
+            "🚫 За кражу заказа или мошенничество блокировка и уголовное наказание.\n\n"
+            "✅ Будьте честными, поднимайтесь в рейтинге и получайте лучшие заказы первыми.\n\n"
+            "Удачной работы и хороших заказов!"
+        )
+
+        reply_kb = await kb.get_courier_kb("run_first")
+
+        new_message = await event.answer_photo(
+            photo=ttl,
+            caption=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        await handler.catch(
+            bot=courier_bot,
+            chat_id=chat_id,
+            user_id=tg_id,
+            new_message=new_message,
+            current_message=None,
+            delete_previous=True,
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+
+@courier_r.callback_query(
+    F.data == "lets_go_first",
+)
+async def data_lets_go_first(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'lets_go_first' для курьера."""
+
+    await callback_query.answer("🚀 Начать работу", show_alert=False)
 
     current_state = CourierState.location.state
-    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
-    tg_id = event.from_user.id
+    tg_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
     current_active_orders_count = await courier_data.get_courier_active_orders_count(
         tg_id
     )
@@ -450,7 +546,7 @@ async def cmd_run(
             "<i>*Доступно только с мобильных устройств</i>"
         )
 
-        await event.bot.send_message(
+        await callback_query.bot.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=reply_kb,
@@ -466,51 +562,41 @@ async def cmd_run(
             "Пожалуйста, завершите текущие заказы, чтобы начать новые."
         )
 
-        await event.bot.send_message(
-            chat_id=chat_id,
+        await callback_query.message.answer(
             text=text,
             disable_notification=True,
             parse_mode="HTML",
         )
 
+    await callback_query.message.delete()
+
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
+    await rediska.set_read_info(courier_bot_id, tg_id, True)
 
 
 @courier_r.message(
     F.content_type == ContentType.LOCATION,
     filters.StateFilter(CourierState.location),
 )
+@courier_r.callback_query(
+    F.data == "back_location",
+)
 async def get_location(
-    message: Message,
+    event: Message | CallbackQuery,
     state: FSMContext,
 ):
     """Обрабатывает получение локации курьера. CourierState.location"""
 
-    if message.location.live_period:
-        await message.answer(
-            text="Локация не принята!\n\nПожалуйста, отправьте статичную локацию.",
-            reply_markup=ReplyKeyboardRemove(),
-            disable_notification=True,
-        )
-        await message.delete()
-        return
-
     current_state = CourierState.default.state
-    tg_id = message.from_user.id
-    courier_tg_id = message.from_user.id
+
+    tg_id = event.from_user.id
+    courier_tg_id = event.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
-
-    my_lon = message.location.longitude
-    my_lat = message.location.latitude
-    radius_km = 5
-
     city_orders = await order_data.get_pending_orders_in_city(courier_city)
-    nearby_orders = await order_data.get_nearby_orders(
-        my_lat,
-        my_lon,
-        radius_km,
-    )
+    data = await state.get_data()
+    order_info = data.get("order_data", {})
+    nearby_orders = order_info.get("nearby_orders", {})
 
     text = (
         f"<b>📋 Заказы</b>\n\n"
@@ -524,26 +610,60 @@ async def get_location(
         available_orders_len=len(nearby_orders),
     )
 
-    await message.answer(
-        text="Локация принята!",
-        reply_markup=ReplyKeyboardRemove(),
-        disable_notification=True,
-    )
+    if isinstance(event, CallbackQuery):
 
-    await message.answer(
-        text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
+        await event.message.edit_text(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
 
-    await state.set_state(current_state)
-    await state.update_data(
-        order_data={
-            "nearby_orders": nearby_orders,
-            "city_orders": city_orders,
-        },
-    )
+    else:
+
+        if event.location.live_period:
+            await event.answer(
+                text=(
+                    f"Локация не принята!\n"
+                    f"Пожалуйста, отправьте статичную локацию!\n\n"
+                    f"<i>*Доступно только с мобильных устройств</i>"
+                ),
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+            )
+            await event.delete()
+            return
+
+        my_lon = event.location.longitude
+        my_lat = event.location.latitude
+        radius_km = 5
+
+        nearby_orders = await order_data.get_nearby_orders(
+            my_lat,
+            my_lon,
+            radius_km,
+        )
+
+        await event.answer(
+            text="Локация принята!",
+            reply_markup=ReplyKeyboardRemove(),
+            disable_notification=True,
+        )
+
+        await event.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await state.update_data(
+            order_data={
+                "nearby_orders": nearby_orders,
+                "city_orders": city_orders,
+            },
+        )
     await rediska.set_state(courier_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, courier_bot_id, courier_tg_id)
 
@@ -813,6 +933,7 @@ async def accept_order(
     data = await state.get_data()
     order_ids: list = data.get("order_ids", [])
     current_order_id = int(data.get("current_order_id"))
+    courier_name, courier_phone, _, _ = await courier_data.get_courier_info(tg_id)
 
     tg_id = callback_query.from_user.id
 
@@ -848,7 +969,13 @@ async def accept_order(
         customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
         await customer_bot.send_message(
             chat_id=customer_tg_id,
-            text=f"Ваш заказ №{current_order_id} был принят курьером!",
+            text=(
+                f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
+                f"Курьер: {courier_name}\n"
+                f"Телефон: {courier_phone}\n\n"
+                f"<i>*Подробности в меню</i> <b>Мои заказы</b>\n\n"
+                f"<i>*Запросите у курьера его транслируемую геолокацию для отслеживания местоположения вашего заказа!</i>"
+            ),
             parse_mode="HTML",
         )
 
@@ -856,10 +983,12 @@ async def accept_order(
 
         text = (
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
-            f"<i>*Подробности в меню</i> <b>Мои заказы</b>\n"
+            f"Курьер: {courier_name}\n"
+            f"Телефон: {courier_phone}\n\n"
+            f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геолокацией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>"
         )
 
-        await callback_query.answer("✅ Заказ принят", show_alert=False)
+        await callback_query.answer("✅ Заказ принят!", show_alert=False)
 
         await callback_query.message.answer(
             text=text,
@@ -1176,7 +1305,10 @@ async def complete_order(
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 
-        notification_text = f"Ваш заказ №{current_order_id} был доставлен курьером!\n"
+        notification_text = (
+            f"Ваш заказ №{current_order_id} был доставлен курьером!\n"
+            f"Спасибо что выбрали наш сервис! 🚀"
+        )
         await customer_bot.send_message(
             chat_id=customer_tg_id,
             text=notification_text,
@@ -1184,7 +1316,9 @@ async def complete_order(
         )
 
         await callback_query.message.answer(
-            f"<b>✅ Заказ №{current_order_id} доставлен</b>!",
+            f"<b>✅ Заказ №{current_order_id} доставлен</b>!\n\n"
+            f"Вы заработали {order.order_price} руб.\n\n"
+            f"Спасибо за вашу работу! 🚀",
             disable_notification=False,
             parse_mode="HTML",
         )

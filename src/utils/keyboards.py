@@ -196,6 +196,7 @@ class Keyboard:
     @staticmethod
     async def get_courier_kb(
         key: str,
+        available_city_orders: int | None = None,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для курьера"""
 
@@ -211,6 +212,16 @@ class Keyboard:
                     ],
                 ],
                 resize_keyboard=True,
+            ),
+            "run_first": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🚀 Начать работу",
+                            callback_data="lets_go_first",
+                        )
+                    ]
+                ]
             ),
             "/subs": InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -279,6 +290,12 @@ class Keyboard:
                             text="Принять заказ", callback_data="accept_order"
                         )
                     ],
+                    [
+                        InlineKeyboardButton(
+                            text="Назад",
+                            callback_data="back_location",
+                        ),
+                    ],
                 ]
             ),
             # ---
@@ -286,9 +303,16 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Принять заказ", callback_data="accept_order"
-                        )
-                    ]
+                            text="Принять заказ",
+                            callback_data="accept_order",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Назад",
+                            callback_data="back_location",
+                        ),
+                    ],
                 ]
             ),
             "one_my_order": InlineKeyboardMarkup(
@@ -347,7 +371,8 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Перейти к заказам!", callback_data="lets_go"
+                            text=f"Перейти к заказам! {available_city_orders if available_city_orders else ''}",
+                            callback_data="lets_go",
                         )
                     ]
                 ]
@@ -418,11 +443,13 @@ class Keyboard:
                         text=f"Заказы в городе {city_orders_len}",
                         callback_data="show_city_orders",
                     ),
+                ],
+                [
                     InlineKeyboardButton(
                         text=f"Заказы рядом {available_orders_len}",
                         callback_data="show_nearby_orders",
                     ),
-                ]
+                ],
             ]
         )
 

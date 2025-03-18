@@ -21,6 +21,7 @@ class Title:
             "/ai": "courier_ai.jpg",
             "on_way": "courier_on-the-way.jpg",
             "success_payment": "success_payment.jpg",
+            "first_run": "run_first.jpg",
         }
 
         img = os.path.join(dir, paths.get(command, ""))
