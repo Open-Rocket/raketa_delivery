@@ -1,5 +1,6 @@
 import re
 import emoji
+import asyncio
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Awaitable
@@ -11,7 +12,7 @@ from aiogram.types import (
 )
 from src.confredis import RedisService
 from src.utils import CustomerState
-from src.config import customer_bot
+from src.config import customer_bot, log
 from aiogram.types import ReplyKeyboardRemove
 
 
@@ -69,18 +70,47 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния пользователя и обработка сообщения"""
 
-    if event.text == "/restart":
+    RESTRICTED_COMMANDS = [
+        "/order",
+        "/my_orders",
+        "/profile",
+        "/faq",
+        "/rules",
+        "/become_courier",
+        "/restart",
+    ]
+
+    async def restart_bot():
         await fsm_context.set_state(CustomerState.default.state)
         await customer_bot.send_message(
             chat_id=event.from_user.id,
-            text="Бот был перезапущен!\n\n▼ <b>Выберите действие ...</b>",
+            text="▼ <b>Выберите действие ...</b>",
             reply_markup=ReplyKeyboardRemove(),
             disable_notification=True,
             parse_mode="HTML",
         )
-        return
+
+    if state == CustomerState.ai_voice_order.state:
+
+        if event.text in RESTRICTED_COMMANDS or event.text == "/start":
+
+            await fsm_context.set_state(CustomerState.default.state)
+            await customer_bot.send_message(
+                chat_id=event.from_user.id,
+                text="Оформление заказа прервано!\nПовторите команду\n\n▼ <b>Выберите действие ...</b>",
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+            await event.delete()
+
+            return
 
     if state == CustomerState.assistant_run.state:
+        if event.text in ("/restart", "/start"):
+            await restart_bot()
+            return
         await event.delete()
         return
 
@@ -95,16 +125,10 @@ async def _check_state_and_handle_message(
         CustomerState.change_Name.state,
         CustomerState.change_City.state,
     ):
-        if event.text in [
-            "/order",
-            "/my_orders",
-            "/profile",
-            "/faq",
-            "/rules",
-            "/become_courier",
-        ]:
+        if event.text in RESTRICTED_COMMANDS:
 
             await fsm_context.set_state(CustomerState.default.state)
+            await asyncio.sleep(0.3)
             return await handler(event, data)
 
     if state in (
@@ -135,14 +159,7 @@ async def _check_state_and_handle_message(
         CustomerState.reg_City.state,
         CustomerState.reg_tou.state,
     ):
-        if event.text in [
-            "/order",
-            "/my_orders",
-            "/profile",
-            "/faq",
-            "/rules",
-            "/become_courier",
-        ]:
+        if event.text in RESTRICTED_COMMANDS:
             await event.delete()
             return
 
@@ -153,15 +170,7 @@ async def _check_state_and_handle_message(
 
     if state in (CustomerState.change_Phone.state,):
 
-        if event.text in [
-            "/start",
-            "/order",
-            "/my_orders",
-            "/profile",
-            "/faq",
-            "/rules",
-            "/become_courier",
-        ]:
+        if event.text in RESTRICTED_COMMANDS or event.text == "/start":
             await customer_bot.send_message(
                 chat_id=event.from_user.id,
                 text="-",
@@ -174,6 +183,10 @@ async def _check_state_and_handle_message(
         if not event.contact or event.contact.user_id != event.from_user.id:
             await event.delete()
             return
+
+    if event.text == "/restart":
+        await restart_bot()
+        return
 
     return await handler(event, data)
 

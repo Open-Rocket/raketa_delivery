@@ -20,7 +20,7 @@ class AssistantAi:
     async def _get_gpt_text(
         self,
         request: str,
-        model="gpt-4o-mini",
+        model="gpt-4-turbo",
     ):
         """Отправляет инструкции для агента ИИ, в случае возникновения ошибок обрабатывает их."""
 
@@ -115,6 +115,10 @@ class AssistantAi:
             addresses = response.get("addresses", [])
             delivery_object = response.get("delivery_object", "-")
             description = response.get("description", "")
+
+            # log.info(
+            #     f"Извлеченные данные: city={city}, addresses={addresses}, delivery_object={delivery_object}, description={description}",
+            # )
 
             return city, addresses, delivery_object, description
 

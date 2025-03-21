@@ -10,16 +10,22 @@ from .routers import (
     customer_fallback,
     courier_fallback,
     payment_r,
+    admin_r,
+    admin_fallback,
 )
 from .bots import (
     customer_bot,
     courier_bot,
+    admin_bot,
     customer_dp,
     courier_dp,
+    admin_dp,
     fsm_customer_storage,
     fsm_courier_storage,
     customer_bot_id,
     courier_bot_id,
+    admin_bot_id,
+    SUPER_ADMIN_TG_ID,
 )
 
 
@@ -39,11 +45,17 @@ __all__ = [
     "payment_provider",
     "customer_bot",
     "courier_bot",
+    "admin_bot",
     "customer_dp",
     "courier_dp",
+    "admin_dp",
     "payment_r",
     "fsm_customer_storage",
     "fsm_courier_storage",
     "customer_bot_id",
     "courier_bot_id",
+    "admin_bot_id",
+    "admin_r",
+    "admin_fallback",
+    "SUPER_ADMIN_TG_ID",
 ]

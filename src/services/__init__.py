@@ -1,7 +1,7 @@
 from .ai_assistant import assistant
 from .routing import route
 from .order import formatter, recognizer
-from .db_requests import customer_data, courier_data, order_data
+from .db_requests import customer_data, courier_data, order_data, admin_data
 from .fuzzy import cities, cities_2, find_closest_city
 
 
@@ -13,6 +13,7 @@ __all__ = [
     "customer_data",
     "courier_data",
     "order_data",
+    "admin_data",
     "cities",
     "cities_2",
     "find_closest_city",

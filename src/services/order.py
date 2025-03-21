@@ -33,7 +33,9 @@ class OrderFormatter:
             coords = await route.get_coordinates(address)
             if coords:
                 coordinates.append(coords)
+
                 maps_url = f"https://maps.yandex.ru/?text={address.replace(' ', '+')}"
+
                 address_links.append(maps_url)
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])

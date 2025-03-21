@@ -81,10 +81,30 @@ class OrderStatus(enum.Enum):
 # Tables
 
 
+class GlobalSettings(Base):
+    __tablename__ = "global_settings"
+
+    global_settings_id: Mapped[intPK]
+
+    service_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
+    order_price_per_km: Mapped[intData] = mapped_column(Integer, default=38)
+    order_max_price: Mapped[intData] = mapped_column(Integer, default=100)
+    subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
+    discount_percent_courier: Mapped[intData] = mapped_column(Integer, default=15)
+    discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
+    free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
+
+
 class Customer(Base):
     __tablename__ = "customers"
 
     customer_id: Mapped[intPK]
+
+    agent_id = mapped_column(
+        Integer, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=True
+    )
 
     customer_tg_id: Mapped[intDataUnique]
     customer_name: Mapped[stringData]
@@ -93,13 +113,18 @@ class Customer(Base):
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
-    orders = relationship("Order", back_populates="customers")
+    orders = relationship("Order", back_populates="customer")
+    agent = relationship("Agent", back_populates="customers")
 
 
 class Courier(Base):
     __tablename__ = "couriers"
 
     courier_id: Mapped[intPK]
+
+    agent_id = mapped_column(
+        Integer, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=True
+    )
 
     courier_tg_id: Mapped[intDataUnique]
     courier_name: Mapped[stringData]
@@ -110,8 +135,37 @@ class Courier(Base):
 
     orders_active_now: Mapped[intData]
 
-    orders = relationship("Order", back_populates="couriers")
+    orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
+    agent = relationship("Agent", back_populates="couriers")
+
+
+class Agent(Base):
+    __tablename__ = "agents"
+
+    agent_id: Mapped[intPK]
+
+    agent_tg_id: Mapped[intDataUnique]
+    agent_name: Mapped[stringData]
+    agent_phone: Mapped[stringData]
+    agent_city: Mapped[stringData]
+    agent_accept_terms_of_use: Mapped[stringData]
+    agent_registration_date: Mapped[datetimeData]
+
+    sid_key: Mapped[stringData]
+
+    couriers = relationship("Courier", back_populates="agent")
+    customers = relationship("Customer", back_populates="agent")
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    admin_id: Mapped[intPK]
+
+    admin_tg_id: Mapped[intDataUnique]
+    admin_name: Mapped[stringData]
+    admin_phone: Mapped[stringData]
 
 
 class Order(Base):
@@ -153,8 +207,8 @@ class Order(Base):
 
     order_forma: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
-    couriers = relationship("Courier", back_populates="orders")
-    customers = relationship("Customer", back_populates="orders")
+    courier = relationship("Courier", back_populates="orders")
+    customer = relationship("Customer", back_populates="orders")
 
 
 class Subscription(Base):
@@ -171,22 +225,15 @@ class Subscription(Base):
     couriers = relationship("Courier", back_populates="subscription")
 
 
-class FreePeriod(Base):
-    __tablename__ = "freeperiod"
-
-    freePeriod_id: Mapped[intPK]
-
-    days: Mapped[int] = mapped_column(Integer, default=10)
-
-
 __all__ = [
     "async_session_factory",
     "Customer",
     "Courier",
+    "Admin",
+    "Agent",
     "Order",
     "OrderStatus",
     "Subscription",
-    "FreePeriod",
-    "engine",
+    "GlobalSettings" "engine",
     "Base",
 ]

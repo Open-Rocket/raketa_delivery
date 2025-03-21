@@ -23,6 +23,7 @@ from ._deps import (
     title,
     courier_bot_id,
     order_data,
+    admin_data,
     rediska,
     cities,
     payment_provider,
@@ -436,6 +437,8 @@ async def cmd_run(
 
     is_read_info = await rediska.is_read_info(courier_bot_id, tg_id)
 
+    current_state = CourierState.default.state
+
     if is_read_info:
 
         if isinstance(event, CallbackQuery):
@@ -453,7 +456,6 @@ async def cmd_run(
             text = (
                 f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
                 f"<i>*Доступно только с мобильных устройств</i>\n\n"
-                f"<i>*После принятий заказа отправьте пожалуйста транслируемую геолокацию заказчику, для того чтобы он мог видеть где находится его заказ</i>"
             )
 
             await event.bot.send_message(
@@ -487,18 +489,19 @@ async def cmd_run(
         ttl = await title.get_title_courier("first_run")
 
         text = (
-            "Отправьте свою локацию, выберите заказ, примите его и выполняйте.\n"
-            "Все заработанные деньги ваши!\n\n"
+            "Отправьте свою локацию, выберите заказ, примите его и выполняйте.\n\n"
             "⚠️ Важно:\n\n"
             "‼️ Частые нарушения правил могут привести к бану аккаунта.\n\n"
             "🚫 За кражу заказа или мошенничество блокировка и уголовное наказание.\n\n"
             "✅ Будьте честными, поднимайтесь в рейтинге и получайте лучшие заказы первыми.\n\n"
+            "💰 Все заработанные деньги ваши!\n\n"
             "Удачной работы и хороших заказов!"
         )
 
         reply_kb = await kb.get_courier_kb("run_first")
 
-        new_message = await event.answer_photo(
+        new_message = await event.bot.send_photo(
+            chat_id=chat_id,
             photo=ttl,
             caption=text,
             reply_markup=reply_kb,
@@ -593,10 +596,27 @@ async def get_location(
     tg_id = event.from_user.id
     courier_tg_id = event.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
-    city_orders = await order_data.get_pending_orders_in_city(courier_city)
-    data = await state.get_data()
-    order_info = data.get("order_data", {})
-    nearby_orders = order_info.get("nearby_orders", {})
+
+    if isinstance(event, CallbackQuery):
+
+        data = await state.get_data()
+        order_info: dict = data.get("order_data", {})
+        nearby_orders = order_info.get("nearby_orders", {})
+        city_orders = order_info.get("city_orders", {})
+
+    else:
+
+        my_lon = event.location.longitude
+        my_lat = event.location.latitude
+        radius_km = 5
+
+        nearby_orders = await order_data.get_nearby_orders(
+            my_lat,
+            my_lon,
+            radius_km,
+        )
+
+        city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
     text = (
         f"<b>📋 Заказы</b>\n\n"
@@ -633,16 +653,6 @@ async def get_location(
             )
             await event.delete()
             return
-
-        my_lon = event.location.longitude
-        my_lat = event.location.latitude
-        radius_km = 5
-
-        nearby_orders = await order_data.get_nearby_orders(
-            my_lat,
-            my_lon,
-            radius_km,
-        )
 
         await event.answer(
             text="Локация принята!",
@@ -780,7 +790,7 @@ async def show_city_orders(
     )
 
     await callback_query.answer(
-        f"🏙️ Все заказы в городе: {len_city_orders}", show_alert=False
+        f"🏙️ Заказы в городе: {len_city_orders}", show_alert=False
     )
 
     await callback_query.message.edit_text(
@@ -803,71 +813,16 @@ async def show_city_orders(
 
 
 @courier_r.callback_query(
-    filters.StateFilter(CourierState.nearby_Orders),
+    filters.StateFilter(
+        CourierState.city_Orders,
+    ),
     F.data.in_({"next_right", "back_left"}),
 )
-async def handle_order_all_navigation_nearby(
+async def handle_order_navigation_city(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Обрабатывает навигацию по заказам в радиусе курьера. next_right, back_left"""
-
-    current_state = CourierState.nearby_Orders.state
-    tg_id = callback_query.from_user.id
-
-    data = await state.get_data()
-    order_data = data.get("order_data", {})
-    nearby_orders_data = order_data.get("nearby_orders_data", {})
-
-    nearby_order_ids = list(nearby_orders_data.keys())
-    current_index = data.get("current_index", 0)
-
-    if not nearby_orders_data or not nearby_order_ids:
-        log.warning(f"❌ Нет доступных заказов.")
-        await callback_query.answer("Нет доступных заказов.", show_alert=True)
-        return
-
-    total_orders_nearby = len(nearby_order_ids)
-
-    if callback_query.data == "next_right":
-        new_index = (current_index + 1) % total_orders_nearby
-        await callback_query.answer(
-            f"{new_index+1}/{total_orders_nearby} ⏩", show_alert=False
-        )
-
-    else:
-        new_index = (current_index - 1) % total_orders_nearby
-        await callback_query.answer(
-            f"⏪ {new_index+1}/{total_orders_nearby}", show_alert=False
-        )
-
-    new_order_id = nearby_order_ids[new_index]
-
-    reply_markup = await kb.get_courier_kb(
-        "available_orders" if total_orders_nearby > 1 else "one_order"
-    )
-
-    await callback_query.message.edit_text(
-        nearby_orders_data[new_order_id]["text"],
-        reply_markup=reply_markup,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await state.update_data(current_index=new_index, current_order_id=new_order_id)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-    await rediska.save_fsm_state(state, courier_bot_id, tg_id)
-
-
-@courier_r.callback_query(
-    filters.StateFilter(CourierState.city_Orders),
-    F.data.in_({"next_right", "back_left"}),
-)
-async def handle_order_all_navigation_city(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обрабатывает навигацию по заказам в городе курьера. next_right, back_left"""
+    """Обрабатывает навигацию по заказам курьера. next_right, back_left"""
 
     current_state = CourierState.city_Orders.state
     tg_id = callback_query.from_user.id
@@ -920,6 +875,69 @@ async def handle_order_all_navigation_city(
 
 
 @courier_r.callback_query(
+    filters.StateFilter(
+        CourierState.nearby_Orders,
+    ),
+    F.data.in_({"next_right", "back_left"}),
+)
+async def handle_order_navigation_nearby(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает навигацию по заказам курьера. next_right, back_left"""
+
+    current_state = CourierState.nearby_Orders.state
+    tg_id = callback_query.from_user.id
+
+    data = await state.get_data()
+    order_data: dict = data.get("order_data", {})
+    nearby_orders_data: dict = order_data.get("nearby_orders", {})
+
+    nearby_order_ids = list(nearby_orders_data.keys())
+    current_index = data.get("current_index", 0)
+
+    if not nearby_orders_data or not nearby_order_ids:
+        log.warning(f"❌ Нет доступных заказов.")
+        await callback_query.answer("Нет доступных заказов.", show_alert=True)
+        return
+
+    total_orders_nearby = len(nearby_order_ids)
+
+    if callback_query.data == "next_right":
+        new_index = (current_index + 1) % total_orders_nearby
+        await callback_query.answer(
+            f"{new_index+1}/{total_orders_nearby} ⏩", show_alert=False
+        )
+
+    else:
+        new_index = (current_index - 1) % total_orders_nearby
+        await callback_query.answer(
+            f"⏪ {new_index+1}/{total_orders_nearby}", show_alert=False
+        )
+
+    new_order_id = nearby_order_ids[new_index]
+
+    reply_markup = await kb.get_courier_kb(
+        "available_orders" if total_orders_nearby > 1 else "one_order"
+    )
+
+    await callback_query.message.edit_text(
+        nearby_orders_data[new_order_id]["text"],
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await state.update_data(current_index=new_index, current_order_id=new_order_id)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+
+
+# ---
+# ---
+
+
+@courier_r.callback_query(
     F.data == "accept_order",
 )
 async def accept_order(
@@ -930,12 +948,15 @@ async def accept_order(
 
     current_state = CourierState.default.state
 
+    tg_id = callback_query.from_user.id
     data = await state.get_data()
     order_ids: list = data.get("order_ids", [])
     current_order_id = int(data.get("current_order_id"))
-    courier_name, courier_phone, _, _ = await courier_data.get_courier_info(tg_id)
+    courier_name, courier_phone, _ = await courier_data.get_courier_info(tg_id)
 
-    tg_id = callback_query.from_user.id
+    customer_name, customer_phone, _ = await order_data.get_customer_info_by_order_id(
+        current_order_id
+    )
 
     if not order_ids:
 
@@ -974,7 +995,7 @@ async def accept_order(
                 f"Курьер: {courier_name}\n"
                 f"Телефон: {courier_phone}\n\n"
                 f"<i>*Подробности в меню</i> <b>Мои заказы</b>\n\n"
-                f"<i>*Запросите у курьера его транслируемую геолокацию для отслеживания местоположения вашего заказа!</i>"
+                f"<i>*Запросите у курьера его транслируемую геопозицию для отслеживания местоположения вашего заказа!\n</i>"
             ),
             parse_mode="HTML",
         )
@@ -983,9 +1004,10 @@ async def accept_order(
 
         text = (
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
-            f"Курьер: {courier_name}\n"
-            f"Телефон: {courier_phone}\n\n"
-            f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геолокацией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>"
+            f"Заказчик: {customer_name}\n"
+            f"Телефон: {customer_phone}\n\n"
+            f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
+            f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>"
         )
 
         await callback_query.answer("✅ Заказ принят!", show_alert=False)
@@ -1013,6 +1035,111 @@ async def accept_order(
             "Ошибка при принятии заказа.",
             show_alert=True,
         )
+
+
+# ---
+
+
+@courier_r.callback_query(
+    F.data == "order_delivered",
+)
+async def complete_order(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на завершение заказа курьером. order_delivered"""
+
+    data = await state.get_data()
+    current_order_id = data.get("current_order_id")
+    tg_id = callback_query.from_user.id
+
+    current_state = CourierState.default.state
+
+    if not current_order_id:
+        await callback_query.message.answer(
+            "Не удалось найти активный заказ для завершения."
+        )
+        return
+
+    try:
+
+        order = await order_data.get_order_by_id(current_order_id)
+
+        current_time = await Time.get_moscow_time()
+
+        execution_time_seconds = (
+            current_time - order.started_at_moscow_time
+        ).total_seconds()
+        execution_time_hours_for_speed = execution_time_seconds / 3600
+        execution_time_hours = int(execution_time_seconds // 3600)
+        execution_time_minutes = int(execution_time_seconds % 3600 // 60)
+
+        speed = order.distance_km / execution_time_hours_for_speed
+
+        AVERAGE_SPEED_KMH = 8
+        SPEED_MULTIPLIER = 10
+
+        if speed > AVERAGE_SPEED_KMH * SPEED_MULTIPLIER:
+            log.warning(
+                f"Заказ {current_order_id} завершён слишком быстро (скорость {speed:.2f} км/ч)"
+            )
+            await callback_query.answer(
+                f"‼️Внимание‼️\n\n"
+                f"Вы пытаетесь завершить заказ слишком рано.\n"
+                f"Подобные действия рассматриваются как нарушение правил.\n"
+                f"При повторных попытках возможны штрафные санкции и блокировка профиля!",
+                show_alert=True,
+            )
+            return
+
+        if order.order_status != OrderStatus.IN_PROGRESS:
+
+            text = f"Заказ №{current_order_id} уже завершён или находится в другом статусе.\n\nСтатус: {'Завершен' if order.order_status == OrderStatus.COMPLETED else  'Отменен' if OrderStatus.CANCELLED else 'Не определен'}."
+
+            await callback_query.message.answer(
+                text=text,
+                parse_mode="HTML",
+            )
+            return
+
+        await order_data.update_order_status_and_completed_time(
+            order_id=current_order_id,
+            new_status=OrderStatus.COMPLETED,
+        )
+        customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
+
+        notification_text = (
+            f"Ваш заказ <b>№{current_order_id}</b> был доставлен курьером!\n"
+            f"Заказ был выполнен за <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
+            f"Спасибо что выбрали наш сервис! 🚀"
+        )
+        await customer_bot.send_message(
+            chat_id=customer_tg_id,
+            text=notification_text,
+            parse_mode="HTML",
+        )
+
+        await callback_query.message.answer(
+            f"<b>✅ Заказ №{current_order_id} доставлен</b>!\n\n"
+            f"Вы заработали <b>{order.price_rub} руб</b>\n"
+            f"Время доставки <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
+            f"Скорость доставки <b>{speed:.2f} км/ч</b>\n\n"
+            f"Спасибо за вашу работу! 🚀",
+            disable_notification=False,
+            parse_mode="HTML",
+        )
+
+        await courier_data.change_order_active_count(tg_id, count=-1)
+        await state.set_state(current_state)
+        await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+        await callback_query.answer("👍 Заказ завершен", show_alert=False)
+
+        await callback_query.message.delete()
+
+    except Exception as e:
+        await callback_query.answer("Ошибка при завершении заказа.", show_alert=True)
+        log.error(f"Ошибка при завершении заказа: {e}")
 
 
 # ---
@@ -1241,105 +1368,6 @@ async def handle_order_navigation(
 # ---
 
 
-@courier_r.callback_query(
-    F.data == "order_delivered",
-)
-async def complete_order(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обрабатывает запрос на завершение заказа курьером. order_delivered"""
-
-    data = await state.get_data()
-    current_order_id = data.get("current_order_id")
-    tg_id = callback_query.from_user.id
-
-    current_state = CourierState.default.state
-
-    if not current_order_id:
-        await callback_query.message.answer(
-            "Не удалось найти активный заказ для завершения."
-        )
-        return
-
-    try:
-
-        order = await order_data.get_order_by_id(current_order_id)
-
-        current_time = await Time.get_moscow_time()
-
-        execution_time_hours = (
-            current_time - order.started_at_moscow_time
-        ).total_seconds() / 3600
-        speed = order.distance_km / execution_time_hours
-
-        AVERAGE_SPEED_KMH = 8
-        SPEED_MULTIPLIER = 5
-
-        if speed > AVERAGE_SPEED_KMH * SPEED_MULTIPLIER:
-            log.warning(
-                f"Заказ {current_order_id} завершён слишком быстро (скорость {speed:.2f} км/ч)"
-            )
-            await callback_query.answer(
-                f"‼️Внимание‼️\n\n"
-                f"Вы пытаетесь завершить заказ слишком рано.\n"
-                f"Подобные действия рассматриваются как нарушение правил.\n"
-                f"При повторных попытках возможны штрафные санкции и блокировка профиля!",
-                show_alert=True,
-            )
-            return
-
-        if order.order_status != OrderStatus.IN_PROGRESS:
-
-            text = f"Заказ №{current_order_id} уже завершён или находится в другом статусе. Статус: {order.order_status}."
-
-            await callback_query.message.answer(
-                text=text,
-                parse_mode="HTML",
-            )
-            return
-
-        await order_data.update_order_status_and_completed_time(
-            order_id=current_order_id,
-            new_status=OrderStatus.COMPLETED,
-        )
-        customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
-
-        notification_text = (
-            f"Ваш заказ №{current_order_id} был доставлен курьером!\n"
-            f"Спасибо что выбрали наш сервис! 🚀"
-        )
-        await customer_bot.send_message(
-            chat_id=customer_tg_id,
-            text=notification_text,
-            parse_mode="HTML",
-        )
-
-        await callback_query.message.answer(
-            f"<b>✅ Заказ №{current_order_id} доставлен</b>!\n\n"
-            f"Вы заработали {order.order_price} руб.\n\n"
-            f"Спасибо за вашу работу! 🚀",
-            disable_notification=False,
-            parse_mode="HTML",
-        )
-
-        await courier_data.change_order_active_count(tg_id, count=-1)
-        await state.set_state(current_state)
-        await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-        await callback_query.answer("👍 Заказ завершен", show_alert=False)
-
-        await callback_query.message.delete()
-
-    except Exception as e:
-        await callback_query.answer("Ошибка при завершении заказа.", show_alert=True)
-        log.error(f"Ошибка при завершении заказа: {e}")
-
-
-# ---
-# ---
-
-
 @courier_r.message(
     F.text == "/profile",
 )
@@ -1520,7 +1548,7 @@ async def change_phone(
 
     text = f"Номер был изменен на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
-    new_message = await message.answer(
+    await message.answer(
         text,
         disable_notification=True,
         parse_mode="HTML",
@@ -1787,10 +1815,12 @@ async def _send_payment_invoice(
 ):
     """Отправляет инвойс для оплаты подписки."""
 
+    price_rub = await admin_data.get_subscription_price()
+
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=99000,  # 990.00 RUB
+            amount=price_rub,
         ),
     ]
 
@@ -1811,9 +1841,9 @@ async def _send_payment_invoice(
         photo_url="https://i.ibb.co/NpQzZyY/subs.jpg",
         photo_width=1200,
         photo_height=720,
-        need_name=True,
-        need_phone_number=True,
-        need_email=True,
+        need_name=False,
+        need_phone_number=False,
+        need_email=False,
         reply_markup=None,
     )
 
@@ -1864,8 +1894,14 @@ async def successful_payment(
         if is_updated:
             ttl = await title.get_title_courier("success_payment")
             text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
-            reply_kb = await kb.get_courier_kb("success_payment")
-            await message.answer_photo(photo=ttl, caption=text, reply_kb=reply_kb)
+            reply_kb = await kb.get_courier_kb(
+                "success_payment",
+            )
+            await message.answer_photo(
+                photo=ttl,
+                caption=text,
+                reply_markup=reply_kb,
+            )
 
             log.info(f"Subscription updated successfully for courier {tg_id}.")
         else:

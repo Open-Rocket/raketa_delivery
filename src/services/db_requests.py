@@ -1,21 +1,24 @@
 import zlib
+import asyncio
 from src.models import (
     async_session_factory,
     Customer,
     Courier,
-    FreePeriod,
+    Admin,
+    Agent,
+    GlobalSettings,
     OrderStatus,
     Order,
     Subscription,
 )
-from sqlalchemy import select
+from sqlalchemy import select, delete, update
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
 from src.config import Time, log
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable
-from src.services.routing import route
+from geopy.distance import geodesic
 
 
 class CustomerData:
@@ -377,13 +380,13 @@ class CourierData:
         """Обновляет количество дней бесплатного периода."""
         async with self.async_session_factory() as session:
             try:
-                result = await session.execute(select(FreePeriod))
-                free_period = result.scalar_one_or_none()
+                result = await session.execute(select(GlobalSettings.free_period_days))
+                free_period: GlobalSettings = result.scalar_one_or_none()
 
                 if free_period:
-                    free_period.days = days
+                    free_period.free_period_days = days
                 else:
-                    free_period = FreePeriod(days=days)
+                    free_period = GlobalSettings(free_period_days=days)
                     session.add(free_period)
 
                 await session.commit()
@@ -396,13 +399,243 @@ class CourierData:
         """Получает количество дней бесплатного периода."""
         async with self.async_session_factory() as session:
             try:
-                result = await session.execute(select(FreePeriod))
-                free_period = result.scalar_one_or_none()
-                return free_period.days if free_period else 10
+                result = await session.execute(select(GlobalSettings.free_period_days))
+                free_period: GlobalSettings = result.scalar_one_or_none()
+                return free_period.free_period_days if free_period else 10
 
             except Exception as e:
                 log.error(f"Ошибка при получении бесплатного периода: {e}")
                 return 10
+
+
+class AdminData:
+    def __init__(self, async_session_factory: Callable[..., AsyncSession]):
+        self.async_session_factory = async_session_factory
+
+    async def set_new_admin(
+        self,
+        tg_id: int,
+        name: str,
+        phone: str,
+    ) -> bool:
+        """Добавляет в БД нового администратора"""
+
+        async with self.async_session_factory() as session:
+            try:
+                new_admin = Admin(
+                    admin_tg_id=tg_id,
+                    admin_name=name,
+                    admin_phone=phone,
+                )
+                session.add(new_admin)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении администратора: {e}")
+                return False
+
+    async def get_all_admins(self) -> list:
+        """Возвращает список администраторов"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Admin))
+            return query.scalars().all()
+
+    async def del_admin(self, phone: str):
+        async with self.async_session_factory() as session:
+            try:
+                await session.execute(delete(Admin).where(Admin.admin_phone == phone))
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при удалении администратора: {e}")
+                return False
+
+    # ---
+
+    async def change_service_status(self, status: bool):
+        """Изменяет статус сервиса"""
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.service_is_active = status
+            else:
+                settings = GlobalSettings(service_is_active=status)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_service_status(self) -> bool:
+        """Возвращает статус сервиса"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings.service_is_active))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.service_is_active if settings else True
+
+    # ---
+
+    async def update_order_prices(self, min_price: int | None, max_piece: int | None):
+        """Обновляет минимальную и максимальную цену заказа"""
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                if min_price:
+                    settings.order_price_per_km = min_price
+                if max_piece:
+                    settings.order_max_price = max_piece
+            else:
+                settings = GlobalSettings(
+                    order_price_per_km=min_price, order_max_price=max_piece
+                )
+                session.add(settings)  # Добавляем только если создаём новый объект
+
+            await session.commit()
+
+    async def get_order_prices(self) -> tuple:
+        """Возвращает минимальную и максимальную цену заказа"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    GlobalSettings.order_price_per_km, GlobalSettings.order_max_price
+                )
+            )
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return (
+                settings.order_price_per_km if settings else 38,
+                settings.order_max_price if settings else 100,
+            )
+
+    # ---
+
+    async def update_subscription_price(self, price: int):
+        """Обновляет цену подписки"""
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.subs_price = price
+            else:
+                settings = GlobalSettings(subs_price=price)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_subscription_price(self) -> int:
+        """Возвращает цену подписки"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings.subs_price))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.subs_price if settings else 99000
+
+    # ---
+
+    async def update_discount_percent_courier(self, percent: int):
+        """Обновляет процент скидки курьеру"""
+        async with self.async_session_factory() as session:
+
+            if percent > 100:
+                percent = 100
+            elif percent < 0:
+                percent = 0
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.discount_percent_courier = percent
+            else:
+                settings = GlobalSettings(discount_percent_courier=percent)
+                session.add(settings)
+
+            await session.commit()
+
+    async def update_discount_percent_first_order(self, percent: int):
+        """Обновляет процент скидки на первый заказ"""
+        async with self.async_session_factory() as session:
+
+            if percent > 100:
+                percent = 100
+            elif percent < 0:
+                percent = 0
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.discount_percent_first_order = percent
+            else:
+                settings = GlobalSettings(discount_percent_first_order=percent)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_discount_percent_courier(self) -> int:
+        """Возвращает процент скидки"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(GlobalSettings.discount_percent_courier)
+            )
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.discount_percent_courier if settings else 15
+
+    async def get_first_order_discount(self) -> float:
+        """Возвращает процент скидки на первый заказ"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(GlobalSettings.discount_percent_first_order)
+            )
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.discount_percent_first_order if settings else 15
+
+    # ---
+
+    async def update_free_period_days(self, days: int):
+        """Обновляет количество дней бесплатного периода"""
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.free_period_days = days
+            else:
+                settings = GlobalSettings(free_period_days=days)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_free_period_days(self) -> int:
+        """Возвращает количество дней бесплатного периода"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings.free_period_days))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.free_period_days if settings else 10
+
+    # ---
+
+    async def get_all_users(self) -> tuple:
+        """Возвращает количество всех пользователей"""
+        async with self.async_session_factory() as session:
+            customers_query = await session.execute(select(Customer))
+            couriers_query = await session.execute(select(Courier))
+            agents_query = await session.execute(select(Agent))
+
+            customers = list(customers_query.scalars())
+            couriers = list(couriers_query.scalars())
+            agents = list(agents_query.scalars())
+
+            return (customers, couriers, agents)
 
 
 class OrderData:
@@ -473,6 +706,25 @@ class OrderData:
                 return (courier_name, courier_phone)
             else:
                 return ("...", "...")
+
+    async def get_customer_info_by_order_id(self, order_id: int) -> tuple:
+        """Возвращает информацию из заказа о заказчике"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(
+                    Order.customer_name,
+                    Order.customer_phone,
+                    Order.customer_tg_id,
+                ).where(Order.order_id == order_id)
+            )
+            customer_info = query.first()
+
+            if customer_info:
+                customer_name, customer_phone, customer_tg_id = customer_info
+                return (customer_name, customer_phone, customer_tg_id)
+            else:
+                return ("...", "...", "...")
 
     # ---
 
@@ -671,15 +923,11 @@ class OrderData:
 
     # ---
 
-    async def get_nearby_orders(
-        self,
-        lat: float,
-        lon: float,
-        radius_km: int,
-    ) -> dict:
+    async def get_nearby_orders(self, lat: float, lon: float, radius_km: int) -> dict:
         """Возвращает доступные заказы в заданном радиусе в виде словаря."""
 
         async with self.async_session_factory() as session:
+
             query = await session.execute(
                 select(Order).where(Order.order_status == OrderStatus.PENDING)
             )
@@ -687,13 +935,11 @@ class OrderData:
             all_orders = query.scalars().all()
             available_orders = {}
 
-            for order in all_orders:
+            async def check_order(order):
                 try:
                     start_lat = float(order.starting_point[0])
                     start_lon = float(order.starting_point[1])
-                    if await route.is_within_radius(
-                        (lat, lon), (start_lat, start_lon), radius_km
-                    ):
+                    if geodesic((lat, lon), (start_lat, start_lon)).km <= radius_km:
                         order_forma = (
                             zlib.decompress(order.order_forma).decode("utf-8")
                             if order.order_forma
@@ -709,12 +955,12 @@ class OrderData:
                     log.error(
                         f"Ошибка обработки координат заказа {order.order_id}: {e}"
                     )
-                    continue
                 except Exception as e:
                     log.error(
                         f"Ошибка декодирования order_forma для заказа {order.order_id}: {e}"
                     )
-                    continue
+
+            await asyncio.gather(*[check_order(order) for order in all_orders])
 
             return available_orders
 
@@ -745,14 +991,54 @@ class OrderData:
 
             return city_orders_dict
 
+    # ---
+
+    async def get_all_orders(self) -> list:
+        """Возвращает все заказы"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Order))
+
+            all_orders = query.scalars().all()
+
+            pending_orders = [
+                order
+                for order in all_orders
+                if order.order_status == OrderStatus.PENDING
+            ]
+            active_orders = [
+                order
+                for order in all_orders
+                if order.order_status == OrderStatus.IN_PROGRESS
+            ]
+            completed_orders = [
+                order
+                for order in all_orders
+                if order.order_status == OrderStatus.COMPLETED
+            ]
+            canceled_orders = [
+                order
+                for order in all_orders
+                if order.order_status == OrderStatus.CANCELLED
+            ]
+
+            return (
+                all_orders,
+                pending_orders,
+                active_orders,
+                completed_orders,
+                canceled_orders,
+            )
+
 
 customer_data = CustomerData(async_session_factory)
 courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
+admin_data = AdminData(async_session_factory)
 
 
 __all__ = [
     "customer_data",
     "courier_data",
     "order_data",
+    "admin_data",
 ]

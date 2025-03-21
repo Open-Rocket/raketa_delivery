@@ -1,11 +1,15 @@
 from aiogram import Router
 
 
-payment_r = Router()
 customer_r = Router()
 courier_r = Router()
+
 customer_fallback = Router()
 courier_fallback = Router()
+payment_r = Router()
+
+admin_r = Router()
+admin_fallback = Router()
 
 
 __all__ = [
@@ -14,4 +18,6 @@ __all__ = [
     "courier_r",
     "customer_fallback",
     "courier_fallback",
+    "admin_r",
+    "admin_fallback",
 ]

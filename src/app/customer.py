@@ -321,7 +321,7 @@ async def customer_accept_tou(
             f"Имя: {customer_name}\n"
             f"Номер: {customer_phone}\n"
             f"Город: {customer_city}\n\n"
-            f"▼ <b>Выберите действие ...</b>"
+            f"▼ <b>Выберите действие в Меню ...</b>"
         )
         new_message = await callback_query.message.answer(
             text=text,
@@ -407,7 +407,7 @@ async def process_order(
                 state,
                 wait_message,
             ),
-            timeout=120,
+            timeout=60,
         )
     except asyncio.TimeoutError:
         await _handle_error_response(

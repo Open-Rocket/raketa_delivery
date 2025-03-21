@@ -48,4 +48,11 @@ class CourierState(StatesGroup):
     pay = State()
 
 
-__all__ = ["CustomerState", "CourierState"]
+class AdminState(StatesGroup):
+
+    default = State()
+
+    password = State()
+
+
+__all__ = ["CustomerState", "CourierState", "AdminState"]

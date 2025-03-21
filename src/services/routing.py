@@ -4,9 +4,9 @@ from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
 from src.config import YANDEX_API_KEY
 from src.services.fuzzy import cities
-from geopy.distance import geodesic
 from src.config import log
 from src.confredis import rediska
+from src.services.db_requests import admin_data
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -16,8 +16,8 @@ class RouteMaster:
 
     YANDEX_API_KEYS = [
         YANDEX_API_KEY,
-        "your_yandex_api_key_2",
-        "your_yandex_api_key_3",
+        YANDEX_API_KEY,
+        YANDEX_API_KEY,
     ]
 
     @staticmethod
@@ -26,17 +26,21 @@ class RouteMaster:
 
         counter = await rediska.get_yandex_api_counter()
 
-        while counter < len(RouteMaster.YANDEX_API_KEYS):
+        while True:
+
             coordinates = await RouteMaster._get_coordinates_from_yandex(
-                address,
-                counter,
+                address, counter
             )
+
             if coordinates != (None, None):
                 return coordinates
-            counter += 1
-            await rediska.set_yandex_api_counter(counter)
 
-        return None, None
+            counter += 1
+
+            if counter >= len(RouteMaster.YANDEX_API_KEYS):
+                counter = 0
+
+            await rediska.set_yandex_api_counter(counter)
 
     @staticmethod
     async def _get_coordinates_from_yandex(
@@ -49,9 +53,12 @@ class RouteMaster:
         base_url = "https://geocode-maps.yandex.ru/1.x/"
         params = {"apikey": api_key, "geocode": address, "format": "json"}
 
+        log.info(f"counter: {counter}")
+
         try:
             response = requests.get(base_url, params=params)
             response.raise_for_status()  # Поднимет исключение, если статус не 2xx
+            # raise requests.RequestException("Error")
         except requests.RequestException as e:
             log.error(
                 f"Error while getting coordinates from Yandex with key {api_key}: {e}"
@@ -124,7 +131,9 @@ class RouteMaster:
         millions_cities = await cities.get_millions_cities()
         small_cities = await cities.get_small_cities()
 
-        base_price_per_km = 100 if 0 < distance <= 2 else 38
+        common_price, max_price = await admin_data.get_order_prices()
+
+        base_price_per_km = max_price if 0 < distance <= 2 else common_price
         city_coefficient = 1.0
 
         if city in millions_cities:
@@ -155,15 +164,6 @@ class RouteMaster:
         total_price = base_price_per_km * distance * total_coefficient
 
         return int(total_price + over_price)
-
-    @staticmethod
-    async def is_within_radius(
-        courier_coords: tuple,
-        order_coords: tuple,
-        radius_km: int,
-    ) -> bool:
-        """Проверяет, находится ли заказ в радиусе курьера"""
-        return geodesic(courier_coords, order_coords).km <= radius_km
 
 
 route = RouteMaster()

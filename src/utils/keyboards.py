@@ -3,6 +3,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    CopyTextButton,
 )
 from typing import Optional
 
@@ -196,7 +197,6 @@ class Keyboard:
     @staticmethod
     async def get_courier_kb(
         key: str,
-        available_city_orders: int | None = None,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для курьера"""
 
@@ -371,7 +371,7 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text=f"Перейти к заказам! {available_city_orders if available_city_orders else ''}",
+                            text=f"Перейти к заказам!",
                             callback_data="lets_go",
                         )
                     ]
@@ -454,6 +454,117 @@ class Keyboard:
         )
 
         return near_kb
+
+    @staticmethod
+    async def get_admin_kb(key: str) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для админа"""
+
+        kb = {
+            "/users": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="👫 Клиенты",
+                            callback_data="choose_user",
+                        ),
+                        InlineKeyboardButton(
+                            text="🥷 Курьеры",
+                            callback_data="choose_courier",
+                        ),
+                        InlineKeyboardButton(
+                            text="🕵🏻‍♂️ Агенты",
+                            callback_data="choose_agent",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🏙️ Данные по городам",
+                            callback_data="city_data_users",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🔄 Обновить данные",
+                            callback_data="refresh_users",
+                        )
+                    ],
+                ]
+            ),
+            "/orders": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="📦 Выбрать заказ",
+                            callback_data="choose_order",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🏙️ Данные по городам",
+                            callback_data="city_data_orders",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🔄 Обновить данные",
+                            callback_data="refresh_orders",
+                        )
+                    ],
+                ]
+            ),
+            "/admins": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="➕ Зарегистрировать админа",
+                            callback_data="set_admin",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="❌ Удалить админа",
+                            callback_data="del_admin",
+                        )
+                    ],
+                ]
+            ),
+            "/global": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="⚙️ Сервис и Данные",
+                            callback_data="service_data",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="💰 Цены и Тарифы",
+                            callback_data="prices",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🎉 Акции и Скидки %",
+                            callback_data="discounts",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="📢 Сообщения и Рассылки",
+                            callback_data="send_message",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🔄 Обновить данные",
+                            callback_data="refresh_global_data",
+                        )
+                    ],
+                ]
+            ),
+        }
+
+        return kb[key]
 
 
 kb: Keyboard = Keyboard()

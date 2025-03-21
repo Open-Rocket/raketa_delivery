@@ -71,7 +71,18 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния курьера и обработка сообщения"""
 
-    if event.text == "/restart":
+    RESTRICTED_COMMANDS = [
+        "/run",
+        "/my_orders",
+        "/profile",
+        "/subs",
+        "/faq",
+        "/rules",
+        "/make_order",
+        "/restart",
+    ]
+
+    async def restart_bot():
         await fsm_context.set_state(CourierState.default.state)
         await courier_bot.send_message(
             chat_id=event.from_user.id,
@@ -80,7 +91,6 @@ async def _check_state_and_handle_message(
             disable_notification=True,
             parse_mode="HTML",
         )
-        return
 
     if state in (CourierState.reg_Phone.state,):
         if event.text in [
@@ -92,15 +102,7 @@ async def _check_state_and_handle_message(
         CourierState.change_Name.state,
         CourierState.change_City.state,
     ):
-        if event.text in [
-            "/run",
-            "/my_orders",
-            "/profile",
-            "/subs",
-            "/faq",
-            "/rules",
-            "/make_order",
-        ]:
+        if event.text in RESTRICTED_COMMANDS:
 
             await fsm_context.set_state(CourierState.default.state)
             return await handler(event, data)
@@ -133,15 +135,7 @@ async def _check_state_and_handle_message(
         CourierState.reg_City.state,
         CourierState.reg_tou.state,
     ):
-        if event.text in [
-            "/run",
-            "/my_orders",
-            "/profile",
-            "/subs",
-            "/faq",
-            "/rules",
-            "/make_order",
-        ]:
+        if event.text in RESTRICTED_COMMANDS:
             await event.delete()
             return
 
@@ -157,11 +151,13 @@ async def _check_state_and_handle_message(
 
         if event.text in [
             "/start",
+            "/my_orders",
             "/profile",
             "/subs",
             "/faq",
             "/rules",
             "/make_order",
+            "/restart",
         ]:
             await courier_bot.send_message(
                 chat_id=event.from_user.id,
@@ -178,6 +174,10 @@ async def _check_state_and_handle_message(
         if not event.contact or event.contact.user_id != event.from_user.id:
             await event.delete()
             return
+
+    if event.text == "/restart":
+        await restart_bot()
+        return
 
     return await handler(event, data)
 
