@@ -836,6 +836,39 @@ async def cmd_rules(
 
 
 @customer_r.message(
+    F.text == "/channel",
+)
+async def cmd_channel(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в телеграмм канал. /channel"""
+
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    text = (
+        f"📺 <b>Официальный канал Raketa Delivery</b>\n\n"
+        f"🔹 <b>Актуальные новости</b> сервиса и важные объявления\n"
+        f"🔹 <b>Полезные советы</b> для курьеров и партнеров\n"
+        f"🔹 <b>Информация</b> о новых функциях и возможностях\n\n"
+        f"🚀 <b>Подписывайтесь, чтобы быть в курсе всех обновлений!</b>\n\n"
+    )
+
+    reply_kb = await kb.get_customer_kb("/channel")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+
+@customer_r.message(
     F.text == "/become_courier",
 )
 async def cmd_become_courier(
@@ -849,9 +882,9 @@ async def cmd_become_courier(
 
     photo_title = await title.get_title_customer("/become_courier")
     text = (
-        "⦿ Стать курьером у нас — это отличный способ заработать без комиссии!\n\n"
-        "⦿ Работайте в удобное время, выбирайте заказы рядом и получайте бонусы за быструю доставку.\n\n"
-        "⦿ Зарабатывайте до 7000₽ в день уже сегодня!"
+        f"📦 <b>Стать курьером у нас</b> — это отличный способ заработать без комиссии! 💸\n\n"
+        f"⏰ <b>Работайте в удобное время</b>, выбирайте заказы рядом и получайте бонусы за быструю доставку 🏃‍♂️💨\n\n"
+        f"💰 <b>Зарабатывайте от 3000₽ в день</b> уже сегодня!"
     )
     reply_kb = await kb.get_customer_kb("/become_courier")
 
@@ -860,10 +893,46 @@ async def cmd_become_courier(
         caption=text,
         reply_markup=reply_kb,
         disable_notification=True,
+        parse_mode="HTML",
     )
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+
+@customer_r.message(
+    F.text == "/become_partner",
+)
+async def cmd_become_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в бота для партнеров. /become_partner"""
+
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+    text = (
+        f"💼 <b>Станьте партнёром Raketa Delivery!</b>\n\n"
+        f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
+        f"🔹 Приглашайте курьеров и получайте <b>30% с их подписки</b>\n"
+        f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
+        f"🔹 Работайте когда хотите — без вложений и рисков!\n\n"
+        f"💰 Чем больше курьеров — тем больше доход! Присоединяйтесь!"
+    )
+    ttl = await title.get_title_customer("/become_partner")
+    reply_kb = await kb.get_customer_kb("/become_partner")
+
+    await message.answer_photo(
+        photo=ttl,
+        caption=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
 
 
 # ---

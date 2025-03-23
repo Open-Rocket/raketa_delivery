@@ -52,7 +52,27 @@ class AdminState(StatesGroup):
 
     default = State()
 
-    password = State()
+
+class PartnerState(StatesGroup):
+
+    default = State()
+
+    reg_state = State()
+    reg_Name = State()
+    reg_Phone = State()
+    reg_City = State()
+    generate_seed_key = State()
 
 
-__all__ = ["CustomerState", "CourierState", "AdminState"]
+class OrdersState(StatesGroup):
+
+    default = State()
+
+
+__all__ = [
+    "CustomerState",
+    "CourierState",
+    "AdminState",
+    "PartnerState",
+    "OrdersState",
+]

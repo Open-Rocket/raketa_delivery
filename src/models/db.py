@@ -94,7 +94,6 @@ class GlobalSettings(Base):
     subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
     discount_percent_courier: Mapped[intData] = mapped_column(Integer, default=15)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
-    free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
 
 
 class Customer(Base):
@@ -102,8 +101,16 @@ class Customer(Base):
 
     customer_id: Mapped[intPK]
 
-    agent_id = mapped_column(
-        Integer, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=True
+    partner_id = mapped_column(
+        Integer,
+        ForeignKey("partners.partner_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+
+    seed_key_id = mapped_column(
+        Integer,
+        ForeignKey("seed_keys.seed_key_id"),
+        nullable=True,
     )
 
     customer_tg_id: Mapped[intDataUnique]
@@ -114,7 +121,8 @@ class Customer(Base):
     customer_registration_date: Mapped[datetimeData]
 
     orders = relationship("Order", back_populates="customer")
-    agent = relationship("Agent", back_populates="customers")
+    seed_key = relationship("SeedKey", back_populates="customers")
+    partner = relationship("Partner", back_populates="customers")
 
 
 class Courier(Base):
@@ -122,8 +130,16 @@ class Courier(Base):
 
     courier_id: Mapped[intPK]
 
-    agent_id = mapped_column(
-        Integer, ForeignKey("agents.agent_id", ondelete="CASCADE"), nullable=True
+    partner_id = mapped_column(
+        Integer,
+        ForeignKey("partners.partner_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+
+    seed_key_id = mapped_column(
+        Integer,
+        ForeignKey("seed_keys.seed_key_id"),
+        nullable=True,
     )
 
     courier_tg_id: Mapped[intDataUnique]
@@ -137,25 +153,41 @@ class Courier(Base):
 
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
-    agent = relationship("Agent", back_populates="couriers")
+    partner = relationship("Partner", back_populates="couriers")
+    seed_key = relationship("SeedKey", back_populates="couriers")
 
 
-class Agent(Base):
-    __tablename__ = "agents"
+class Partner(Base):
+    __tablename__ = "partners"
 
-    agent_id: Mapped[intPK]
+    partner_id: Mapped[intPK]
 
-    agent_tg_id: Mapped[intDataUnique]
-    agent_name: Mapped[stringData]
-    agent_phone: Mapped[stringData]
-    agent_city: Mapped[stringData]
-    agent_accept_terms_of_use: Mapped[stringData]
-    agent_registration_date: Mapped[datetimeData]
+    partner_tg_id: Mapped[intDataUnique]
+    partner_name: Mapped[stringData]
+    partner_phone: Mapped[stringData]
+    partner_city: Mapped[stringData]
+    partner_registration_date: Mapped[datetimeData]
 
-    sid_key: Mapped[stringData]
+    seed_key = relationship("SeedKey", uselist=False, back_populates="partner")
 
-    couriers = relationship("Courier", back_populates="agent")
-    customers = relationship("Customer", back_populates="agent")
+    couriers = relationship("Courier", back_populates="partner")
+    customers = relationship("Customer", back_populates="partner")
+
+
+class SeedKey(Base):
+    __tablename__ = "seed_keys"
+
+    seed_key_id: Mapped[intPK]
+    partner_id = mapped_column(
+        Integer,
+        ForeignKey("partners.partner_id", ondelete="CASCADE"),
+        unique=True,
+    )
+    seed_key: Mapped[stringData] = mapped_column(String, unique=True)
+
+    partner = relationship("Partner", back_populates="seed_key")
+    couriers = relationship("Courier", back_populates="seed_key")
+    customers = relationship("Customer", back_populates="seed_key")
 
 
 class Admin(Base):
@@ -174,13 +206,19 @@ class Order(Base):
     order_id: Mapped[intPK]
 
     order_status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus), nullable=False, default=OrderStatus.PENDING
+        Enum(OrderStatus),
+        nullable=False,
+        default=OrderStatus.PENDING,
     )
     customer_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=True
+        Integer,
+        ForeignKey("customers.customer_id", ondelete="CASCADE"),
+        nullable=True,
     )
     courier_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("couriers.courier_id", ondelete="CASCADE"), nullable=True
+        Integer,
+        ForeignKey("couriers.courier_id", ondelete="CASCADE"),
+        nullable=True,
     )
 
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
@@ -219,7 +257,9 @@ class Subscription(Base):
     end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     courier_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("couriers.courier_id"), nullable=False
+        Integer,
+        ForeignKey("couriers.courier_id"),
+        nullable=False,
     )
 
     couriers = relationship("Courier", back_populates="subscription")
@@ -230,7 +270,8 @@ __all__ = [
     "Customer",
     "Courier",
     "Admin",
-    "Agent",
+    "Partner",
+    "SeedKey",
     "Order",
     "OrderStatus",
     "Subscription",

@@ -1,0 +1,540 @@
+from ._deps import (
+    CommandStart,
+    FSMContext,
+    PartnerState,
+    BufferedInputFile,
+    ContentType,
+    ReplyKeyboardRemove,
+    filters,
+    Message,
+    CallbackQuery,
+    LabeledPrice,
+    zlib,
+    Time,
+    json,
+    F,
+    generate_seed,
+    generate_partner_card,
+    find_closest_city,
+    partner_bot,
+    partner_bot_id,
+    partner_r,
+    partner_fallback,
+    partner_data,
+    handler,
+    kb,
+    title,
+    rediska,
+    cities,
+    log,
+)
+
+
+# ---
+# ---
+
+
+@partner_r.message(
+    CommandStart(),
+)
+async def cmd_start_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /start для партнера."""
+
+    tg_id = message.from_user.id
+    is_reg = await rediska.is_reg(partner_bot_id, tg_id)
+    new_message = None
+
+    if is_reg:
+        current_state = PartnerState.default.state
+        await message.answer(
+            text="▼ <b>Выберите действие ...</b>",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        current_state = PartnerState.reg_state.state
+        photo_title = await title.get_title_partner("/start")
+        text = (
+            "🚀 <b>Добро пожаловать в Raketa Delivery | Партнеры</b>\n\n"
+            "🔹 <b>Наши условия:</b>\n"
+            "Вы привлекаете как клиентов, так и курьеров, и получаете <b>30% с подписки каждого курьера</b>, которого привлекли.\n\n"
+            "🔸 Привлекая клиентов, ты помогаешь увеличивать сеть заказов, что делает сервис более востребованным и выгодным для всех.\n\n"
+            "🔸 Работай в удобное время, привлекай курьеров и получай пассивный доход!\n\n"
+            "🚀 <b>Присоединяйся, начинай зарабатывать!</b>"
+        )
+        reply_kb = await kb.get_partner_kb("/start")
+        new_message = await message.answer_photo(
+            photo=photo_title,
+            caption=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    if new_message:
+        await handler.catch(
+            bot=partner_bot,
+            chat_id=message.chat.id,
+            user_id=tg_id,
+            new_message=new_message,
+            current_message=message,
+            delete_previous=True,
+        )
+
+
+@partner_r.callback_query(
+    F.data == "reg_partner",
+)
+async def data_reg_partner(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на регистрацию курьера."""
+
+    await callback_query.answer("✍️ Регистрация", show_alert=False)
+
+    current_state = PartnerState.reg_Name.state
+    tg_id = callback_query.from_user.id
+    text = (
+        f"Пройдите небольшую регистрацию.\n"
+        f"Это не займет много времени.\n\n"
+        f"<b>Как вас зовут?</b>\n\n"
+    )
+
+    new_message = await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=partner_bot,
+        chat_id=callback_query.message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
+
+
+@partner_r.message(
+    filters.StateFilter(PartnerState.reg_Name),
+)
+async def data_name_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает имя партнера. PartnerState.reg_Name"""
+
+    current_state = PartnerState.reg_Phone.state
+    tg_id = message.from_user.id
+    courier_name = message.text
+
+    reply_kb = await kb.get_partner_kb("phone_number")
+    text = (
+        f"Привет, {courier_name}!👋\n\nЧтобы начать работу, пожалуйста, укажите ваш номер телефона для связи.\n\n"
+        f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
+        f"<i>*Отправка номера возможно только по клику на кнопку 'Поделится номером'!</i>\n\n"
+        f"<b>Ваш номер:</b>"
+    )
+
+    new_message = await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+    await rediska.set_name(partner_bot_id, tg_id, courier_name)
+
+    await handler.catch(
+        bot=partner_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
+    )
+
+
+@partner_r.message(
+    filters.StateFilter(PartnerState.reg_Phone),
+)
+async def data_phone_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает номер телефона партнера. PartnerState.reg_Phone"""
+
+    current_state = PartnerState.reg_City.state
+    tg_id = message.from_user.id
+    courier_phone = message.contact.phone_number
+
+    text = (
+        f"📍 <b>Последний шаг!</b>\n\n"
+        f"Укажите ваш город, чтобы система могла правильно распределять курьеров и клиентов, "
+        f"увеличивая количество заказов и ваш доход.\n\n"
+        f"<b>Ваш город:</b>"
+    )
+
+    new_message = await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+    await rediska.set_phone(partner_bot_id, tg_id, courier_phone)
+
+    await handler.catch(
+        bot=partner_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
+    )
+
+
+@partner_r.message(
+    filters.StateFilter(PartnerState.reg_City),
+)
+async def data_city_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает город партнера. PartnerState.reg_City"""
+
+    tg_id = message.from_user.id
+    russian_cities = await cities.get_cities()
+    city, _ = await find_closest_city(message.text, russian_cities)
+
+    if not city:
+        await message.answer(
+            text=f"Введите корректное название города!\n\n<b>Ваш город:</b>",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        current_state = PartnerState.generate_seed_key.state
+        reply_kb = await kb.get_partner_kb("generate_seed")
+        text = (
+            f"🔑 <b>Генерация ключа партнёра</b>\n\n"
+            f"Для того чтобы вы могли привлекать новых пользователей, необходимо сгенерировать уникальный ключ. "
+            f"Этот ключ закрепляет клиентов и курьеров за вами, позволяя системе учитывать вашу активность "
+            f"и начислять вам вознаграждение.\n\n"
+            f"Как это работает?\n"
+            f"1️⃣ После генерации ключа вы сможете передавать его курьерам и клиентам.\n"
+            f"2️⃣ Курьеры, регистрируясь в системе с вашим ключом, становятся вашими рефералами.\n"
+            f"3️⃣ С каждого оплаченного месяца подписки курьера вы будете получать 30% от её стоимости.\n"
+            f"4️⃣ Чем больше активных курьеров и клиентов привязано к вашему ключу, тем выше ваш доход.\n\n"
+        )
+
+        new_message = await message.answer(
+            text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+        await rediska.set_city(partner_bot_id, tg_id, city)
+
+    await handler.catch(
+        bot=partner_bot,
+        chat_id=message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=message,
+        delete_previous=True,
+    )
+
+
+@partner_r.callback_query(
+    F.data == "generate_seed_key",
+)
+@partner_r.callback_query(
+    F.data == "try_save_again",
+)
+async def partner_generate_seed(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает генерацию seed для партнера с возможностью повторной попытки."""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
+
+    seed_key_from_redis = await rediska.get_seed_key(partner_bot_id, tg_id)
+    all_seed_keys = await partner_data.get_all_seed_keys()
+
+    log.info(f"Seed key from redis: {seed_key_from_redis}")
+    log.info(f"All seed keys: {all_seed_keys}")
+
+    if not seed_key_from_redis:
+
+        await callback_query.answer("🔑 Генерация ключа...", show_alert=False)
+
+        partner_name, partner_phone, partner_city = await rediska.get_user_info(
+            partner_bot_id, tg_id
+        )
+
+        try:
+
+            is_set_reg = await rediska.set_reg(partner_bot_id, tg_id, True)
+            is_set_partner_to_db = await partner_data.set_new_partner(
+                tg_id, partner_name, partner_phone, partner_city
+            )
+
+            if is_set_reg and is_set_partner_to_db:
+                partner_id, partner_name, partner_phone, partner_city = (
+                    await partner_data.get_partner_info(tg_id)
+                )
+
+                while True:
+                    seed_key = await generate_seed()
+                    if seed_key not in all_seed_keys:
+                        break
+
+                log.info(f"Generated unique seed key: {seed_key}")
+
+                is_create = await partner_data.create_new_seed_key(partner_id, seed_key)
+                await rediska.set_seed_key(partner_bot_id, tg_id, seed_key)
+
+                if is_create:
+                    text = (
+                        f"🔑 <b>Ваш ключ:</b> <b><code>{seed_key}</code></b>\n\n"
+                        f"- Этот ключ служит промокодом для ваших клиентов. Используя его при первом заказе, они получат скидку на доставку.\n\n"
+                        f"- Для курьеров это также промокод, который дает скидку на подписку. Таким образом, курьеры могут снизить свои затраты на участие в сервисе.\n\n"
+                        f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
+                        f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете 30% с подписки курьеров каждый месяц.\n\n"
+                        f"▼ <b>Выберите действие ...</b>"
+                    )
+
+                    new_message = await callback_query.message.answer(
+                        text=text,
+                        disable_notification=True,
+                        parse_mode="HTML",
+                    )
+
+                    await state.set_state(current_state)
+                    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+                else:
+                    new_message = await callback_query.message.answer(
+                        text="<b>‼️ Произошла ошибка при создании ключа, попробуйте позже еще раз!</b>\n\n",
+                        disable_notification=True,
+                        parse_mode="HTML",
+                    )
+
+            else:
+                new_message = await callback_query.message.answer(
+                    text="<b>‼️ Произошла ошибка при сохранении данных, попробуйте позже еще раз!</b>\n\n",
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
+
+        except Exception as e:
+            new_message = await callback_query.message.answer(
+                text="<b>‼️ Произошла ошибка, попробуйте позже.</b>\n\n",
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+    else:
+
+        text = (
+            f"🔑 <b>Ваш ключ:</b> <b><code>{seed_key}</code></b>\n\n"
+            f"- Этот ключ служит промокодом для ваших клиентов. Используя его при первом заказе, они получат скидку на доставку.\n\n"
+            f"- Для курьеров это также промокод, который дает скидку на подписку. Таким образом, курьеры могут снизить свои затраты на участие в сервисе.\n\n"
+            f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
+            f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете 30% с подписки курьеров каждый месяц.\n\n"
+            f"▼ <b>Выберите действие ...</b>"
+        )
+
+        new_message = await callback_query.message.answer(
+            text=text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await handler.catch(
+        bot=partner_bot,
+        chat_id=chat_id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
+
+
+# ---
+# ---
+
+
+@partner_r.message(
+    F.text == "/users",
+)
+async def cmd_users_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /users для партнера."""
+
+    tg_id = message.from_user.id
+    current_state = PartnerState.default.state
+
+    customers, couriers = await partner_data.get_all_my_seed_key_referrals(tg_id=tg_id)
+
+    text = (
+        f"<b>👥 Пользователи</b>\n\n"
+        f"Здесь вы можете посмотреть основную статистику о привлеченныx вами пользователях.\n\n"
+        f" - Вы привлекли пользователей: <b>{len(customers) + len(couriers)}</b>\n"
+        f" - Клиентов: <b>{len(customers)}</b>\n"
+        f" - Курьеров: <b>{len(couriers)}</b>\n"
+    )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.message(
+    F.text == "/referral",
+)
+async def cmd_referral_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /referral для партнера."""
+
+    current_state = PartnerState.default.state
+    tg_id = message.from_user.id
+
+    seed_key = await rediska.get_seed_key(partner_bot_id, tg_id)
+
+    text = (
+        f"Приглашайте курьеров и клиентов, используя этот ключ. "
+        f"За каждого привлеченного курьера вы будете получать 30% от его подписки каждый месяц.\n\n"
+        f"<b>🔑 Ваш ключ:</b>"
+    )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await message.answer(
+        text=f"<b><code>{seed_key}</code></b>\n\n",
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.message(
+    F.text == "/earn",
+)
+async def cmd_earn_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /earn для партнера."""
+
+    tg_id = message.from_user.id
+    current_state = PartnerState.default.state
+
+    text = (
+        f"📊 <b>Статистика дохода</b>\n\n"
+        f"Здесь вы можете посмотреть статистику вашего дохода за последний месяц.\n\n"
+        f"🔸 <b>Ваш доход:</b> <b>20000 ₽</b>\n"
+    )
+
+    reply_kb = await kb.get_partner_kb("earn_request")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.message(F.text == "/adv")
+async def cmd_adv_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /adv для партнера."""
+
+    current_state = PartnerState.default.state
+    tg_id = message.from_user.id
+    seed_key = await rediska.get_seed_key(partner_bot_id, tg_id)
+
+    pdf_data = await generate_partner_card(seed_key)
+    vizitka = BufferedInputFile(pdf_data, filename="partner_card.pdf")
+
+    await message.answer_document(
+        document=vizitka,
+        caption="🔥 <b>Ваша визитка</b>",
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.callback_query(
+    F.data == "get_partner_earn",
+)
+async def data_earn_partner(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на вывод заработанных денег."""
+
+    await callback_query.answer("💰 Запрос на вывод", show_alert=False)
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+
+    text = (
+        f"✅ Ваш запрос принят!\n\n"
+        f"С вами свяжется наш менеджер для уточнения деталей.\n\n"
+    )
+
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)

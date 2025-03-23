@@ -5,7 +5,8 @@ from src.models import (
     Customer,
     Courier,
     Admin,
-    Agent,
+    Partner,
+    SeedKey,
     GlobalSettings,
     OrderStatus,
     Order,
@@ -629,13 +630,128 @@ class AdminData:
         async with self.async_session_factory() as session:
             customers_query = await session.execute(select(Customer))
             couriers_query = await session.execute(select(Courier))
-            agents_query = await session.execute(select(Agent))
+            partners_query = await session.execute(select(Partner))
 
             customers = list(customers_query.scalars())
             couriers = list(couriers_query.scalars())
-            agents = list(agents_query.scalars())
+            partners = list(partners_query.scalars())
 
-            return (customers, couriers, agents)
+            return (customers, couriers, partners)
+
+
+class PartnerData:
+    def __init__(self, async_session_factory: Callable[..., AsyncSession]):
+        self.async_session_factory = async_session_factory
+
+    async def set_new_partner(
+        self,
+        tg_id: int,
+        name: str,
+        phone: str,
+        city: str,
+    ) -> bool:
+        """Добавляет в БД нового партнера, если такого еще нет."""
+
+        async with self.async_session_factory() as session:
+            try:
+                # Проверяем, существует ли партнер с таким tg_id
+                existing_partner = await session.scalar(
+                    select(Partner).where(Partner.partner_tg_id == tg_id)
+                )
+                if existing_partner:
+                    log.error(f"Партнёр с tg_id {tg_id} уже существует.")
+                    return False  # Партнёр уже существует
+
+                new_partner = Partner(
+                    partner_tg_id=tg_id,
+                    partner_name=name,
+                    partner_phone=phone,
+                    partner_city=city,
+                    partner_registration_date=await Time.get_moscow_time(),
+                )
+                session.add(new_partner)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении партнера: {e}")
+                return False
+
+    # ---
+
+    async def get_partner_info(self, tg_id: int) -> tuple:
+        """Возвращает имя, номер и город партнера из БД"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+            if partner:
+                return (
+                    partner.partner_id or None,
+                    partner.partner_name or None,
+                    partner.partner_phone or None,
+                    partner.partner_city or None,
+                )
+            return (
+                None,
+                None,
+                None,
+                None,
+            )
+
+    async def get_all_seed_keys(self) -> list:
+        """Возвращает все seed ключи"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(SeedKey))
+            return query.scalars().all()
+
+    # ---
+
+    async def create_new_seed_key(
+        self,
+        partner_id: int,
+        key: str,
+    ) -> bool:
+        """Добавляет новый seed ключ"""
+        async with self.async_session_factory() as session:
+            try:
+                new_key = SeedKey(
+                    partner_id=partner_id,
+                    seed_key=key,
+                )
+                session.add(new_key)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении seed ключа: {e}")
+                return False
+
+    # ---
+
+    async def get_all_my_seed_key_referrals(self, tg_id: int) -> tuple:
+        """Возвращает все seed ключи, привязанные к партнеру"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+            if partner:
+
+                customer_query_seed_key = await session.execute(
+                    select(Customer).where(Customer.seed_key_id == partner.partner_id)
+                )
+                courier_query_seed_key = await session.execute(
+                    select(Courier).where(Courier.seed_key_id == partner.partner_id)
+                )
+
+                customers = customer_query_seed_key.scalars().all()
+                couriers = courier_query_seed_key.scalars().all()
+
+                return (customers, couriers)
+
+            return ([], [])
 
 
 class OrderData:
@@ -1034,11 +1150,12 @@ customer_data = CustomerData(async_session_factory)
 courier_data = CourierData(async_session_factory)
 order_data = OrderData(async_session_factory)
 admin_data = AdminData(async_session_factory)
-
+partner_data = PartnerData(async_session_factory)
 
 __all__ = [
     "customer_data",
     "courier_data",
     "order_data",
     "admin_data",
+    "partner_data",
 ]

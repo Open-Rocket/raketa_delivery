@@ -79,6 +79,10 @@ async def _check_state_and_handle_message(
         "/faq",
         "/rules",
         "/make_order",
+        "/channel",
+        "/become_partner",
+        "/chat",
+        "/orders_bot",
         "/restart",
     ]
 

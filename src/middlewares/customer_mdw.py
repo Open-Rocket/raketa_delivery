@@ -77,6 +77,8 @@ async def _check_state_and_handle_message(
         "/faq",
         "/rules",
         "/become_courier",
+        "/become_partner",
+        "/channel",
         "/restart",
     ]
 

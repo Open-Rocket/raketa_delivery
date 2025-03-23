@@ -12,6 +12,7 @@ from ._deps import (
     LabeledPrice,
     zlib,
     Time,
+    json,
     F,
     find_closest_city,
     admin_data,
@@ -37,7 +38,6 @@ from ._deps import (
     admin_bot,
     SUPER_ADMIN_TG_ID,
 )
-import json
 
 
 # ---
@@ -56,8 +56,12 @@ async def cmd_start_admin(
     tg_id = message.from_user.id
     current_state = AdminState.default.state
 
+    admin_status = "Super Admin" if tg_id == SUPER_ADMIN_TG_ID else "Admin"
+
+    text = f"Вы вошли как <b>{admin_status}</b>.\n\n▼ <b>Выберите действие ...</b>"
+
     await message.answer(
-        text="▼ <b>Выберите действие ...</b>",
+        text=text,
         reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
@@ -78,7 +82,7 @@ async def cmd_users(
     tg_id = event.from_user.id
     current_state = AdminState.default.state
 
-    customers, couriers, agents = await admin_data.get_all_users()
+    customers, couriers, partners = await admin_data.get_all_users()
 
     text = (
         f"<b>👥 Пользователи</b>\n\n"
@@ -86,7 +90,7 @@ async def cmd_users(
         f" - Всего пользователей: <b>{len(customers) + len(couriers)}</b>\n"
         f" - Клиентов: <b>{len(customers)}</b>\n"
         f" - Курьеров: <b>{len(couriers)}</b>\n"
-        f" - Агентов: <b>{len(couriers)}</b>\n\n"
+        f" - Партнеров: <b>{len(partners)}</b>\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("/users")

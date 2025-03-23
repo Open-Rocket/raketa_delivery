@@ -308,11 +308,12 @@ async def courier_accept_tou(
         accept_tou,
     )
 
+    reply_kb = await kb.get_courier_kb("super_go")
+
     if is_set_reg and is_set_courier_to_db:
 
         await callback_query.answer("✅ Принято", show_alert=False)
 
-        reply_kb = await kb.get_courier_kb("super_go")
         free_period = await courier_data.get_free_period()
 
         text = (
@@ -1687,7 +1688,141 @@ async def cmd_make_order(
     reply_kb = await kb.get_courier_kb("/make_order")
 
     await message.answer(
-        text,
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+
+@courier_r.message(
+    F.text == "/become_partner",
+)
+async def cmd_become_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в бот для партнеров. /become_partner"""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    text = (
+        f"💼 <b>Станьте партнёром Raketa Delivery!</b>\n\n"
+        f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
+        f"🔹 Приглашайте курьеров и получайте <b>30% с их подписки</b>\n"
+        f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
+        f"🔹 Работайте когда хотите — без вложений и рисков!\n\n"
+        f"💰 Чем больше курьеров — тем больше доход! Присоединяйтесь!"
+    )
+    ttl = await title.get_title_courier("/become_partner")
+    reply_kb = await kb.get_courier_kb("/become_partner")
+
+    await message.answer_photo(
+        photo=ttl,
+        caption=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+
+@courier_r.message(
+    F.text == "/chat",
+)
+async def cmd_courier_chat(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в чат курьеров. /chat"""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    text = (
+        f"💬 <b>Чат курьеров Raketa Delivery</b>\n\n"
+        f"🔹 <b>Общайтесь</b> с другими курьерами, делитесь опытом и советами\n"
+        f"🔹 <b>Обсуждайте заказы</b> и находите оптимальные маршруты\n"
+        f"🔹 <b>Следите за новостями</b> сервиса и узнавайте полезные фишки\n\n"
+        f"🚀 <b>Присоединяйтесь, задавайте вопросы и зарабатывайте вместе с Raketa!</b>"
+    )
+
+    reply_kb = await kb.get_courier_kb("/chat")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+
+@courier_r.message(
+    F.text == "/orders_bot",
+)
+async def cmd_orders_bot(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в бот заказов. /orders_bot"""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    text = (
+        f"📋 <b>Бот заказов Raketa Delivery</b>\n\n"
+        f"🔹 <b>Получайте заказы</b> в удобном формате и выбирайте подходящие\n"
+        f"🔹 <b>Оперативные уведомления</b> о новых заказах в вашем городе\n"
+        f"🔹 <b>Гибкий график</b> — работайте когда удобно\n\n"
+        f"🚀 <b>Подключайтесь и начните зарабатывать с Raketa прямо сейчас!</b>"
+    )
+
+    reply_kb = await kb.get_courier_kb("/orders_bot")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+
+@courier_r.message(
+    F.text == "/channel",
+)
+async def cmd_channel(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на переход в телеграмм канал. /channel"""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    text = (
+        f"📺 <b>Официальный канал Raketa Delivery</b>\n\n"
+        f"🔹 <b>Актуальные новости</b> сервиса и важные объявления\n"
+        f"🔹 <b>Полезные советы</b> для курьеров и партнеров\n"
+        f"🔹 <b>Информация</b> о новых функциях и возможностях\n\n"
+        f"🚀 <b>Подписывайтесь, чтобы быть в курсе всех обновлений!</b>\n\n"
+    )
+
+    reply_kb = await kb.get_courier_kb("/channel")
+
+    await message.answer(
+        text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",

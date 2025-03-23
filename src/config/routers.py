@@ -11,6 +11,11 @@ payment_r = Router()
 admin_r = Router()
 admin_fallback = Router()
 
+partner_r = Router()
+partner_fallback = Router()
+
+orders_r = Router()
+orders_fallback = Router()
 
 __all__ = [
     "payment_r",
@@ -20,4 +25,8 @@ __all__ = [
     "courier_fallback",
     "admin_r",
     "admin_fallback",
+    "partner_r",
+    "partner_fallback",
+    "orders_r",
+    "orders_fallback",
 ]

@@ -145,6 +145,21 @@ class RedisService:
             log.error(f"Ошибка записи статуса ознакомления с информацией в Redis: {e}")
 
     # ---
+    async def set_seed_key(self, bot_id: int, user_id: int, seed_key: str):
+        """Сохраняет seed_key пользователя в Redis"""
+        key = RedisKey(bot_id, user_id)
+        try:
+            await self.redis.hset(f"user_info:{key}", "seed_key", seed_key)
+        except Exception as e:
+            log.error(f"Ошибка записи seed_key в Redis: {e}")
+
+    async def get_seed_key(self, bot_id: int, user_id: int) -> str | None:
+        """Получает seed_key пользователя из Redis"""
+        key = RedisKey(bot_id, user_id)
+        seed_key = await self.redis.hget(f"user_info:{key}", "seed_key")
+        return seed_key.decode("utf-8") if seed_key else None
+
+    # ---
 
     async def get_name(self, bot_id: int, user_id: int) -> str | None:
         """Получает имя и телефон пользователя из Redis"""

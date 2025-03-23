@@ -48,6 +48,26 @@ class Keyboard:
                     ]
                 ]
             ),
+            "/become_partner": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Cтать партнером",
+                            url="https://t.me/raketadelivery_agents_bot",
+                        )
+                    ]
+                ]
+            ),
+            "/channel": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Перейти в канал",
+                            url="https://t.me/raketadeliverychannel",
+                        )
+                    ]
+                ]
+            ),
             # ---
             "accept_tou": InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -256,6 +276,46 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="Заказать доставку",
                             url="https://t.me/raketadelivery_bot",
+                        )
+                    ]
+                ]
+            ),
+            "/become_partner": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Cтать партнером",
+                            url="https://t.me/raketadelivery_agents_bot",
+                        )
+                    ]
+                ]
+            ),
+            "/chat": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Перейти в чат",
+                            url="https://t.me/+3umqnjKcHMlmNjQy",
+                        )
+                    ]
+                ]
+            ),
+            "/channel": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Перейти в канал",
+                            url="https://t.me/raketadeliverychannel",
+                        )
+                    ]
+                ]
+            ),
+            "/orders_bot": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Получать заказы",
+                            url="https://t.me/raketadelivery_orders_bot",
                         )
                     ]
                 ]
@@ -472,15 +532,9 @@ class Keyboard:
                             callback_data="choose_courier",
                         ),
                         InlineKeyboardButton(
-                            text="🕵🏻‍♂️ Агенты",
-                            callback_data="choose_agent",
+                            text="🤝 Партнеры",
+                            callback_data="choose_partner",
                         ),
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="🏙️ Данные по городам",
-                            callback_data="city_data_users",
-                        )
                     ],
                     [
                         InlineKeyboardButton(
@@ -496,12 +550,6 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="📦 Выбрать заказ",
                             callback_data="choose_order",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="🏙️ Данные по городам",
-                            callback_data="city_data_orders",
                         )
                     ],
                     [
@@ -560,6 +608,63 @@ class Keyboard:
                             callback_data="refresh_global_data",
                         )
                     ],
+                ]
+            ),
+        }
+
+        return kb[key]
+
+    @staticmethod
+    async def get_partner_kb(key: str) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для админа"""
+
+        kb = {
+            "/start": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Регистрация",
+                            callback_data="reg_partner",
+                        )
+                    ],
+                ]
+            ),
+            "phone_number": ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text="Поделиться номером", request_contact=True)],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+                input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
+            ),
+            "generate_seed": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🔑 Сгенерировать",
+                            callback_data="generate_seed_key",
+                        )
+                    ]
+                ]
+            ),
+            "try_save_again": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Повторить попытку",
+                            callback_data="try_save_again",
+                        )
+                    ]
+                ]
+            ),
+            "earn_request": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Запросить выплату",
+                            callback_data="get_partner_earn",
+                        )
+                    ]
                 ]
             ),
         }
