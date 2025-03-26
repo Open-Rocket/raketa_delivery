@@ -667,6 +667,52 @@ class Keyboard:
                     ]
                 ]
             ),
+            "adv_request": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Визитка для курьера",
+                            callback_data="business_card_courier",
+                        ),
+                        InlineKeyboardButton(
+                            text="Визитка для клиента",
+                            callback_data="business_card_customer",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Буклет для курьера",
+                            callback_data="buklet_courier",
+                        ),
+                        InlineKeyboardButton(
+                            text="Буклет для клиента",
+                            callback_data="buklet_customer",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="QR-код бота курьера",
+                            callback_data="QR_courier",
+                        ),
+                        InlineKeyboardButton(
+                            text="QR-код бота клиента",
+                            callback_data="QR_customer",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Логотип",
+                            callback_data="logo",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="SEED ключ",
+                            callback_data="seed_key",
+                        ),
+                    ],
+                ]
+            ),
         }
 
         return kb[key]

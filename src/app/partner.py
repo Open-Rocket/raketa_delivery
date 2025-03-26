@@ -3,19 +3,19 @@ from ._deps import (
     FSMContext,
     PartnerState,
     BufferedInputFile,
+    InputMediaDocument,
+    CallbackQuery,
+    Message,
+    filters,
     ContentType,
     ReplyKeyboardRemove,
-    filters,
-    Message,
-    CallbackQuery,
     LabeledPrice,
     zlib,
     Time,
     json,
     F,
-    generate_seed,
-    generate_partner_card,
     find_closest_city,
+    seed_maker,
     partner_bot,
     partner_bot_id,
     partner_r,
@@ -308,7 +308,7 @@ async def partner_generate_seed(
                 )
 
                 while True:
-                    seed_key = await generate_seed()
+                    seed_key = await seed_maker.generate_seed()
                     if seed_key not in all_seed_keys:
                         break
 
@@ -408,6 +408,9 @@ async def cmd_users_partner(
         f" - Вы привлекли пользователей: <b>{len(customers) + len(couriers)}</b>\n"
         f" - Клиентов: <b>{len(customers)}</b>\n"
         f" - Курьеров: <b>{len(couriers)}</b>\n"
+        f" - Оплачено подписок: <b>{0}</b>\n"
+        f" - % оплат от общего числа: <b>{0}</b>\n"
+        f" - Общий заработок: <b>{0}</b>\n\n"
     )
 
     await message.answer(
@@ -457,9 +460,19 @@ async def cmd_referral_partner(
 
 
 @partner_r.message(
-    F.text == "/earn",
+    F.text == "/info",
 )
-async def cmd_earn_partner(
+async def cmd_info_partner(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает команду /info для партнера."""
+
+
+@partner_r.message(
+    F.text == "/balance",
+)
+async def cmd_balance_partner(
     message: Message,
     state: FSMContext,
 ):
@@ -469,9 +482,9 @@ async def cmd_earn_partner(
     current_state = PartnerState.default.state
 
     text = (
-        f"📊 <b>Статистика дохода</b>\n\n"
-        f"Здесь вы можете посмотреть статистику вашего дохода за последний месяц.\n\n"
-        f"🔸 <b>Ваш доход:</b> <b>20000 ₽</b>\n"
+        f"📊 <b>Текущий баланс</b>\n\n"
+        f"Здесь вы можете посмотреть ваш текущий баланс с момента последней выплаты.\n\n"
+        f"🔸 <b>Баланс:</b> <b>20000 ₽</b>\n"
     )
 
     reply_kb = await kb.get_partner_kb("earn_request")
@@ -487,28 +500,340 @@ async def cmd_earn_partner(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.message(F.text == "/adv")
+# ---
+#
+
+
+@partner_r.message(
+    F.text == "/adv",
+)
 async def cmd_adv_partner(
     message: Message,
     state: FSMContext,
 ):
     """Обрабатывает команду /adv для партнера."""
 
-    current_state = PartnerState.default.state
     tg_id = message.from_user.id
-    seed_key = await rediska.get_seed_key(partner_bot_id, tg_id)
+    current_state = PartnerState.default.state
 
-    pdf_data = await generate_partner_card(seed_key)
-    vizitka = BufferedInputFile(pdf_data, filename="partner_card.pdf")
+    text = (
+        f"📈 <b>Рекламные материалы</b>\n\n"
+        f"Здесь вы можете скачать рекламные материалы для привлечения новых пользователей в сервис.\n\n"
+        f"🔸 <b>Визитка и буклет для курьера</b>\n"
+        f"🔸 <b>Визитка и буклет для клиента</b>\n"
+        f"🔸 <b>QR коды отдельно</b>\n"
+        f"🔸 <b>Ваш персональный ключ отдельно</b>\n\n"
+        f"<i>*Мы подготовили для вас уже готовый материал, но при желании вы можете сделать свой!</i>\n"
+    )
 
-    await message.answer_document(
-        document=vizitka,
-        caption="🔥 <b>Ваша визитка</b>",
+    reply_kb = await kb.get_partner_kb("adv_request")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
         parse_mode="HTML",
     )
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.callback_query(F.data == "business_card_courier")
+@partner_r.callback_query(F.data == "business_card_customer")
+async def data_business_card(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Возвращает визитку для пользователя."""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+    seed_key = await partner_data.get_my_seed_key(tg_id)
+    callback_data = callback_query.data
+
+    log.info(f"callback_message: {callback_data}")
+
+    try:
+        pdf_data = await seed_maker.get_business_card(
+            seed_key=seed_key,
+            type_template=f"{callback_data}",
+        )
+        business_card = BufferedInputFile(pdf_data, filename=f"{callback_data}.pdf")
+
+        type_of_users = (
+            "курьеров" if callback_data == "business_card_courier" else "клиентов"
+        )
+
+        text = (
+            f"🔥 <b>Ваша визитка для {type_of_users}</b>\n\n"
+            f"Рекомендации по использованию визитки:\n"
+            f"1️⃣ Распечатайте визитку и раздавайте ее.\n"
+            f"2️⃣ Отправьте визитку в электронном виде в чаты и группы.\n\n"
+            f"Отслеживайте количество привлеченных пользователей и ваш доход в разделе <b>Пользователи 👥</b> и <b>Баланс 💰</b>.\n\n"
+        )
+
+        await callback_query.message.answer_document(
+            document=business_card,
+            caption=f"Размеры визитки: 90x50 мм.",
+            parse_mode="HTML",
+        )
+
+        await callback_query.message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    except Exception as e:
+        await callback_query.message.answer(f"Ошибка при генерации визитки: {str(e)}")
+
+
+@partner_r.callback_query(F.data == "buklet_courier")
+@partner_r.callback_query(F.data == "buklet_customer")
+async def data_buklet(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Возвращает буклет для пользователя."""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+    seed_key = await partner_data.get_my_seed_key(tg_id)
+    callback_data = callback_query.data
+
+    log.info(f"callback_message: {callback_data}")
+
+    try:
+        pdf_data = await seed_maker.get_business_card(
+            seed_key=seed_key,
+            type_template=f"{callback_data}",
+        )
+        buklet = BufferedInputFile(pdf_data, filename=f"{callback_data}.pdf")
+
+        type_of_users = "курьеров" if callback_data == "buklet_courier" else "клиентов"
+
+        text = (
+            f"🔥 <b>Ваш буклет для {type_of_users}</b>\n\n"
+            f"Рекомендации по использованию буклета:\n"
+            f"1️⃣ Распечатайте буклет и раздавайте его.\n"
+            f"2️⃣ Отправьте буклет в электронном виде в чаты и группы.\n\n"
+            f"Отслеживайте количество привлеченных пользователей и ваш доход в разделе <b>Пользователи 👥</b> и <b>Баланс 💰</b>.\n\n"
+        )
+
+        await callback_query.message.answer_document(
+            document=buklet,
+            caption=f"Размеры буклета: А4 - A5.",
+            parse_mode="HTML",
+        )
+
+        await callback_query.message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    except Exception as e:
+        await callback_query.message.answer(f"Ошибка при генерации буклета: {str(e)}")
+
+
+@partner_r.callback_query(F.data == "QR_courier")
+@partner_r.callback_query(F.data == "QR_customer")
+async def data_qr_courier(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Возвращает QR-коды для пользователя."""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+    callback_data = callback_query.data
+
+    log.info(f"callback_message: {callback_data}")
+
+    try:
+        png_data: tuple = await seed_maker.get_qr_codes(type_of_user=callback_data)
+        qr_white = BufferedInputFile(png_data[0], filename=f"{callback_data}_white.png")
+        qr_black = BufferedInputFile(png_data[1], filename=f"{callback_data}_black.png")
+
+        type_of_users = "курьеров" if callback_data == "QR_courier" else "клиентов"
+        type_of_bot = (
+            "@raketadeliverywork_bot"
+            if callback_data == "QR_courier"
+            else "@raketadelivery_bot"
+        )
+        link = (
+            "https://t.me/raketadeliverywork_bot"
+            if callback_data == "QR_courier"
+            else "https://t.me/raketadelivery_bot"
+        )
+
+        text = (
+            f"🔥 <b>QR-коды для {type_of_users}</b>\n\n"
+            f"Белый и чёрный в формате .png\n"
+            f"Бот: {type_of_bot}\n"
+            f"Ссылка: {link}\n\n"
+            f"Рекомендации по использованию QR-кода:\n"
+            f"1️⃣ Разместите его на своем сайте или в социальных сетях.\n\n"
+            f"Отслеживайте количество привлечённых пользователей и ваш доход в разделе <b>Пользователи 👥</b> и <b>Баланс 💰</b>.\n\n"
+        )
+
+        await callback_query.message.answer_media_group(
+            media=[
+                InputMediaDocument(
+                    media=qr_white,
+                    caption=f"QR-код {type_of_users} (белый)",
+                ),
+                InputMediaDocument(
+                    media=qr_black,
+                    caption=f"QR-код {type_of_users} (чёрный)",
+                ),
+            ]
+        )
+        await callback_query.message.answer(
+            text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    except Exception as e:
+        await log.info(f"Ошибка при генерации QR-кода: {str(e)}")
+        await callback_query.message.answer(f"Ошибка при генерации QR-кода")
+
+
+@partner_r.callback_query(F.data == "logo")
+async def data_logo(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Возвращает логотипы"""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+
+    try:
+        png_data: tuple = await seed_maker.get_logo()
+        font_logo_white = BufferedInputFile(
+            png_data[0],
+            filename=f"font_logo_white.png",
+        )
+        font_logo_black = BufferedInputFile(
+            png_data[1],
+            filename=f"font_logo_black.png",
+        )
+        logo_white = BufferedInputFile(
+            png_data[2],
+            filename=f"logo_white.png",
+        )
+        logo_black = BufferedInputFile(
+            png_data[3],
+            filename=f"logo_black.png",
+        )
+
+        text = (
+            f"🔥 <b>Логотипы сервиса Raketa</b>\n\n"
+            f"C надписью и без в формате .png\n\n"
+            f"Отслеживайте количество привлечённых пользователей и ваш доход в разделе <b>Пользователи 👥</b> и <b>Баланс 💰</b>.\n\n"
+        )
+
+        await callback_query.message.answer_media_group(
+            media=[
+                InputMediaDocument(
+                    media=font_logo_white,
+                    caption=f"Логотип с надписью (белый)",
+                ),
+                InputMediaDocument(
+                    media=font_logo_black,
+                    caption=f"Логотип с надписью (черный)",
+                ),
+                InputMediaDocument(
+                    media=logo_white,
+                    caption=f"Логотип (белый)",
+                ),
+                InputMediaDocument(
+                    media=logo_black,
+                    caption=f"Логотип (черный)",
+                ),
+            ]
+        )
+
+        await callback_query.message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    except Exception as e:
+        await log.info(f"Ошибка при генерации логотипа: {str(e)}")
+        await callback_query.message.answer(f"Ошибка при генерации логотипа")
+
+
+@partner_r.callback_query(F.data == "seed_key")
+async def data_seed_key_svg(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Возвращает SVG SEED ключа с белым и черным текстом"""
+
+    current_state = PartnerState.default.state
+    tg_id = callback_query.from_user.id
+    seed_key = await partner_data.get_my_seed_key(tg_id)
+
+    try:
+        svg_white, svg_black = await seed_maker.get_seed_key_svg(seed_key=seed_key)
+
+        # Преобразуем SVG-код в байты
+        svg_white_bytes = svg_white.encode("utf-8")
+        svg_black_bytes = svg_black.encode("utf-8")
+
+        seed_file_white = BufferedInputFile(
+            svg_white_bytes, filename="seed_key_white.svg"
+        )
+        seed_file_black = BufferedInputFile(
+            svg_black_bytes, filename="seed_key_black.svg"
+        )
+
+        text = (
+            "🔥 <b>Ваш SEED ключ</b>\n\n"
+            "В формате .svg\n\n"
+            "Отслеживайте количество привлечённых пользователей и ваш доход в разделе "
+            "<b>Пользователи 👥</b> и <b>Баланс 💰</b>.\n\n"
+        )
+
+        await callback_query.message.answer_media_group(
+            media=[
+                InputMediaDocument(
+                    media=seed_file_white, caption="SEED ключ (белый текст)"
+                ),
+                InputMediaDocument(
+                    media=seed_file_black, caption="SEED ключ (чёрный текст)"
+                ),
+            ]
+        )
+
+        await callback_query.message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+    except Exception as e:
+        log.info(f"Ошибка при генерации SVG SEED ключа: {str(e)}")
+        await callback_query.message.answer("Ошибка при генерации SVG SEED ключа")
+
+
+# ---
+# ---
 
 
 @partner_r.callback_query(
@@ -532,7 +857,6 @@ async def data_earn_partner(
 
     await callback_query.message.answer(
         text=text,
-        disable_notification=True,
         parse_mode="HTML",
     )
 

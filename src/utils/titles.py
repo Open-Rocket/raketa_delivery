@@ -54,7 +54,7 @@ class Title:
 
     @staticmethod
     async def get_title_partner(command: str) -> FSInputFile | None:
-        """Возвращает картинку для клиента"""
+        """Возвращает картинку для партнера"""
 
         dir = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "../..", "public"
@@ -65,8 +65,44 @@ class Title:
         }
 
         img = os.path.join(dir, paths.get(command, ""))
+
         if os.path.isfile(img):
             return FSInputFile(img)
+
+        return None
+
+    import os
+
+    @staticmethod
+    async def get_adv_partner(command: str) -> bytes | None:
+        """Возвращает рекламные данные для партнера как bytes"""
+
+        dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "../..", "public"
+        )
+
+        paths = {
+            "business_card_courier": "business_card_courier.pdf",
+            "business_card_customer": "business_card_customer.pdf",
+            "buklet_customer": "buklet_customer.pdf",
+            "buklet_courier": "buklet_courier.pdf",
+            "QR_courier_white": "QR_courier_white.png",
+            "QR_courier_black": "QR_courier_black.png",
+            "QR_customer_white": "QR_customer_white.png",
+            "QR_customer_black": "QR_customer_black.png",
+            "font_logo_white": "font_logo_white.png",
+            "font_logo_black": "font_logo_black.png",
+            "logo_white": "logo_white.png",
+            "logo_black": "logo_black.png",
+        }
+
+        path = os.path.join(dir, paths.get(command, ""))
+
+        if os.path.isfile(path):
+            # Открываем файл в бинарном режиме и конвертируем его в bytes
+            with open(path, "rb") as f:
+                pdf_bytes = f.read()
+            return pdf_bytes
 
         return None
 

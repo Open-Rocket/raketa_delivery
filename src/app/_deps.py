@@ -1,15 +1,16 @@
+import io
 import asyncio
 import time
 import zlib
+import json
 from aiogram import Router, filters, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from datetime import datetime, timedelta
-from aiogram.types import LabeledPrice
+from aiogram.types import LabeledPrice, InputMediaDocument
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from aiogram.types import ReplyKeyboardRemove
-import json
 
 
 from src.services import (
@@ -22,8 +23,7 @@ from src.services import (
     formatter,
     route,
     recognizer,
-    generate_seed,
-    generate_partner_card,
+    seed_maker,
 )
 from src.models import OrderStatus
 from src.confredis import rediska
@@ -70,6 +70,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "io",
     "zlib",
     "json",
     "time",
@@ -136,7 +137,7 @@ __all__ = [
     "orders_fallback",
     "PartnerState",
     "OrdersState",
-    "generate_seed",
-    "generate_partner_card",
+    "seed_maker",
     "BufferedInputFile",
+    "InputMediaDocument",
 ]

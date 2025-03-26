@@ -708,6 +708,20 @@ class PartnerData:
 
     # ---
 
+    async def get_my_seed_key(self, tg_id: int) -> Optional[str]:
+        """Возвращает seed ключ партнера"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner.partner_id).where(Partner.partner_tg_id == tg_id)
+            )
+            if partner:
+                seed_key = await session.scalar(
+                    select(SeedKey.seed_key).where(SeedKey.partner_id == partner)
+                )
+                return seed_key
+
+    # ---
+
     async def create_new_seed_key(
         self,
         partner_id: int,

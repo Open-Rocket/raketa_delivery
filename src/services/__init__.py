@@ -9,8 +9,7 @@ from .db_requests import (
     partner_data,
 )
 from .fuzzy import cities, cities_2, find_closest_city
-from .seed_generator import generate_seed
-from .seed_card import generate_partner_card
+from .seed import seed_maker
 
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     "cities",
     "cities_2",
     "find_closest_city",
-    "generate_seed",
-    "generate_partner_card",
+    "seed_maker",
 ]
