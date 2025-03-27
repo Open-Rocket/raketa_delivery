@@ -27,6 +27,7 @@ from ._deps import (
     formatter,
     cities,
     log,
+    randint,
     find_closest_city,
     F,
 )
@@ -245,7 +246,7 @@ async def data_city_customer(
         reply_kb = await kb.get_customer_kb("accept_tou")
         text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
-            f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+            f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
             f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
             f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -256,6 +257,7 @@ async def data_city_customer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -289,7 +291,7 @@ async def customer_accept_tou(
     reply_kb = await kb.get_customer_kb("accept_tou")
     tou_text = (
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -481,13 +483,13 @@ async def _process_order_logic(
         return
 
     prepare_dict = await formatter._prepare_data(
-        moscow_time,
-        customer_name,
-        customer_phone,
-        city,
-        addresses,
-        delivery_object,
-        description,
+        time=moscow_time,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        city=city,
+        addresses=addresses,
+        delivery_object=delivery_object,
+        description=description,
     )
 
     if not prepare_dict:
@@ -499,7 +501,12 @@ async def _process_order_logic(
         )
         return
 
-    order_info = await formatter.format_order_form(prepare_dict)
+    customer_discount = await customer_data.get_customer_discount(tg_id)
+
+    order_info = await formatter.format_order_form(
+        prepare_dict,
+        customer_discount,
+    )
     reply_kb = await kb.get_customer_kb("voice_order_accept")
 
     await wait_message.delete()
@@ -595,7 +602,7 @@ async def set_order_to_db(
             f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
             f"Мы ищем курьера для вашего заказа 🔎\n\n"
             f"<i>*Информацию о заказах можно посмотреть в разделе</i> <b>Мои заказы</b>.\n\n"
-            f"▼ <b>Выберите действие ...</b>"
+            f"▼ <b>Выберите действие в Меню ...</b>"
         )
     except Exception as e:
         log.error(f"Ошибка при создании заказа: {str(e)}")
@@ -614,6 +621,8 @@ async def set_order_to_db(
     await callback_query.answer("🧾 Заказ создан", show_alert=False)
 
     await callback_query.message.delete()
+
+    await customer_data.set_customer_discount(tg_id, 0)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -655,30 +664,77 @@ async def cancel_order(
 @customer_r.message(
     F.text == "/order",
 )
+@customer_r.callback_query(F.data == "make_order")
+@customer_r.callback_query(F.data == "not_now")
 async def cmd_order(
-    message: Message,
+    event: Message | CallbackQuery,
     state: FSMContext,
 ):
     """Обработчик команды /order для клиента."""
 
-    tg_id = message.from_user.id
+    tg_id = event.from_user.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
+    is_set_key = await customer_data.is_set_key(tg_id)
+
+    log.info(f"set_key: {is_set_key}")
+
+    if not is_set_key:
+
+        if isinstance(event, CallbackQuery):
+            await event.answer(f"окей, пропустим", show_alert=False)
+            await event.message.delete()
+
+        current_state = CustomerState.default.state
+
+        skip_counter = await rediska.get_skip_counter(customer_bot_id, tg_id)
+
+        if skip_counter > 9:
+            skip_counter = 1
+
+        await rediska.set_skip_counter(customer_bot_id, tg_id, skip_counter + 1)
+
+        log.info(f"skip_counter: {skip_counter}")
+
+        indexes_of_retry = [0, 3, 5, 9]
+
+        if isinstance(event, Message) and skip_counter in indexes_of_retry:
+
+            text = f"Введите PROMOKOD и получите <b>50% скидку</b> на текущий заказ"
+            reply_kb = await kb.get_customer_kb("key")
+
+            await event.answer(
+                text=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+            return
 
     if is_read_info:
+
+        if isinstance(event, CallbackQuery):
+            await event.message.delete()
+
         current_state = CustomerState.ai_voice_order.state
         text = (
             f"<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             f"заказ будет оформлен в считанные секунды.</i>\n\n"
             f"ゞ <b>Опишите ваш заказ ...</b>"
         )
-        await message.answer(
+        await event.answer(
             text=text,
             disable_notification=True,
             parse_mode="HTML",
         )
+
     else:
+
+        if isinstance(event, CallbackQuery):
+            await event.message.delete()
+
         current_state = CustomerState.default.state
-        photo_title = await title.get_title_customer(message.text)
+        photo_title = await title.get_title_customer("/order")
         reply_kb = await kb.get_customer_kb("/order")
         text = (
             "◉ Вы можете сделать заказ с помощью текста или голоса, "
@@ -686,13 +742,24 @@ async def cmd_order(
             "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
             "ассистент создаст заявку для вашего заказа.</i>"
         )
-        await message.answer_photo(
-            photo=photo_title,
-            caption=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
+
+        if isinstance(event, CallbackQuery):
+            await event.message.answer_photo(
+                photo=photo_title,
+                caption=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+        elif isinstance(event, Message):
+            await event.answer_photo(
+                photo=photo_title,
+                caption=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -729,6 +796,72 @@ async def data_ai(
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
     await rediska.set_read_info(customer_bot_id, tg_id, True)
+
+
+# ---
+
+
+@customer_r.callback_query(
+    F.data == "PROMOKOD",
+)
+async def data_set_PROMOKOD(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'PROMOKOD' для клиента."""
+
+    await callback_query.message.delete()
+    await callback_query.answer("% PROMOKOD", show_alert=False)
+
+    current_state = CustomerState.set_seed_key.state
+    tg_id = callback_query.from_user.id
+
+    text = f"Ваш PROMOKOD:"
+
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+
+@customer_r.message(
+    filters.StateFilter(CustomerState.set_seed_key),
+)
+async def data_PROMOKOD(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик состояния 'CustomerState.set_seed_key'."""
+
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+    seed_key = message.text
+
+    is_set_key = await customer_data.set_customer_seed_key(tg_id, seed_key)
+
+    log.info(f"is_set_key: {is_set_key}")
+
+    if is_set_key:
+        text = "✅ PROMOKOD успешно установлен!\n\nСкидка на следующий заказ <b>50%</b>"
+        reply_kb = await kb.get_customer_kb("make_order")
+        await customer_data.set_customer_discount(tg_id, 50)
+    else:
+        text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
+        reply_kb = await kb.get_customer_kb("try_seed_again")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 # ---
@@ -775,26 +908,28 @@ async def cmd_profile(
 
 
 @customer_r.message(
-    F.text == "/faq",
+    F.text == "/info",
 )
-async def cmd_faq(
+async def cmd_info(
     message: Message,
     state: FSMContext,
 ):
-    """Обработчик команды /faq для клиента."""
+    """Обработчик команды /info."""
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
 
     text = (
-        f"🤔 <b>Вопросы и ответы</b>\n\n"
-        f"Частые вопросы и ответы на них "
-        f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>"
+        f"ℹ️ <b>Информация</b>\n\n"
+        f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
+        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
+        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
     )
 
     await message.answer(
         text=text,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -817,7 +952,7 @@ async def cmd_rules(
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -828,6 +963,7 @@ async def cmd_rules(
     await message.answer(
         text=text,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 

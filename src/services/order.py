@@ -45,7 +45,12 @@ class OrderFormatter:
 
         yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
         distance = round(await route.calculate_total_distance(coordinates), 2)
-        price = await route.get_price(distance, time, city=city)
+
+        price = await route.get_price(
+            distance,
+            time,
+            city=city,
+        )
         addresses_text = "\n".join(
             [
                 f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
@@ -67,7 +72,7 @@ class OrderFormatter:
         }
 
     @staticmethod
-    async def format_order_form(data: dict) -> str:
+    async def format_order_form(data: dict, discount: int = 0) -> str:
         """Форматирует и возвращает текст заказа на основе подготовленных данных."""
         (
             city,
@@ -82,6 +87,9 @@ class OrderFormatter:
             _,
         ) = [data[key] for key in data.keys()]
 
+        if discount:
+            price = f"<s>{price}₽</s> {int(price - price * discount / 100)}₽"
+
         order_forma = (
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
@@ -89,7 +97,7 @@ class OrderFormatter:
             f"{addresses_text}\n\n"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
-            f"<b>Стоимость доставки:</b> {price}₽\n\n"
+            f"<b>Стоимость доставки:</b> {price}\n\n"
             f"<b>Описание:</b> {description}\n\n"
             f"------------------------------------------\n"
             f"• Проверьте ваш заказ и если все верно, то разместите.\n"

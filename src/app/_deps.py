@@ -3,6 +3,7 @@ import asyncio
 import time
 import zlib
 import json
+from random import randint
 from aiogram import Router, filters, F
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -70,6 +71,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "randint",
     "io",
     "zlib",
     "json",

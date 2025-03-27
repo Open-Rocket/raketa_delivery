@@ -37,7 +37,7 @@ from ._deps import (
 @partner_r.message(
     CommandStart(),
 )
-async def cmd_start_partner(
+async def cmd_start(
     message: Message,
     state: FSMContext,
 ):
@@ -50,7 +50,7 @@ async def cmd_start_partner(
     if is_reg:
         current_state = PartnerState.default.state
         await message.answer(
-            text="▼ <b>Выберите действие ...</b>",
+            text="▼ <b>Выберите действие в Меню ...</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -62,9 +62,9 @@ async def cmd_start_partner(
             "🚀 <b>Добро пожаловать в Raketa Delivery | Партнеры</b>\n\n"
             "🔹 <b>Наши условия:</b>\n"
             "Вы привлекаете как клиентов, так и курьеров, и получаете <b>30% с подписки каждого курьера</b>, которого привлекли.\n\n"
-            "🔸 Привлекая клиентов, ты помогаешь увеличивать сеть заказов, что делает сервис более востребованным и выгодным для всех.\n\n"
-            "🔸 Работай в удобное время, привлекай курьеров и получай пассивный доход!\n\n"
-            "🚀 <b>Присоединяйся, начинай зарабатывать!</b>"
+            "🔸 Привлекая клиентов, вы помогаете увеличивать сеть сервиса, что делает его более востребованным и выгодным.\n\n"
+            "🔸 Работайте в удобное время, привлекай новых пользователей и получайте пассивный доход!\n\n"
+            "💰 <b>Присоединяйтесь и начинайте зарабатывать уже сейчас!</b>"
         )
         reply_kb = await kb.get_partner_kb("/start")
         new_message = await message.answer_photo(
@@ -92,7 +92,7 @@ async def cmd_start_partner(
 @partner_r.callback_query(
     F.data == "reg_partner",
 )
-async def data_reg_partner(
+async def data_reg(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -130,7 +130,7 @@ async def data_reg_partner(
 @partner_r.message(
     filters.StateFilter(PartnerState.reg_Name),
 )
-async def data_name_partner(
+async def data_name(
     message: Message,
     state: FSMContext,
 ):
@@ -142,7 +142,7 @@ async def data_name_partner(
 
     reply_kb = await kb.get_partner_kb("phone_number")
     text = (
-        f"Привет, {courier_name}!👋\n\nЧтобы начать работу, пожалуйста, укажите ваш номер телефона для связи.\n\n"
+        f"Привет, {courier_name}!👋\n\nПожалуйста, укажите ваш номер телефона.\n\n"
         f"<i>*При регистрации с компьютера нажмите на значок команд рядом с полем ввода.</i>\n\n"
         f"<i>*Отправка номера возможно только по клику на кнопку 'Поделится номером'!</i>\n\n"
         f"<b>Ваш номер:</b>"
@@ -172,7 +172,7 @@ async def data_name_partner(
 @partner_r.message(
     filters.StateFilter(PartnerState.reg_Phone),
 )
-async def data_phone_partner(
+async def data_phone(
     message: Message,
     state: FSMContext,
 ):
@@ -182,12 +182,7 @@ async def data_phone_partner(
     tg_id = message.from_user.id
     courier_phone = message.contact.phone_number
 
-    text = (
-        f"📍 <b>Последний шаг!</b>\n\n"
-        f"Укажите ваш город, чтобы система могла правильно распределять курьеров и клиентов, "
-        f"увеличивая количество заказов и ваш доход.\n\n"
-        f"<b>Ваш город:</b>"
-    )
+    text = f"<b>Ваш город:</b>"
 
     new_message = await message.answer(
         text=text,
@@ -212,7 +207,7 @@ async def data_phone_partner(
 @partner_r.message(
     filters.StateFilter(PartnerState.reg_City),
 )
-async def data_city_partner(
+async def data_city(
     message: Message,
     state: FSMContext,
 ):
@@ -324,7 +319,7 @@ async def partner_generate_seed(
                         f"- Для курьеров это также промокод, который дает скидку на подписку. Таким образом, курьеры могут снизить свои затраты на участие в сервисе.\n\n"
                         f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
                         f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете 30% с подписки курьеров каждый месяц.\n\n"
-                        f"▼ <b>Выберите действие ...</b>"
+                        f"▼ <b>Выберите действие в Меню ...</b>"
                     )
 
                     new_message = await callback_query.message.answer(
@@ -389,13 +384,13 @@ async def partner_generate_seed(
 
 
 @partner_r.message(
-    F.text == "/users",
+    F.text == "/refs",
 )
-async def cmd_users_partner(
+async def cmd_refs(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает команду /users для партнера."""
+    """Обрабатывает команду /refs"""
 
     tg_id = message.from_user.id
     current_state = PartnerState.default.state
@@ -404,7 +399,7 @@ async def cmd_users_partner(
 
     text = (
         f"<b>👥 Пользователи</b>\n\n"
-        f"Здесь вы можете посмотреть основную статистику о привлеченныx вами пользователях.\n\n"
+        f"Здесь вы можете посмотреть основную статистику о пользователях, которых вы привлекли в сервис.\n\n"
         f" - Вы привлекли пользователей: <b>{len(customers) + len(couriers)}</b>\n"
         f" - Клиентов: <b>{len(customers)}</b>\n"
         f" - Курьеров: <b>{len(couriers)}</b>\n"
@@ -424,13 +419,13 @@ async def cmd_users_partner(
 
 
 @partner_r.message(
-    F.text == "/referral",
+    F.text == "/key",
 )
-async def cmd_referral_partner(
+async def cmd_key(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает команду /referral для партнера."""
+    """Обрабатывает команду /key"""
 
     current_state = PartnerState.default.state
     tg_id = message.from_user.id
@@ -462,24 +457,46 @@ async def cmd_referral_partner(
 @partner_r.message(
     F.text == "/info",
 )
-async def cmd_info_partner(
+async def cmd_info(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает команду /info для партнера."""
+    """Обработчик команды /info"""
+
+    current_state = PartnerState.default.state
+    tg_id = message.from_user.id
+
+    text = (
+        f"ℹ️ <b>Информация</b>\n\n"
+        f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
+        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
+        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
+    )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
 @partner_r.message(
     F.text == "/balance",
 )
-async def cmd_balance_partner(
+async def cmd_balance(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает команду /earn для партнера."""
+    """Обрабатывает команду /balance"""
 
     tg_id = message.from_user.id
     current_state = PartnerState.default.state
+
+    balance = await partner_data.get_my_balance(tg_id)
 
     text = (
         f"📊 <b>Текущий баланс</b>\n\n"
@@ -501,17 +518,17 @@ async def cmd_balance_partner(
 
 
 # ---
-#
+# ---
 
 
 @partner_r.message(
     F.text == "/adv",
 )
-async def cmd_adv_partner(
+async def cmd_adv(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает команду /adv для партнера."""
+    """Обрабатывает команду /adv"""
 
     tg_id = message.from_user.id
     current_state = PartnerState.default.state
@@ -545,7 +562,7 @@ async def data_business_card(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Возвращает визитку для пользователя."""
+    """Возвращает визитку"""
 
     current_state = PartnerState.default.state
     tg_id = callback_query.from_user.id
@@ -597,7 +614,7 @@ async def data_buklet(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Возвращает буклет для пользователя."""
+    """Возвращает буклет"""
 
     current_state = PartnerState.default.state
     tg_id = callback_query.from_user.id
@@ -647,7 +664,7 @@ async def data_qr_courier(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Возвращает QR-коды для пользователя."""
+    """Возвращает QR-коды"""
 
     current_state = PartnerState.default.state
     tg_id = callback_query.from_user.id
@@ -781,7 +798,7 @@ async def data_seed_key_svg(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Возвращает SVG SEED ключа с белым и черным текстом"""
+    """Возвращает SVG SEED ключа"""
 
     current_state = PartnerState.default.state
     tg_id = callback_query.from_user.id
@@ -839,7 +856,7 @@ async def data_seed_key_svg(
 @partner_r.callback_query(
     F.data == "get_partner_earn",
 )
-async def data_earn_partner(
+async def data_earn(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):

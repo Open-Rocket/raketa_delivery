@@ -255,6 +255,26 @@ class RedisService:
             log.error(f"Ошибка чтения счётчика использования ключей Яндекс API: {e}")
             return None
 
+    # ---
+
+    async def set_skip_counter(self, bot_id: int, user_id: int, value: int):
+        """Сохраняет счётчик пропусков в Redis"""
+        key = RedisKey(bot_id, user_id)
+        try:
+            await self.redis.hset(f"user_info:{key}", "skip_counter", value)
+        except Exception as e:
+            log.error(f"Ошибка записи счётчика пропусков в Redis: {e}")
+
+    async def get_skip_counter(self, bot_id: int, user_id: int) -> int:
+        """Получает счётчик пропусков из Redis"""
+        key = RedisKey(bot_id, user_id)
+        try:
+            skip_counter = await self.redis.hget(f"user_info:{key}", "skip_counter")
+            return int(skip_counter) if skip_counter else 0
+        except Exception as e:
+            log.error(f"Ошибка чтения счётчика пропусков из Redis: {e}")
+            return 0
+
 
 async def create_redis_service() -> RedisService:
     """Асинхронная фабрика для создания экземпляра RedisService"""

@@ -120,6 +120,8 @@ class Customer(Base):
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
+    customer_discount: Mapped[intData]
+
     orders = relationship("Order", back_populates="customer")
     seed_key = relationship("SeedKey", back_populates="customers")
     partner = relationship("Partner", back_populates="customers")
@@ -142,6 +144,12 @@ class Courier(Base):
         nullable=True,
     )
 
+    payment_id = mapped_column(
+        Integer,
+        ForeignKey("payments.payment_id"),
+        nullable=True,
+    )
+
     courier_tg_id: Mapped[intDataUnique]
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
@@ -155,6 +163,7 @@ class Courier(Base):
     subscription = relationship("Subscription", back_populates="couriers")
     partner = relationship("Partner", back_populates="couriers")
     seed_key = relationship("SeedKey", back_populates="couriers")
+    payment = relationship("Payment", back_populates="payer")
 
 
 class Partner(Base):
@@ -167,6 +176,8 @@ class Partner(Base):
     partner_phone: Mapped[stringData]
     partner_city: Mapped[stringData]
     partner_registration_date: Mapped[datetimeData]
+
+    balance: Mapped[intData] = mapped_column(Integer, default=0)
 
     seed_key = relationship("SeedKey", uselist=False, back_populates="partner")
 
@@ -183,7 +194,7 @@ class SeedKey(Base):
         ForeignKey("partners.partner_id", ondelete="CASCADE"),
         unique=True,
     )
-    seed_key: Mapped[stringData] = mapped_column(String, unique=True)
+    seed_key: Mapped[stringData]
 
     partner = relationship("Partner", back_populates="seed_key")
     couriers = relationship("Courier", back_populates="seed_key")
@@ -265,6 +276,20 @@ class Subscription(Base):
     couriers = relationship("Courier", back_populates="subscription")
 
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    payment_id: Mapped[intPK]
+
+    payment_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    payment_sum_rub: Mapped[intData] = mapped_column(Integer, nullable=False)
+
+    payer_id: Mapped[int]
+    receiver_id: Mapped[int]
+
+    payer = relationship("Courier", back_populates="payment")
+
+
 __all__ = [
     "async_session_factory",
     "Customer",
@@ -272,9 +297,11 @@ __all__ = [
     "Admin",
     "Partner",
     "SeedKey",
+    "Payment",
     "Order",
     "OrderStatus",
     "Subscription",
-    "GlobalSettings" "engine",
+    "GlobalSettings",
+    "engine",
     "Base",
 ]

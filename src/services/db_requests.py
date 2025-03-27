@@ -6,13 +6,14 @@ from src.models import (
     Courier,
     Admin,
     Partner,
+    Payment,
     SeedKey,
     GlobalSettings,
     OrderStatus,
     Order,
     Subscription,
 )
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, func
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
@@ -94,6 +95,70 @@ class CustomerData:
                     customer.customer_city or "...",
                 )
             return ("...", "...", "...")
+
+    # ---
+
+    async def is_set_key(self, tg_id: int) -> bool:
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            if customer:
+                if customer.seed_key_id:
+                    return True
+                return False
+
+    # ---
+
+    async def set_customer_seed_key(self, tg_id: int, seed_key: str) -> bool:
+        """Привязывает seed ключ к клиенту"""
+
+        async with self.async_session_factory() as session:
+
+            seed_key_obj = await session.execute(
+                select(SeedKey).where(SeedKey.seed_key == seed_key)
+            )
+            seed_key_obj = seed_key_obj.scalar_one_or_none()
+
+            log.info(f"seed_key_obj: {seed_key_obj}")
+
+            if not seed_key_obj.seed_key:
+                log.info(f"seed_key_obj.seed_key: {seed_key_obj.seed_key}")
+                return False
+
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+
+            if customer:
+                log.info(f"customer: {customer.customer_id}")
+                customer.seed_key_id = seed_key_obj.seed_key_id
+                customer.partner_id = seed_key_obj.partner_id
+                await session.flush()
+                await session.commit()
+                return True
+
+            return False
+
+    # ---
+
+    async def set_customer_discount(self, tg_id: int, discount: int) -> bool:
+        """Устанавливает скидку клиенту"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            customer.customer_discount = discount
+            await session.commit()
+
+    async def get_customer_discount(self, tg_id: int) -> int:
+        """Возвращает скидку клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            customer_discount = customer.customer_discount
+            return customer_discount if customer_discount else 0
 
 
 class CourierData:
@@ -407,6 +472,41 @@ class CourierData:
             except Exception as e:
                 log.error(f"Ошибка при получении бесплатного периода: {e}")
                 return 10
+
+    # ---
+
+    async def set_payment(self, payer_id: int, sum: int):
+        """Добавляет платёж в БД и начисляет 30% партнёру, если он есть"""
+        async with self.async_session_factory() as session:
+            try:
+                # Добавляем новый платёж
+                new_payment = Payment(
+                    payment_date=await Time.get_moscow_time(),
+                    payment_sum_rub=sum,
+                    payer_id=payer_id,
+                )
+                session.add(new_payment)
+
+                # Проверяем, есть ли у курьера партнер
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_id == payer_id)
+                )
+                if courier and courier.partner_id:
+                    partner = await session.scalar(
+                        select(Partner).where(Partner.partner_id == courier.partner_id)
+                    )
+                    if partner:
+                        partner.balance += int(
+                            sum * 0.3
+                        )  # Начисляем 30% от суммы платежа
+
+                await session.commit()
+                return True
+
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении платежа: {e}")
+                return False
 
 
 class AdminData:
@@ -766,6 +866,43 @@ class PartnerData:
                 return (customers, couriers)
 
             return ([], [])
+
+    # ---
+
+    async def change_partner_balance(self, tg_id: int, new_balance: int) -> None:
+        """Устанавливает новый баланс партнера"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+            if partner:
+                partner.balance = new_balance
+                await session.commit()
+
+    async def get_partner_balance(self, tg_id: int) -> int:
+        """Возвращает текущий баланс партнера"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+        return partner.balance if partner else 0
+
+    async def get_my_all_time_earn(self, tg_id: int) -> int:
+        """Возвращает общую сумму заработка партнера (30% от подписок курьеров)"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+            if not partner:
+                return 0
+
+            total_earnings = await session.scalar(
+                select(func.sum(Payment.payment_sum_rub * 0.3))
+                .join(Courier, Courier.courier_id == Payment.payer_id)
+                .where(Courier.partner_id == partner.partner_id)
+            )
+
+            return int(total_earnings or 0)
 
 
 class OrderData:

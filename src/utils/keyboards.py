@@ -181,6 +181,43 @@ class Keyboard:
                     ],
                 ]
             ),
+            # ---
+            "key": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="В другой раз 🕒",
+                            callback_data="not_now",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Ввести PROMOKOD",
+                            callback_data="PROMOKOD",
+                        ),
+                    ],
+                ]
+            ),
+            "make_order": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Сделать заказ",
+                            callback_data="make_order",
+                        )
+                    ]
+                ]
+            ),
+            "try_seed_again": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Ввести PROMOKOD еще раз",
+                            callback_data="PROMOKOD",
+                        )
+                    ]
+                ]
+            ),
         }
 
         return kb[key]

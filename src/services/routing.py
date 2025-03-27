@@ -53,7 +53,7 @@ class RouteMaster:
         base_url = "https://geocode-maps.yandex.ru/1.x/"
         params = {"apikey": api_key, "geocode": address, "format": "json"}
 
-        log.info(f"counter: {counter}")
+        log.info(f"yandex_api_counter: {counter}")
 
         try:
             response = requests.get(base_url, params=params)
@@ -162,8 +162,9 @@ class RouteMaster:
 
         total_coefficient = city_coefficient * time_coefficient * distance_coefficient
         total_price = base_price_per_km * distance * total_coefficient
+        price = int(total_price + over_price)
 
-        return int(total_price + over_price)
+        return price
 
 
 route = RouteMaster()

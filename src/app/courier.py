@@ -23,6 +23,7 @@ from ._deps import (
     title,
     courier_bot_id,
     order_data,
+    partner_data,
     admin_data,
     rediska,
     cities,
@@ -235,7 +236,7 @@ async def data_city_courier(
         reply_kb = await kb.get_courier_kb("accept_tou")
         text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
-            f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+            f"<a href='https://drive.google.com/file/d/16NYgi7_7GL830A4xwaeHBYsYKyduOiSS/view?usp=drive_link'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
             f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
             f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -282,7 +283,7 @@ async def courier_accept_tou(
 
     tou_text = (
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -340,6 +341,7 @@ async def courier_accept_tou(
             ),
             reply_markup=reply_kb,
             disable_notification=True,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -1605,13 +1607,13 @@ async def change_city(
 
 
 @courier_r.message(
-    F.text == "/faq",
+    F.text == "/info",
 )
-async def cmd_faq(
+async def cmd_info(
     message: Message,
     state: FSMContext,
 ):
-    """Обрабатывает запрос на просмотр FAQ. /faq"""
+    """Обработчик команды /info."""
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
@@ -1620,14 +1622,16 @@ async def cmd_faq(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     text = (
-        f"🤔 <b>Вопросы и ответы</b>\n\n"
-        f"Частые вопросы и ответы на них "
-        f"<a href='https://drive.google.com/file/d/1cXYK_FqU7kRpTU9p04dVjcE4vRbmNvMw/view?usp=sharing'>FAQ</a>"
+        f"ℹ️ <b>Информация</b>\n\n"
+        f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
+        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
+        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
     )
 
     await message.answer(
         text,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -1650,7 +1654,7 @@ async def cmd_rules(
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://drive.google.com/file/d/1iKhjWckZhn54aYWjDFLQXL46W6J0NhhC/view?usp=sharing'>"
+        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -1661,6 +1665,7 @@ async def cmd_rules(
     await message.answer(
         text,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -2023,6 +2028,11 @@ async def successful_payment(
     tg_id = message.from_user.id
 
     try:
+
+        _ = await courier_data.set_payment(
+            tg_id, message.successful_payment.total_amount
+        )
+
         is_updated = await courier_data.update_courier_subscription(
             tg_id=tg_id, days=30
         )
