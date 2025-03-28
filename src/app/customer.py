@@ -14,12 +14,15 @@ from ._deps import (
     zlib,
     handler,
     customer_bot,
+    orders_bot,
+    orders_bot_id,
     customer_bot_id,
     customer_r,
     customer_fallback,
     kb,
     title,
     customer_data,
+    admin_data,
     order_data,
     recognizer,
     rediska,
@@ -306,11 +309,22 @@ async def customer_accept_tou(
         tg_id,
         True,
     )
+
+    username = callback_query.from_user.username
+
+    if username:
+        user_link = f"https://t.me/{username}"
+    else:
+        user_link = f"tg://user?id={callback_query.from_user.id}"
+
+    customer_tg_link = f"<a href='{user_link}'>@{username if username else 'User'}</a>"
+
     is_set_customer_to_db = await customer_data.set_customer(
         tg_id,
         customer_name,
         customer_phone,
         customer_city,
+        customer_tg_link,
         accept_tou,
     )
 
@@ -343,6 +357,7 @@ async def customer_accept_tou(
             ),
             reply_markup=reply_kb,
             disable_notification=True,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -503,20 +518,56 @@ async def _process_order_logic(
 
     customer_discount = await customer_data.get_customer_discount(tg_id)
 
-    order_info = await formatter.format_order_form(
+    username = message.from_user.username
+
+    if username:
+        user_link = f"https://t.me/{username}"
+    else:
+        user_link = f"tg://user?id={message.from_user.id}"
+
+    customer_tg_link = f"<a href='{user_link}'>@{username if username else 'User'}</a>"
+
+    await customer_data.set_customer_tg_link(
+        tg_id=tg_id,
+        tg_link=customer_tg_link,
+    )
+
+    order_info_data = await formatter.format_order_form(
         prepare_dict,
+        customer_tg_link,
         customer_discount,
     )
-    reply_kb = await kb.get_customer_kb("voice_order_accept")
 
-    await wait_message.delete()
+    show_discount = False
+
+    if len(order_info_data) == 3:
+        order_info, price, discount_price = order_info_data
+        show_discount = True
+
+    elif len(order_info_data) == 1:
+        order_info = order_info_data[0]
+        show_discount = False
+
+    reply_kb = await kb.get_customer_kb("voice_order_accept")
 
     await message.answer(
         text=order_info,
         reply_markup=reply_kb,
         disable_notification=False,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
+
+    if show_discount:
+
+        await message.answer(
+            text=f"🪙 Ваша скидка 50% = <s>{price}₽</s> {discount_price}₽",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    if wait_message:
+        await wait_message.delete()
 
     await state.set_state(current_state)
     await state.update_data(current_order_info=(prepare_dict, order_info))
@@ -544,7 +595,8 @@ async def _handle_error_response(
 
     reply_kb = await kb.get_customer_kb("rerecord")
 
-    await wait_message.delete()
+    if wait_message:
+        await wait_message.delete()
 
     await message.answer(
         error_messages[error_key],
@@ -604,6 +656,7 @@ async def set_order_to_db(
             f"<i>*Информацию о заказах можно посмотреть в разделе</i> <b>Мои заказы</b>.\n\n"
             f"▼ <b>Выберите действие в Меню ...</b>"
         )
+
     except Exception as e:
         log.error(f"Ошибка при создании заказа: {str(e)}")
         text = "‼️ Ошибка при создании заказа.\n" "Попробуйте повторить заказ."
@@ -613,7 +666,7 @@ async def set_order_to_db(
         )
 
     await callback_query.message.answer(
-        text,
+        text=text,
         disable_notification=True,
         parse_mode="HTML",
     )
@@ -699,7 +752,9 @@ async def cmd_order(
 
         if isinstance(event, Message) and skip_counter in indexes_of_retry:
 
-            text = f"Введите PROMOKOD и получите <b>50% скидку</b> на текущий заказ"
+            discount_offer = await admin_data.get_first_order_discount()
+
+            text = f"Введите PROMOKOD и получите <b>{discount_offer}% скидку</b> на текущий заказ"
             reply_kb = await kb.get_customer_kb("key")
 
             await event.answer(
@@ -730,8 +785,8 @@ async def cmd_order(
 
     else:
 
-        if isinstance(event, CallbackQuery):
-            await event.message.delete()
+        # if isinstance(event, CallbackQuery):
+        #     await event.message.delete()
 
         current_state = CustomerState.default.state
         photo_title = await title.get_title_customer("/order")
@@ -839,16 +894,18 @@ async def data_PROMOKOD(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
-    seed_key = message.text
+    seed_key = message.text.upper()
 
     is_set_key = await customer_data.set_customer_seed_key(tg_id, seed_key)
 
     log.info(f"is_set_key: {is_set_key}")
 
+    discount_offer = await admin_data.get_first_order_discount()
+
     if is_set_key:
         text = "✅ PROMOKOD успешно установлен!\n\nСкидка на следующий заказ <b>50%</b>"
         reply_kb = await kb.get_customer_kb("make_order")
-        await customer_data.set_customer_discount(tg_id, 50)
+        await customer_data.set_customer_discount(tg_id, discount_offer)
     else:
         text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
         reply_kb = await kb.get_customer_kb("try_seed_again")
@@ -1241,6 +1298,7 @@ async def get_my_orders(
         orders_data[first_order_id]["text"],
         reply_markup=reply_kb,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -1292,6 +1350,7 @@ async def handle_order_navigation(
         await callback_query.message.edit_text(
             orders_data[current_order_id]["text"],
             reply_markup=callback_query.message.reply_markup,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 

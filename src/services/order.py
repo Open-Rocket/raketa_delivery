@@ -72,7 +72,11 @@ class OrderFormatter:
         }
 
     @staticmethod
-    async def format_order_form(data: dict, discount: int = 0) -> str:
+    async def format_order_form(
+        data: dict,
+        customer_link,
+        discount: int = 0,
+    ) -> tuple:
         """Форматирует и возвращает текст заказа на основе подготовленных данных."""
         (
             city,
@@ -88,25 +92,32 @@ class OrderFormatter:
         ) = [data[key] for key in data.keys()]
 
         if discount:
-            price = f"<s>{price}₽</s> {int(price - price * discount / 100)}₽"
+            plus_price = int(price * 1.0)
+            price = f"{int(plus_price - discount * plus_price / 100)}"
 
         order_forma = (
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
-            f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n\n"
+            f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n"
+            f"<b>Telegram:</b> {customer_link}\n\n"
             f"{addresses_text}\n\n"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
-            f"<b>Стоимость доставки:</b> {price}\n\n"
+            f"<b>Стоимость доставки:</b> {price}₽\n"
+            f"<i>Оплата наличными или переводом!\n\n</i>"
             f"<b>Описание:</b> {description}\n\n"
-            f"------------------------------------------\n"
-            f"• Проверьте ваш заказ и если все верно, то разместите.\n"
-            f"• Курьер может связаться с вами для уточнения деталей!\n"
-            f"• Оплачивайте курьеру наличными или переводом.\n\n"
             f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
         )
 
-        return order_forma
+        return (
+            (
+                order_forma,
+                plus_price,
+                price,
+            )
+            if discount
+            else (order_forma,)
+        )
 
 
 class MessageRecognizer:

@@ -35,6 +35,7 @@ class CustomerData:
         name: str,
         phone: str,
         city: str,
+        tg_link: str,
         tou: str,
     ) -> bool:
         """Добавляет в БД нового клиента"""
@@ -45,6 +46,7 @@ class CustomerData:
                     customer_name=name,
                     customer_phone=phone,
                     customer_city=city,
+                    customer_tg_link=tg_link,
                     customer_accept_terms_of_use=tou,
                     customer_registration_date=await Time.get_moscow_time(),
                 )
@@ -160,6 +162,26 @@ class CustomerData:
             customer_discount = customer.customer_discount
             return customer_discount if customer_discount else 0
 
+    # ---
+
+    async def set_customer_tg_link(self, tg_id: int, tg_link: str) -> bool:
+        """Устанавливает ссылку на клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            customer.customer_tg_link = tg_link
+            await session.commit()
+
+    async def get_customer_tg_link(self, tg_id: int) -> str:
+        """Возвращает ссылку на клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            customer_link = customer.customer_tg_link
+            return customer_link if customer_link else "..."
+
 
 class CourierData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
@@ -196,7 +218,16 @@ class CourierData:
                 log.error(f"Ошибка при добавлении курьера: {e}")
                 return False
 
+    async def get_courier_id(self, tg_id: int) -> int:
+        """Возвращает id курьера по tg_id"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            return courier.courier_id if courier else 0
+
     # ---
+
     async def change_order_active_count(self, tg_id: int, count: int) -> bool:
         """Изменяет счетчик активных заказов курьера на count"""
 
@@ -508,6 +539,62 @@ class CourierData:
                 log.error(f"Ошибка при добавлении платежа: {e}")
                 return False
 
+    # ---
+
+    async def set_courier_seed_key(self, tg_id: int, seed_key: str) -> bool:
+        """Привязывает seed ключ к курьеру"""
+
+        async with self.async_session_factory() as session:
+
+            seed_key_obj = await session.execute(
+                select(SeedKey).where(SeedKey.seed_key == seed_key)
+            )
+            seed_key_obj = seed_key_obj.scalar_one_or_none()
+
+            log.info(f"seed_key_obj: {seed_key_obj}")
+
+            if not seed_key_obj.seed_key:
+                log.info(f"seed_key_obj.seed_key: {seed_key_obj.seed_key}")
+                return False
+
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+
+            if courier:
+                log.info(f"courier: {courier.courier_id}")
+                courier.seed_key_id = seed_key_obj.seed_key_id
+                courier.partner_id = seed_key_obj.partner_id
+                await session.flush()
+                await session.commit()
+                return True
+
+            return False
+
+    async def get_courier_seed_key(self, tg_id: int) -> Optional[str]:
+        """Возвращает seed ключ курьера"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if courier:
+                seed_key = await session.scalar(
+                    select(SeedKey.seed_key).where(
+                        SeedKey.partner_id == courier.partner_id
+                    )
+                )
+                return seed_key
+
+    async def is_set_key(self, tg_id: int) -> bool:
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if courier:
+                if courier.seed_key_id:
+                    return True
+                return False
+
 
 class AdminData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
@@ -725,6 +812,22 @@ class AdminData:
 
     # ---
 
+    async def get_profit(self) -> int:
+        """Возвращает прибыль сервиса"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(func.sum(Payment.payment_sum_rub)))
+            profit = result.scalar_one_or_none()
+            return profit if profit else 0
+
+    async def get_turnover(self) -> int:
+        """Возвращает оборот сервиса"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(func.sum(Order.price_rub)))
+            turnover = result.scalar_one_or_none()
+            return turnover if turnover else 0
+
+    # ---
+
     async def get_all_users(self) -> tuple:
         """Возвращает количество всех пользователей"""
         async with self.async_session_factory() as session:
@@ -904,6 +1007,23 @@ class PartnerData:
 
             return int(total_earnings or 0)
 
+    async def get_paid_subscriptions_count(self, tg_id: int) -> int:
+        """Возвращает количество оплаченных подписок курьеров, привязанных к партнеру"""
+        async with self.async_session_factory() as session:
+            partner = await session.scalar(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+            if not partner:
+                return 0
+
+            paid_count = await session.scalar(
+                select(func.count(Payment.payment_id))
+                .join(Courier, Courier.courier_id == Payment.payer_id)
+                .where(Courier.partner_id == partner.partner_id)
+            )
+
+            return int(paid_count or 0)
+
 
 class OrderData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
@@ -1069,6 +1189,7 @@ class OrderData:
         self,
         order_id: int,
         new_status: OrderStatus,
+        speed_kmh: float,
     ) -> bool:
         """Обновляет статус заказа и время завершения его выполнения"""
 
@@ -1080,6 +1201,7 @@ class OrderData:
 
             order.order_status = new_status
             order.completed_at_moscow_time = await Time.get_moscow_time()
+            order.speed_kmh = speed_kmh
 
             await session.flush()
             await session.commit()

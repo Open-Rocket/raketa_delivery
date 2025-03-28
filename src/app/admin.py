@@ -84,10 +84,12 @@ async def cmd_users(
 
     customers, couriers, partners = await admin_data.get_all_users()
 
+    all_users = len(customers) + len(couriers) + len(partners)
+
     text = (
         f"<b>👥 Пользователи</b>\n\n"
         f"Здесь вы можете посмотреть основную статистику по пользователям платформы.\n\n"
-        f" - Всего пользователей: <b>{len(customers) + len(couriers)}</b>\n"
+        f" - Всего пользователей: <b>{all_users}</b>\n"
         f" - Клиентов: <b>{len(customers)}</b>\n"
         f" - Курьеров: <b>{len(couriers)}</b>\n"
         f" - Партнеров: <b>{len(partners)}</b>\n\n"
@@ -253,12 +255,31 @@ async def cmd_global(
     discount_percent_courier = await admin_data.get_discount_percent_courier()
     discount_percent_first_order = await admin_data.get_first_order_discount()
     free_period_days = await admin_data.get_free_period_days()
+    customers, couriers, partners = await admin_data.get_all_users()
+    all_users = len(customers) + len(couriers) + len(partners)
+    profit = await admin_data.get_profit()
+    turnover = await admin_data.get_turnover()
+    (
+        all_orders,
+        _,
+        _,
+        _,
+        _,
+    ) = await order_data.get_all_orders()
+
+    superadmin_data = (
+        f" - Пользователей: <b>{all_users}</b>\n"
+        f" - Всего заказов: <b>{len(all_orders)}</b>\n"
+        f" - Прибыль: <b>{profit}₽</b>\n"
+        f" - Оборот: <b>{profit}₽</b>\n\n"
+    )
 
     text = (
         f"<b>🌎 Глобальное управление сервисом</b>\n\n"
         f"Здесь вы можете управлять всеми настройками сервиса и получать актуальную информацию.\n\n"
         f"<b>⚙️ Сервис и Данные</b>\n"
-        f" - Текущее состояние сервиса: <b>{'Активен' if service_status else 'На профилактике'}</b>\n\n"
+        f" - Текущее состояние сервиса: <b>{'Активен' if service_status else 'На профилактике'}</b>\n"
+        f"{superadmin_data if tg_id == SUPER_ADMIN_TG_ID else ''}"
         f"<b>💰 Цены и Тарифы</b>\n"
         f" - Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" - Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
@@ -303,3 +324,7 @@ async def cmd_global(
     await state.update_data(message_text_global=text, message_kb_global=new_kb_json)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+
+
+# ---
+# ---

@@ -117,6 +117,7 @@ class Customer(Base):
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_city: Mapped[stringData]
+    customer_tg_link: Mapped[stringData]
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
@@ -235,6 +236,7 @@ class Order(Base):
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     started_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    speed_kmh = Mapped[floatData]
 
     order_city: Mapped[stringData]
 
@@ -285,7 +287,6 @@ class Payment(Base):
     payment_sum_rub: Mapped[intData] = mapped_column(Integer, nullable=False)
 
     payer_id: Mapped[int]
-    receiver_id: Mapped[int]
 
     payer = relationship("Courier", back_populates="payment")
 

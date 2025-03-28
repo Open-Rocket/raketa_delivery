@@ -18,6 +18,7 @@ from ._deps import (
     courier_r,
     courier_fallback,
     courier_data,
+    customer_data,
     payment_r,
     kb,
     title,
@@ -265,9 +266,7 @@ async def data_city_courier(
     )
 
 
-@courier_r.callback_query(
-    F.data == "accept_tou",
-)
+@courier_r.callback_query(F.data == "accept_tou")
 async def courier_accept_tou(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -313,14 +312,13 @@ async def courier_accept_tou(
 
     if is_set_reg and is_set_courier_to_db:
 
-        await callback_query.answer("✅ Принято", show_alert=False)
+        await callback_query.answer("PROMOKOD", show_alert=False)
 
         free_period = await courier_data.get_free_period()
 
-        text = (
-            f"<b>Как новому курьеру вам доступен\n{free_period}-дневный бесплатный период!</b> 🚀\n\n"
-            f"Попробуйте все возможности сервиса и начинайте зарабатывать уже сейчас! ✨"
-        )
+        text = f"Введите PROMOKOD и получите <b>{free_period} дней</b> бесплатного периода!"
+
+        reply_kb = await kb.get_courier_kb("key")
 
         new_message = await callback_query.message.answer(
             text=text,
@@ -348,6 +346,86 @@ async def courier_accept_tou(
     await handler.catch(
         bot=courier_bot,
         chat_id=callback_query.message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
+
+
+@courier_r.callback_query(
+    F.data == "PROMOKOD",
+)
+@courier_r.callback_query(F.data == "try_seed_again")
+async def data_set_PROMOKOD(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'PROMOKOD' для курьера."""
+
+    await callback_query.answer("% PROMOKOD", show_alert=False)
+
+    current_state = CourierState.set_seed_key.state
+    tg_id = callback_query.from_user.id
+
+    text = f"Ваш PROMOKOD:"
+
+    new_message = await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=courier_bot,
+        chat_id=callback_query.message.chat.id,
+        user_id=tg_id,
+        new_message=new_message,
+        current_message=None,
+        delete_previous=True,
+    )
+
+
+@courier_r.message(filters.StateFilter(CourierState.set_seed_key))
+async def data_PROMOKOD(
+    message: Message,
+    state: FSMContext,
+):
+    current_state = CourierState.reg_state.state
+    tg_id = message.from_user.id
+    seed_key = message.text.upper()
+
+    log.info(f"seed_key: {seed_key}")
+
+    free_period = await courier_data.get_free_period()
+    is_set_key = await courier_data.set_courier_seed_key(tg_id, seed_key)
+
+    log.info(f"is_set_key: {is_set_key}")
+
+    if is_set_key:
+        text = f"✅ PROMOKOD успешно установлен!\n\nАктивируйте бесплатный {free_period} дневный период и начните работу!"
+        reply_kb = await kb.get_courier_kb("super_go")
+
+    else:
+        text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
+        reply_kb = await kb.get_courier_kb("try_seed_again")
+
+    new_message = await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    await handler.catch(
+        bot=courier_bot,
+        chat_id=message.chat.id,
         user_id=tg_id,
         new_message=new_message,
         current_message=None,
@@ -434,6 +512,10 @@ async def cmd_run(
     state: FSMContext,
 ):
     """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
+
+    if isinstance(event, CallbackQuery):
+        await event.answer("🚀 Начать работу", show_alert=False)
+        await event.message.delete()
 
     tg_id = event.from_user.id
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
@@ -696,7 +778,7 @@ async def show_nearby_orders(
     current_state = CourierState.nearby_Orders.state
 
     data = await state.get_data()
-    order_data = data.get("order_data", {})
+    order_data: dict = data.get("order_data", {})
     nearby_orders = order_data.get("nearby_orders", {})
 
     tg_id = callback_query.from_user.id
@@ -735,6 +817,7 @@ async def show_nearby_orders(
         await callback_query.message.edit_text(
             nearby_orders_data[first_order_id]["text"],
             reply_markup=reply_markup,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -760,7 +843,7 @@ async def show_city_orders(
     current_state = CourierState.city_Orders.state
 
     data = await state.get_data()
-    order_data = data.get("order_data", {})
+    order_data: dict = data.get("order_data", {})
     city_orders = order_data.get("city_orders", {})
 
     tg_id = callback_query.from_user.id
@@ -799,6 +882,7 @@ async def show_city_orders(
     await callback_query.message.edit_text(
         orders_data[first_order_id]["text"],
         reply_markup=reply_markup,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -865,6 +949,7 @@ async def handle_order_navigation_city(
     await callback_query.message.edit_text(
         city_orders_data[new_order_id]["text"],
         reply_markup=reply_markup,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -927,6 +1012,7 @@ async def handle_order_navigation_nearby(
     await callback_query.message.edit_text(
         nearby_orders_data[new_order_id]["text"],
         reply_markup=reply_markup,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -957,8 +1043,8 @@ async def accept_order(
     current_order_id = int(data.get("current_order_id"))
     courier_name, courier_phone, _ = await courier_data.get_courier_info(tg_id)
 
-    customer_name, customer_phone, _ = await order_data.get_customer_info_by_order_id(
-        current_order_id
+    customer_name, customer_phone, customer_tg_id = (
+        await order_data.get_customer_info_by_order_id(current_order_id)
     )
 
     if not order_ids:
@@ -990,7 +1076,8 @@ async def accept_order(
             new_status=OrderStatus.IN_PROGRESS,
         )
 
-        customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
+        # customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
+        customer_tg_link = await customer_data.get_customer_tg_link(customer_tg_id)
         await customer_bot.send_message(
             chat_id=customer_tg_id,
             text=(
@@ -1008,7 +1095,9 @@ async def accept_order(
         text = (
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
             f"Заказчик: {customer_name}\n"
-            f"Телефон: {customer_phone}\n\n"
+            f"Телефон: {customer_phone}\n"
+            f"Telegram: {customer_tg_link}\n\n"
+            f"<i>*Принимайте оплату наличными или переводом!</i>\n\n"
             f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
             f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>"
         )
@@ -1017,6 +1106,7 @@ async def accept_order(
 
         await callback_query.message.answer(
             text=text,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -1108,6 +1198,7 @@ async def complete_order(
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             new_status=OrderStatus.COMPLETED,
+            speed_kmh=speed,
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 
@@ -1310,6 +1401,7 @@ async def get_my_orders(
         orders_data[first_order_id]["text"],
         reply_markup=reply_markup,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -1363,6 +1455,7 @@ async def handle_order_navigation(
     await callback_query.message.edit_text(
         orders_data[next_order_id]["text"],
         reply_markup=callback_query.message.reply_markup,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -1716,7 +1809,7 @@ async def cmd_become_partner(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     text = (
-        f"💼 <b>Станьте партнёром Raketa Delivery!</b>\n\n"
+        f"💼 <b>Станьте партнёром Raketa!</b>\n\n"
         f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
         f"🔹 Приглашайте курьеров и получайте <b>30% с их подписки</b>\n"
         f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
@@ -1729,39 +1822,6 @@ async def cmd_become_partner(
     await message.answer_photo(
         photo=ttl,
         caption=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-
-@courier_r.message(
-    F.text == "/chat",
-)
-async def cmd_courier_chat(
-    message: Message,
-    state: FSMContext,
-):
-    """Обрабатывает запрос на переход в чат курьеров. /chat"""
-
-    current_state = CourierState.default.state
-    tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-    text = (
-        f"💬 <b>Чат курьеров Raketa Delivery</b>\n\n"
-        f"🔹 <b>Общайтесь</b> с другими курьерами, делитесь опытом и советами\n"
-        f"🔹 <b>Обсуждайте заказы</b> и находите оптимальные маршруты\n"
-        f"🔹 <b>Следите за новостями</b> сервиса и узнавайте полезные фишки\n\n"
-        f"🚀 <b>Присоединяйтесь, задавайте вопросы и зарабатывайте вместе с Raketa!</b>"
-    )
-
-    reply_kb = await kb.get_courier_kb("/chat")
-
-    await message.answer(
-        text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
@@ -2029,8 +2089,13 @@ async def successful_payment(
 
     try:
 
+        courier_id = await courier_data.get_courier_id(tg_id)
+
+        sum = message.successful_payment.total_amount // 100
+
         _ = await courier_data.set_payment(
-            tg_id, message.successful_payment.total_amount
+            courier_id,
+            sum,
         )
 
         is_updated = await courier_data.update_courier_subscription(

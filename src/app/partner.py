@@ -383,39 +383,63 @@ async def partner_generate_seed(
 # ---
 
 
-@partner_r.message(
-    F.text == "/refs",
-)
-async def cmd_refs(
-    message: Message,
-    state: FSMContext,
-):
+@partner_r.message(F.text == "/refs")
+@partner_r.callback_query(F.data == "refresh_refs")
+async def cmd_refs(event: Message | CallbackQuery, state: FSMContext):
     """Обрабатывает команду /refs"""
 
-    tg_id = message.from_user.id
+    tg_id = event.from_user.id
     current_state = PartnerState.default.state
 
     customers, couriers = await partner_data.get_all_my_seed_key_referrals(tg_id=tg_id)
+    paid_subscriptions = await partner_data.get_paid_subscriptions_count(tg_id=tg_id)
+    total_earnings = await partner_data.get_my_all_time_earn(tg_id=tg_id)
+    total_refs = len(customers) + len(couriers)
 
     text = (
-        f"<b>👥 Пользователи</b>\n\n"
-        f"Здесь вы можете посмотреть основную статистику о пользователях, которых вы привлекли в сервис.\n\n"
-        f" - Вы привлекли пользователей: <b>{len(customers) + len(couriers)}</b>\n"
+        f"<b>👥 Рефералы</b>\n\n"
+        f"Здесь вы можете посмотреть основную статистику о рефералах, которых вы привлекли в сервис.\n\n"
+        f" - Вы привлекли пользователей: <b>{total_refs}</b>\n"
         f" - Клиентов: <b>{len(customers)}</b>\n"
         f" - Курьеров: <b>{len(couriers)}</b>\n"
-        f" - Оплачено подписок: <b>{0}</b>\n"
-        f" - % оплат от общего числа: <b>{0}</b>\n"
-        f" - Общий заработок: <b>{0}</b>\n\n"
+        f" - Оплачено подписок: <b>{paid_subscriptions}</b>\n"
+        f" - Общий заработок: <b>{total_earnings}₽</b>\n\n"
     )
 
-    await message.answer(
-        text=text,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
+    reply_kb = await kb.get_partner_kb("refresh_refs")
+
+    state_data = await state.get_data()
+    saved_text = state_data.get("message_text_refs")
+    saved_kb = state_data.get("message_kb_refs")
+
+    new_kb_json = json.dumps(reply_kb.model_dump())
+
+    if isinstance(event, Message):
+        await event.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    elif isinstance(event, CallbackQuery):
+
+        await event.answer(
+            text="🔄 Обновление данных...",
+            show_alert=False,
+        )
+
+        if saved_text != text or saved_kb != new_kb_json:
+            await event.message.edit_text(
+                text=text,
+                reply_markup=reply_kb,
+                parse_mode="HTML",
+            )
 
     await state.set_state(current_state)
+    await state.update_data(message_text_refs=text, message_kb_refs=new_kb_json)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
+    await rediska.save_fsm_state(state, partner_bot_id, tg_id)
 
 
 @partner_r.message(
@@ -484,37 +508,56 @@ async def cmd_info(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.message(
-    F.text == "/balance",
-)
-async def cmd_balance(
-    message: Message,
-    state: FSMContext,
-):
+@partner_r.message(F.text == "/balance")
+@partner_r.callback_query(F.data == "refresh_balance")
+async def cmd_balance(event: Message | CallbackQuery, state: FSMContext):
     """Обрабатывает команду /balance"""
 
-    tg_id = message.from_user.id
+    tg_id = event.from_user.id
     current_state = PartnerState.default.state
 
-    balance = await partner_data.get_my_balance(tg_id)
+    balance = await partner_data.get_partner_balance(tg_id)
 
     text = (
         f"📊 <b>Текущий баланс</b>\n\n"
         f"Здесь вы можете посмотреть ваш текущий баланс с момента последней выплаты.\n\n"
-        f"🔸 <b>Баланс:</b> <b>20000 ₽</b>\n"
+        f"🔸 <b>Баланс:</b> <b>{balance}₽</b>\n"
     )
 
     reply_kb = await kb.get_partner_kb("earn_request")
 
-    await message.answer(
-        text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
+    state_data = await state.get_data()
+    saved_text = state_data.get("message_text_balance")
+    saved_kb = state_data.get("message_kb_balance")
+
+    new_kb_json = json.dumps(reply_kb.model_dump())
+
+    if isinstance(event, Message):
+        await event.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    elif isinstance(event, CallbackQuery):
+
+        await event.answer(
+            text="🔄 Обновление баланса...",
+            show_alert=False,
+        )
+
+        if saved_text != text or saved_kb != new_kb_json:
+            await event.message.edit_text(
+                text=text,
+                reply_markup=reply_kb,
+                parse_mode="HTML",
+            )
 
     await state.set_state(current_state)
+    await state.update_data(message_text_balance=text, message_kb_balance=new_kb_json)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
+    await rediska.save_fsm_state(state, partner_bot_id, tg_id)
 
 
 # ---
@@ -867,10 +910,19 @@ async def data_earn(
     current_state = PartnerState.default.state
     tg_id = callback_query.from_user.id
 
-    text = (
-        f"✅ Ваш запрос принят!\n\n"
-        f"С вами свяжется наш менеджер для уточнения деталей.\n\n"
-    )
+    balance = await partner_data.get_partner_balance(tg_id)
+
+    if balance < 1000:
+        text = (
+            f"🚫 <b>Минимальная сумма вывода:</b> 1000₽\n\n"
+            f"Ваш текущий баланс: <b>{balance}₽</b>\n\n"
+            f"Приглашайте больше клиентов и курьеров, чтобы увеличить свой доход!\n\n"
+        )
+    else:
+        text = (
+            f"✅ Ваш запрос принят!\n\n"
+            f"С вами свяжется наш менеджер для уточнения деталей.\n\n"
+        )
 
     await callback_query.message.answer(
         text=text,

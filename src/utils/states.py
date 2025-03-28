@@ -31,6 +31,8 @@ class CourierState(StatesGroup):
 
     default = State()
 
+    set_seed_key = State()
+
     reg_state = State()
     reg_Name = State()
     reg_Phone = State()

@@ -138,6 +138,7 @@ async def _check_state_and_handle_message(
         CourierState.reg_Phone.state,
         CourierState.reg_City.state,
         CourierState.reg_tou.state,
+        CourierState.set_seed_key.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await event.delete()
