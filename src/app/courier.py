@@ -12,6 +12,7 @@ from ._deps import (
     LabeledPrice,
     zlib,
     Time,
+    json,
     courier_bot,
     courier_bot_id,
     handler,
@@ -479,7 +480,7 @@ async def data_PROMOKOD(
         if end_date and end_date >= moscow_time:
             remaining_days = (end_date - moscow_time).days
             subscription_status = (
-                f"<b>Подписка:</b> Активна 🚀\n\n"
+                f"<b>Подписка:</b> Активна 🚀\n"
                 f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
                 f"🕒 Осталось дней: {remaining_days}\n\n"
             )
@@ -518,8 +519,14 @@ async def cmd_run(
     """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
 
     if isinstance(event, CallbackQuery):
+        # Проверяем, что событие содержит сообщение, прежде чем пытаться его удалить
+        if event.message:
+            try:
+                await event.message.delete()  # Попытка удалить сообщение
+            except Exception as e:
+                log.error(f"Ошибка удаления сообщения: {e}")
+
         await event.answer("🚀 Начать работу", show_alert=False)
-        await event.message.delete()
 
     current_state = CourierState.default.state
     tg_id = event.from_user.id
@@ -531,9 +538,7 @@ async def cmd_run(
     log.info(f"end_date: {end_date}")
 
     if end_date and end_date >= moscow_time:
-
         if is_read_info:
-
             if isinstance(event, CallbackQuery):
                 await event.answer("🚀 Начать работу", show_alert=False)
 
@@ -545,7 +550,6 @@ async def cmd_run(
             reply_kb = await kb.get_courier_kb("/run")
 
             if current_active_orders_count < 3:
-
                 text = (
                     f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
                     f"<i>*Доступно только с мобильных устройств</i>\n\n"
@@ -558,11 +562,8 @@ async def cmd_run(
                     disable_notification=True,
                     parse_mode="HTML",
                 )
-
             else:
-
                 current_state = CourierState.default.state
-
                 text = (
                     "Вы уже выполняете максимальное количество заказов.\n\n"
                     "Пожалуйста, завершите текущие заказы, чтобы начать новые."
@@ -574,9 +575,7 @@ async def cmd_run(
                     disable_notification=True,
                     parse_mode="HTML",
                 )
-
         else:
-
             current_state = CourierState.default.state
 
             ttl = await title.get_title_courier("first_run")
@@ -609,7 +608,6 @@ async def cmd_run(
                 delete_previous=True,
             )
     else:
-
         reply_kb = await kb.get_courier_kb("pay_sub")
         text = "‼️ Ваша подписка не активна, пожалуйста, оплатите подписку."
 
@@ -654,24 +652,29 @@ async def get_location(
 
     if isinstance(event, CallbackQuery):
 
-        data = await state.get_data()
-        order_info: dict = data.get("order_data", {})
-        nearby_orders = order_info.get("nearby_orders", {})
-        city_orders = order_info.get("city_orders", {})
+        if event.data == "refresh_orders" or event.data == "back_location":
+
+            my_lat, my_lon = await courier_data.get_courier_last_location(courier_tg_id)
+            radius_km = 5
+
+            nearby_orders = await order_data.get_nearby_orders(
+                my_lat, my_lon, radius_km
+            )
+            city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
     else:
-
-        my_lon = event.location.longitude
         my_lat = event.location.latitude
+        my_lon = event.location.longitude
         radius_km = 5
 
-        nearby_orders = await order_data.get_nearby_orders(
+        nearby_orders = await order_data.get_nearby_orders(my_lat, my_lon, radius_km)
+        city_orders = await order_data.get_pending_orders_in_city(courier_city)
+
+        _ = await courier_data.update_courier_location(
+            tg_id,
             my_lat,
             my_lon,
-            radius_km,
         )
-
-        city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
     text = (
         f"<b>📋 Заказы</b>\n\n"
@@ -685,23 +688,54 @@ async def get_location(
         available_orders_len=len(nearby_orders),
     )
 
-    if isinstance(event, CallbackQuery):
+    # Сохраняем данные состояния для сравнения
+    state_data = await state.get_data()
+    saved_text = state_data.get("message_text_orders")
+    saved_kb = state_data.get("message_kb_orders")
 
-        await event.message.edit_text(
-            text=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
+    new_kb_json = json.dumps(reply_kb.model_dump())
+
+    if isinstance(event, CallbackQuery):
+        if event.data == "back_location":
+            await event.answer(
+                text="↩️ Назад",
+                show_alert=False,
+            )
+
+            # Обновляем сообщение с заказами
+            await event.message.edit_text(
+                text=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+                parse_mode="HTML",
+            )
+
+        if (
+            event.data == "refresh_orders"
+            or saved_text != text
+            or saved_kb != new_kb_json
+        ):
+            await event.answer(
+                text="🔄 Обновление данных...",
+                show_alert=False,
+            )
+
+            # Проверяем, что контент действительно изменился, прежде чем обновлять сообщение
+            if saved_text != text or saved_kb != new_kb_json:
+                await event.message.edit_text(
+                    text=text,
+                    reply_markup=reply_kb,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
 
     else:
-
         if event.location.live_period:
             await event.answer(
                 text=(
-                    f"Локация не принята!\n"
-                    f"Пожалуйста, отправьте статичную локацию!\n\n"
-                    f"<i>*Доступно только с мобильных устройств</i>"
+                    "Локация не принята!\n"
+                    "Пожалуйста, отправьте статичную локацию!\n\n"
+                    "<i>*Доступно только с мобильных устройств</i>"
                 ),
                 reply_markup=ReplyKeyboardRemove(),
                 disable_notification=True,
@@ -722,13 +756,15 @@ async def get_location(
             parse_mode="HTML",
         )
 
-        await state.set_state(current_state)
-        await state.update_data(
-            order_data={
-                "nearby_orders": nearby_orders,
-                "city_orders": city_orders,
-            },
-        )
+    await state.set_state(current_state)
+    await state.update_data(
+        message_text_orders=text,
+        message_kb_orders=new_kb_json,
+        order_data={
+            "nearby_orders": nearby_orders,
+            "city_orders": city_orders,
+        },
+    )
     await rediska.set_state(courier_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, courier_bot_id, courier_tg_id)
 
@@ -1453,7 +1489,11 @@ async def cmd_profile(
 
     if end_date and end_date >= moscow_time:
         remaining_days = (end_date - moscow_time).days
-        subscription_status = f"<b>Подписка:</b> Активна 🚀\n📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n🕒 Осталось дней: {remaining_days}\n\n"
+        subscription_status = (
+            f"<b>Подписка:</b> Активна 🚀\n"
+            f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
+            f"🕒 Осталось дней: {remaining_days}\n\n"
+        )
     else:
         subscription_status = "<b>Подписка:</b> Не активна\n\n"
 

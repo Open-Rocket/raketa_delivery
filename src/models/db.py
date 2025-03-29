@@ -156,6 +156,9 @@ class Courier(Base):
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
 
+    courier_location_lat: Mapped[floatData]
+    courier_location_lon: Mapped[floatData]
+
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[datetimeData]
 

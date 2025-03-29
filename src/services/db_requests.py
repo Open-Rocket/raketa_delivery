@@ -587,6 +587,45 @@ class CourierData:
                     return True
                 return False
 
+    # ---
+
+    async def update_courier_location(self, tg_id, my_lat: float, my_lon: float):
+        """Обновляет местоположение курьера в БД"""
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return False
+
+                courier.courier_location_lat = my_lat
+                courier.courier_location_lon = my_lon
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении местоположения курьера: {e}")
+                return False
+
+    async def get_courier_last_location(self, tg_id: int) -> tuple:
+        """Возвращает местоположение курьера из БД"""
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return None
+
+                return (
+                    courier.courier_location_lat,
+                    courier.courier_location_lon,
+                )
+            except Exception as e:
+                log.error(f"Ошибка при получении местоположения курьера: {e}")
+                return None
+
 
 class AdminData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
