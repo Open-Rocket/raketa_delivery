@@ -35,7 +35,6 @@ class CustomerData:
         name: str,
         phone: str,
         city: str,
-        tg_link: str,
         tou: str,
     ) -> bool:
         """Добавляет в БД нового клиента"""
@@ -46,7 +45,6 @@ class CustomerData:
                     customer_name=name,
                     customer_phone=phone,
                     customer_city=city,
-                    customer_tg_link=tg_link,
                     customer_accept_terms_of_use=tou,
                     customer_registration_date=await Time.get_moscow_time(),
                 )
@@ -142,6 +140,20 @@ class CustomerData:
 
             return False
 
+    async def get_customer_seed_key(self, tg_id: int) -> Optional[str]:
+        """Возвращает seed ключ клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            if customer:
+                seed_key = await session.scalar(
+                    select(SeedKey.seed_key).where(
+                        SeedKey.partner_id == customer.partner_id
+                    )
+                )
+                return seed_key
+
     # ---
 
     async def set_customer_discount(self, tg_id: int, discount: int) -> bool:
@@ -161,26 +173,6 @@ class CustomerData:
             )
             customer_discount = customer.customer_discount
             return customer_discount if customer_discount else 0
-
-    # ---
-
-    async def set_customer_tg_link(self, tg_id: int, tg_link: str) -> bool:
-        """Устанавливает ссылку на клиента"""
-        async with self.async_session_factory() as session:
-            customer = await session.scalar(
-                select(Customer).where(Customer.customer_tg_id == tg_id)
-            )
-            customer.customer_tg_link = tg_link
-            await session.commit()
-
-    async def get_customer_tg_link(self, tg_id: int) -> str:
-        """Возвращает ссылку на клиента"""
-        async with self.async_session_factory() as session:
-            customer = await session.scalar(
-                select(Customer).where(Customer.customer_tg_id == tg_id)
-            )
-            customer_link = customer.customer_tg_link
-            return customer_link if customer_link else "..."
 
 
 class CourierData:

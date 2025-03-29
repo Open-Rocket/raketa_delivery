@@ -86,7 +86,7 @@ async def _check_state_and_handle_message(
         await fsm_context.set_state(CustomerState.default.state)
         await customer_bot.send_message(
             chat_id=event.from_user.id,
-            text="▼ <b>Выберите действие ...</b>",
+            text=f"▼ <b>Выберите действие в • ≡ Меню •</b>",
             reply_markup=ReplyKeyboardRemove(),
             disable_notification=True,
             parse_mode="HTML",
@@ -126,6 +126,7 @@ async def _check_state_and_handle_message(
     if state in (
         CustomerState.change_Name.state,
         CustomerState.change_City.state,
+        CustomerState.set_seed_key.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
 

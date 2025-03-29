@@ -182,14 +182,8 @@ class Keyboard:
                 ]
             ),
             # ---
-            "key": InlineKeyboardMarkup(
+            "promo": InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="В другой раз 🕒",
-                            callback_data="not_now",
-                        ),
-                    ],
                     [
                         InlineKeyboardButton(
                             text="Ввести PROMOKOD",
@@ -275,7 +269,7 @@ class Keyboard:
                     [
                         InlineKeyboardButton(
                             text="🚀 Начать работу",
-                            callback_data="lets_go_first",
+                            callback_data="lets_go",
                         )
                     ]
                 ]
@@ -500,6 +494,16 @@ class Keyboard:
                 ]
             ),
             # ---
+            "promo": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Ввести PROMOKOD",
+                            callback_data="PROMOKOD",
+                        ),
+                    ],
+                ]
+            ),
             "key": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -572,6 +576,12 @@ class Keyboard:
                     InlineKeyboardButton(
                         text=f"Заказы рядом {available_orders_len}",
                         callback_data="show_nearby_orders",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"🔄 Обновить данные",
+                        callback_data="refresh_orders",
                     ),
                 ],
             ]

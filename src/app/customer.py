@@ -56,7 +56,7 @@ async def cmd_start_customer(
     if is_reg:
         current_state = CustomerState.default.state
         await message.answer(
-            text="▼ <b>Выберите действие ...</b>",
+            text=f"▼ <b>Выберите действие в • ≡ Меню •</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -310,21 +310,11 @@ async def customer_accept_tou(
         True,
     )
 
-    username = callback_query.from_user.username
-
-    if username:
-        user_link = f"https://t.me/{username}"
-    else:
-        user_link = f"tg://user?id={callback_query.from_user.id}"
-
-    customer_tg_link = f"<a href='{user_link}'>@{username if username else 'User'}</a>"
-
     is_set_customer_to_db = await customer_data.set_customer(
         tg_id,
         customer_name,
         customer_phone,
         customer_city,
-        customer_tg_link,
         accept_tou,
     )
 
@@ -337,7 +327,7 @@ async def customer_accept_tou(
             f"Имя: {customer_name}\n"
             f"Номер: {customer_phone}\n"
             f"Город: {customer_city}\n\n"
-            f"▼ <b>Выберите действие в Меню ...</b>"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
         new_message = await callback_query.message.answer(
             text=text,
@@ -518,23 +508,8 @@ async def _process_order_logic(
 
     customer_discount = await customer_data.get_customer_discount(tg_id)
 
-    username = message.from_user.username
-
-    if username:
-        user_link = f"https://t.me/{username}"
-    else:
-        user_link = f"tg://user?id={message.from_user.id}"
-
-    customer_tg_link = f"<a href='{user_link}'>@{username if username else 'User'}</a>"
-
-    await customer_data.set_customer_tg_link(
-        tg_id=tg_id,
-        tg_link=customer_tg_link,
-    )
-
     order_info_data = await formatter.format_order_form(
         prepare_dict,
-        customer_tg_link,
         customer_discount,
     )
 
@@ -640,6 +615,7 @@ async def set_order_to_db(
         return
 
     try:
+
         order_number = await order_data.create_order(
             tg_id=tg_id,
             data=data,
@@ -653,7 +629,7 @@ async def set_order_to_db(
             f"Заказ <b>№{order_number}</b> успешно создан! 🎉\n"
             f"Мы ищем курьера для вашего заказа 🔎\n\n"
             f"<i>*Информацию о заказах можно посмотреть в разделе</i> <b>Мои заказы</b>.\n\n"
-            f"▼ <b>Выберите действие в Меню ...</b>"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
 
     except Exception as e:
@@ -713,15 +689,13 @@ async def cancel_order(
 @customer_r.message(
     F.text == "/order",
 )
-@customer_r.callback_query(F.data == "make_order")
-@customer_r.callback_query(F.data == "not_now")
 async def cmd_order(
-    event: Message | CallbackQuery,
+    message: Message,
     state: FSMContext,
 ):
     """Обработчик команды /order для клиента."""
 
-    tg_id = event.from_user.id
+    tg_id = message.from_user.id
     is_read_info = await rediska.is_read_info(customer_bot_id, tg_id)
     is_set_key = await customer_data.is_set_key(tg_id)
 
@@ -729,16 +703,13 @@ async def cmd_order(
 
     if is_read_info:
 
-        if isinstance(event, CallbackQuery):
-            await event.message.delete()
-
         current_state = CustomerState.ai_voice_order.state
         text = (
             f"<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             f"заказ будет оформлен в считанные секунды.</i>\n\n"
             f"ゞ <b>Опишите ваш заказ ...</b>"
         )
-        await event.answer(
+        await message.answer(
             text=text,
             disable_notification=True,
             parse_mode="HTML",
@@ -756,23 +727,13 @@ async def cmd_order(
             "ассистент создаст заявку для вашего заказа.</i>"
         )
 
-        if isinstance(event, CallbackQuery):
-            await event.message.answer_photo(
-                photo=photo_title,
-                caption=text,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-
-        elif isinstance(event, Message):
-            await event.answer_photo(
-                photo=photo_title,
-                caption=text,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
+        await message.answer_photo(
+            photo=photo_title,
+            caption=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -825,21 +786,62 @@ async def cmd_promo(
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
 
-    discount_offer = await admin_data.get_first_order_discount()
+    customer_seed_key = await customer_data.get_customer_seed_key(tg_id)
+
+    if customer_seed_key:
+        text = (
+            f"🎉 <b>PROMOKOD</b>\n\n"
+            f"Вы являетесь участником PROMO акций!\n\n"
+            f"Ваш PROMOKOD: <code>{customer_seed_key}</code>"
+        )
+
+        await message.answer(
+            text=text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+
+        text = (
+            f"🎉 <b>PROMOKOD</b>\n\n"
+            f"Здесь вы можете ввести свой промокод, участвовать в акциях и получать скидки.\n\n"
+        )
+
+        reply_kb = await kb.get_customer_kb("promo")
+
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+
+@customer_r.callback_query(
+    F.data == "PROMOKOD",
+)
+async def data_set_PROMOKOD(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'PROMOKOD' для клиента."""
+
+    tg_id = callback_query.from_user.id
+    await callback_query.answer("🎉 PROMOKOD", show_alert=False)
+
     is_set_key = await customer_data.is_set_key(tg_id)
 
     if is_set_key:
         text = f"Вы уже применили свой PROMOKOD!\n\n"
     else:
         current_state = CustomerState.set_seed_key.state
+        text = f"Ваш PROMOKOD:"
 
-        text = (
-            f"<b>PROMOKOD</b>\n\n"
-            f"Введите PROMOKOD и получите <b>{discount_offer}% скидку</b> на текущий заказ!\n\n"
-            f"Ваш PROMOKOD:"
-        )
-
-    await message.answer(
+    await callback_query.message.answer(
         text=text,
         disable_notification=True,
         parse_mode="HTML",
@@ -866,20 +868,16 @@ async def data_PROMOKOD(
 
     log.info(f"is_set_key: {is_set_key}")
 
-    discount_offer = await admin_data.get_first_order_discount()
+    discount = await admin_data.get_first_order_discount()
 
     if is_set_key:
-        text = "✅ PROMOKOD успешно установлен!\n\nСкидка на следующий заказ <b>50%</b>"
-        reply_kb = await kb.get_customer_kb("make_order")
-        await customer_data.set_customer_discount(tg_id, discount_offer)
+        await customer_data.set_customer_discount(tg_id, discount)
+        text = f"✅ PROMOKOD успешно установлен!\n\nСкидка на следующий заказ <b>{discount}%</b>"
     else:
         text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
-        reply_kb = await kb.get_customer_kb("try_seed_again")
 
     await message.answer(
         text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
         parse_mode="HTML",
     )
 
@@ -1400,7 +1398,7 @@ async def cancel_my_order(
         text = (
             f"<b>Заказ №{current_order_id} успешно отменён.</b>\n\n"
             f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отменённые.</b>\n\n"
-            f"▼ <b>Выберите действие ...</b>"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
         await callback_query.message.answer(
             text,
@@ -1524,7 +1522,9 @@ async def change_name(
 
     name = message.text
 
-    text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+    text = (
+        f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+    )
 
     await message.answer(
         text=text,
@@ -1554,7 +1554,10 @@ async def change_phone(
     tg_id = message.from_user.id
     phone = message.contact.phone_number
 
-    text = f"Номер был изменено на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+    text = (
+        f"Номер был изменено на {phone} 🎉\n\n"
+        f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+    )
 
     await message.answer(
         text=text,
@@ -1599,12 +1602,13 @@ async def change_city(
     else:
 
         current_state = CustomerState.default.state
-        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+        text = (
+            f"Город был изменен на {city} 🎉\n\n"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+        )
 
         _ = await customer_data.update_customer_city(tg_id, city)
         _ = await rediska.set_city(customer_bot_id, tg_id, city)
-
-        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
 
         await message.answer(
             text=text,

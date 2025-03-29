@@ -459,17 +459,11 @@ async def cmd_key(
     text = (
         f"Приглашайте курьеров и клиентов, используя этот ключ. "
         f"За каждого привлеченного курьера вы будете получать 30% от его подписки каждый месяц.\n\n"
-        f"<b>🔑 Ваш ключ:</b>"
+        f"<b>🔑 Ваш ключ:</b> <code>{seed_key}</code>"
     )
 
     await message.answer(
         text=text,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    await message.answer(
-        text=f"<b><code>{seed_key}</code></b>\n\n",
         disable_notification=True,
         parse_mode="HTML",
     )

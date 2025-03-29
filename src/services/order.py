@@ -74,7 +74,6 @@ class OrderFormatter:
     @staticmethod
     async def format_order_form(
         data: dict,
-        customer_link,
         discount: int = 0,
     ) -> tuple:
         """Форматирует и возвращает текст заказа на основе подготовленных данных."""
@@ -99,14 +98,13 @@ class OrderFormatter:
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
             f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n"
-            f"<b>Telegram:</b> {customer_link}\n\n"
             f"{addresses_text}\n\n"
+            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
             f"<b>Стоимость доставки:</b> {price}₽\n"
-            f"<i>Оплата наличными или переводом!\n\n</i>"
+            f"<i>Наличными или переводом!\n\n</i>"
             f"<b>Описание:</b> {description}\n\n"
-            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
         )
 
         return (

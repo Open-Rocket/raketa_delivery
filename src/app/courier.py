@@ -56,7 +56,7 @@ async def cmd_start_courier(
     if is_reg:
         current_state = CourierState.default.state
         await message.answer(
-            text="▼ <b>Выберите действие ...</b>",
+            text=f"▼ <b>Выберите действие в • ≡ Меню •</b>",
             disable_notification=True,
             parse_mode="HTML",
         )
@@ -65,7 +65,7 @@ async def cmd_start_courier(
         current_state = CourierState.reg_state.state
         photo_title = await title.get_title_courier("/start")
         text = (
-            "Добро пожаловать в сервис доставки <b>Ракета!</b>\n\n"
+            "Добро пожаловать в сервис доставки <b>Raketa!</b>\n\n"
             "◉ <b>Наши условия:</b>\n"
             "<b>Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого выполненного заказа.</b>\n\n"
             "Присоединяйся и начинай зарабатывать больше уже сегодня!"
@@ -188,7 +188,7 @@ async def data_phone_courier(
 
     text = (
         f"Последний шаг!\n\n"
-        f"Чтобы сделать заказы максимально удобными, пожалуйста, укажите город, где вы будете работать.\n\n"
+        f"Чтобы сделать заказы максимально удобными, пожалуйста, введите город, где вы будете работать.\n\n"
         f"<b>Ваш город:</b>"
     )
 
@@ -249,6 +249,7 @@ async def data_city_courier(
             text,
             reply_markup=reply_kb,
             disable_notification=True,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -273,33 +274,19 @@ async def courier_accept_tou(
 ):
     """Обрабатывает принятие пользовательского соглашения. CourierState.reg_tou"""
 
-    current_state = CourierState.reg_tou.state
     tg_id = callback_query.from_user.id
-
     accept_tou = (
         "Пользовательское соглашение и правила использования сервиса - Принимаю"
-    )
-
-    tou_text = (
-        f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
-        f"Пользовательским соглашением и правилами использования</a>, а также "
-        f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
-        f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
-        f"отправкой или получением посылок, должны соответствовать законодательству "
-        f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
     courier_name, courier_phone, courier_city = await rediska.get_user_info(
         courier_bot_id, tg_id
     )
-
     is_set_reg = await rediska.set_reg(
         courier_bot_id,
         tg_id,
         True,
     )
-
     is_set_courier_to_db = await courier_data.set_courier(
         tg_id,
         courier_name,
@@ -308,29 +295,56 @@ async def courier_accept_tou(
         accept_tou,
     )
 
-    reply_kb = await kb.get_courier_kb("super_go")
-
     if is_set_reg and is_set_courier_to_db:
 
-        await callback_query.answer("PROMOKOD", show_alert=False)
+        await callback_query.answer("✅ Принято", show_alert=False)
 
-        free_period = await courier_data.get_free_period()
+        current_state = CourierState.default.state
 
-        text = f"Введите PROMOKOD и получите <b>{free_period} дней</b> бесплатного периода!"
+        moscow_time = await Time.get_moscow_time()
+        courier_name, courier_phone, courier_city, end_date = (
+            await courier_data.get_courier_full_info(tg_id)
+        )
 
-        reply_kb = await kb.get_courier_kb("key")
+        if end_date and end_date >= moscow_time:
+            remaining_days = (end_date - moscow_time).days
+            subscription_status = (
+                f"<b>Подписка:</b> Активна 🚀\n\n"
+                f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
+                f"🕒 Осталось дней: {remaining_days}\n\n"
+            )
+
+        else:
+            subscription_status = "<b>Подписка:</b> Не активна\n\n"
+
+        text = (
+            f"Вы успешно зарегистрировались! 🎉\n\n"
+            f"Имя: {courier_name}\n"
+            f"Номер: {courier_phone}\n"
+            f"Город: {courier_city}\n"
+            f"{subscription_status}"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+        )
 
         new_message = await callback_query.message.answer(
             text=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
+            disable_notification=False,
             parse_mode="HTML",
         )
 
-        await state.set_state(current_state)
-        await rediska.set_state(courier_bot_id, tg_id, current_state)
-
     else:
+
+        current_state = CourierState.reg_tou.state
+        reply_kb = await kb.get_courier_kb("accept_tou")
+        tou_text = (
+            f"Начиная использование сервиса, вы соглашаетесь с "
+            f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
+            f"Пользовательским соглашением и правилами использования</a>, а также "
+            f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
+            f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
+            f"отправкой или получением посылок, должны соответствовать законодательству "
+            f"вашего государства и общепринятым этическим нормам.</i>\n\n"
+        )
 
         new_message = await callback_query.message.answer(
             text=(
@@ -343,6 +357,9 @@ async def courier_accept_tou(
             parse_mode="HTML",
         )
 
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
     await handler.catch(
         bot=courier_bot,
         chat_id=callback_query.message.chat.id,
@@ -353,24 +370,76 @@ async def courier_accept_tou(
     )
 
 
+# ---
+# ---
+
+
+@courier_r.message(F.text == "/promo")
+async def cmd_promo(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /promo для курьера."""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    courier_seed_key = await courier_data.get_courier_seed_key(tg_id)
+
+    if courier_seed_key:
+        text = (
+            f"🎉 <b>PROMOKOD</b>\n\n"
+            f"Вы являетесь участником PROMO акций!\n\n"
+            f"Ваш PROMOKOD: <code>{courier_seed_key}</code>"
+        )
+
+        await message.answer(
+            text=text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+
+        text = (
+            f"🎉 <b>PROMOKOD</b>\n\n"
+            f"Здесь вы можете ввести свой промокод, участвовать в акциях и получать скидки.\n\n"
+        )
+
+        reply_kb = await kb.get_courier_kb("promo")
+
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+
 @courier_r.callback_query(
     F.data == "PROMOKOD",
 )
-@courier_r.callback_query(F.data == "try_seed_again")
 async def data_set_PROMOKOD(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
     """Обработчик коллбэка 'PROMOKOD' для курьера."""
 
-    await callback_query.answer("% PROMOKOD", show_alert=False)
-
-    current_state = CourierState.set_seed_key.state
     tg_id = callback_query.from_user.id
+    await callback_query.answer("🎉 PROMOKOD", show_alert=False)
 
-    text = f"Ваш PROMOKOD:"
+    is_set_key = await courier_data.is_set_key(tg_id)
 
-    new_message = await callback_query.message.answer(
+    if is_set_key:
+        text = f"Вы уже применили свой PROMOKOD!\n\n"
+    else:
+        current_state = CourierState.set_seed_key.state
+        text = f"Ваш PROMOKOD:"
+
+    await callback_query.message.answer(
         text=text,
         disable_notification=True,
         parse_mode="HTML",
@@ -379,122 +448,57 @@ async def data_set_PROMOKOD(
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
-    await handler.catch(
-        bot=courier_bot,
-        chat_id=callback_query.message.chat.id,
-        user_id=tg_id,
-        new_message=new_message,
-        current_message=None,
-        delete_previous=True,
-    )
 
-
-@courier_r.message(filters.StateFilter(CourierState.set_seed_key))
+@courier_r.message(
+    filters.StateFilter(CourierState.set_seed_key),
+)
 async def data_PROMOKOD(
     message: Message,
     state: FSMContext,
 ):
-    current_state = CourierState.reg_state.state
+    """Обработчик состояния 'CourierState.set_seed_key'."""
+
+    current_state = CourierState.default.state
     tg_id = message.from_user.id
     seed_key = message.text.upper()
 
-    log.info(f"seed_key: {seed_key}")
-
-    free_period = await courier_data.get_free_period()
     is_set_key = await courier_data.set_courier_seed_key(tg_id, seed_key)
 
     log.info(f"is_set_key: {is_set_key}")
 
-    if is_set_key:
-        text = f"✅ PROMOKOD успешно установлен!\n\nАктивируйте бесплатный {free_period} дневный период и начните работу!"
-        reply_kb = await kb.get_courier_kb("super_go")
+    free_period = await courier_data.get_free_period()
 
+    if is_set_key:
+        moscow_time = await Time.get_moscow_time()
+        free_period = await courier_data.get_free_period()
+
+        _ = await courier_data.update_courier_subscription(tg_id, days=free_period)
+
+        _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
+
+        if end_date and end_date >= moscow_time:
+            remaining_days = (end_date - moscow_time).days
+            subscription_status = (
+                f"<b>Подписка:</b> Активна 🚀\n\n"
+                f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
+                f"🕒 Осталось дней: {remaining_days}\n\n"
+            )
+
+        text = (
+            f"✅ PROMOKOD успешно установлен!\n\n"
+            f"Вам начислено <b>+{free_period}</b> бесплатных дней.\n\n"
+            f"{subscription_status}"
+        )
     else:
         text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
-        reply_kb = await kb.get_courier_kb("try_seed_again")
 
-    new_message = await message.answer(
+    await message.answer(
         text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
         parse_mode="HTML",
     )
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-    await handler.catch(
-        bot=courier_bot,
-        chat_id=message.chat.id,
-        user_id=tg_id,
-        new_message=new_message,
-        current_message=None,
-        delete_previous=True,
-    )
-
-
-@courier_r.callback_query(
-    F.data == "super_go",
-)
-async def courier_super_go(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обрабатывает запрос на активацию бесплатного периода. CourierState.super_go"""
-
-    await callback_query.answer("⭐️⭐️⭐️", show_alert=False)
-
-    current_state = CourierState.default.state
-    tg_id = callback_query.from_user.id
-
-    free_period = await courier_data.get_free_period()
-    moscow_time = await Time.get_moscow_time()
-
-    log.info(f"free_period: {free_period}")
-
-    _ = await courier_data.update_courier_subscription(tg_id, days=free_period)
-
-    courier_name, courier_phone, courier_city, end_date = (
-        await courier_data.get_courier_full_info(tg_id)
-    )
-
-    if end_date and end_date >= moscow_time:
-        remaining_days = (end_date - moscow_time).days
-        subscription_status = (
-            f"<b>Подписка:</b> Активна 🚀\n\n"
-            f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
-            f"🕒 Осталось дней: {remaining_days}\n\n"
-        )
-
-    else:
-        subscription_status = "<b>Подписка:</b> Не активна\n\n"
-
-    text = (
-        f"Вы успешно зарегистрировались! 🎉\n\n"
-        f"Имя: {courier_name}\n"
-        f"Номер: {courier_phone}\n"
-        f"Город: {courier_city}\n"
-        f"{subscription_status}"
-        f"▼ <b>Выберите действие ...</b>"
-    )
-
-    new_message = await callback_query.message.answer(
-        text=text,
-        disable_notification=False,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-    await handler.catch(
-        bot=courier_bot,
-        chat_id=callback_query.message.chat.id,
-        user_id=tg_id,
-        new_message=new_message,
-        current_message=None,
-        delete_previous=True,
-    )
 
 
 # ---
@@ -517,150 +521,113 @@ async def cmd_run(
         await event.answer("🚀 Начать работу", show_alert=False)
         await event.message.delete()
 
-    tg_id = event.from_user.id
-    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
-
-    is_read_info = await rediska.is_read_info(courier_bot_id, tg_id)
-
     current_state = CourierState.default.state
+    tg_id = event.from_user.id
+    moscow_time = await Time.get_moscow_time()
+    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+    is_read_info = await rediska.is_read_info(courier_bot_id, tg_id)
+    _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
 
-    if is_read_info:
+    log.info(f"end_date: {end_date}")
 
-        if isinstance(event, CallbackQuery):
-            await event.answer("🚀 Начать работу", show_alert=False)
+    if end_date and end_date >= moscow_time:
 
-        current_state = CourierState.location.state
-        current_active_orders_count = (
-            await courier_data.get_courier_active_orders_count(tg_id)
-        )
+        if is_read_info:
 
-        reply_kb = await kb.get_courier_kb("/run")
+            if isinstance(event, CallbackQuery):
+                await event.answer("🚀 Начать работу", show_alert=False)
 
-        if current_active_orders_count < 3:
-
-            text = (
-                f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
-                f"<i>*Доступно только с мобильных устройств</i>\n\n"
+            current_state = CourierState.location.state
+            current_active_orders_count = (
+                await courier_data.get_courier_active_orders_count(tg_id)
             )
 
-            await event.bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
+            reply_kb = await kb.get_courier_kb("/run")
+
+            if current_active_orders_count < 3:
+
+                text = (
+                    f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
+                    f"<i>*Доступно только с мобильных устройств</i>\n\n"
+                )
+
+                await event.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=reply_kb,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
+
+            else:
+
+                current_state = CourierState.default.state
+
+                text = (
+                    "Вы уже выполняете максимальное количество заказов.\n\n"
+                    "Пожалуйста, завершите текущие заказы, чтобы начать новые."
+                )
+
+                await event.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
 
         else:
 
             current_state = CourierState.default.state
 
+            ttl = await title.get_title_courier("first_run")
+
             text = (
-                "Вы уже выполняете максимальное количество заказов.\n\n"
-                "Пожалуйста, завершите текущие заказы, чтобы начать новые."
+                f"⚠️ Важно:\n\n"
+                f"- Частые нарушения правил могут привести к бану аккаунта.\n\n"
+                f"- За кражу заказа или мошенничество блокировка и уголовное наказание.\n\n"
+                f"🍀 Удачной работы!\n"
+                f"💰 Все заработанные деньги ваши!\n\n"
             )
 
-            await event.bot.send_message(
+            reply_kb = await kb.get_courier_kb("run_first")
+
+            new_message = await event.bot.send_photo(
                 chat_id=chat_id,
-                text=text,
+                photo=ttl,
+                caption=text,
+                reply_markup=reply_kb,
                 disable_notification=True,
                 parse_mode="HTML",
             )
 
+            await handler.catch(
+                bot=courier_bot,
+                chat_id=chat_id,
+                user_id=tg_id,
+                new_message=new_message,
+                current_message=None,
+                delete_previous=True,
+            )
     else:
 
-        current_state = CourierState.default.state
+        reply_kb = await kb.get_courier_kb("pay_sub")
+        text = "‼️ Ваша подписка не активна, пожалуйста, оплатите подписку."
 
-        ttl = await title.get_title_courier("first_run")
-
-        text = (
-            "Отправьте свою локацию, выберите заказ, примите его и выполняйте.\n\n"
-            "⚠️ Важно:\n\n"
-            "‼️ Частые нарушения правил могут привести к бану аккаунта.\n\n"
-            "🚫 За кражу заказа или мошенничество блокировка и уголовное наказание.\n\n"
-            "✅ Будьте честными, поднимайтесь в рейтинге и получайте лучшие заказы первыми.\n\n"
-            "💰 Все заработанные деньги ваши!\n\n"
-            "Удачной работы и хороших заказов!"
-        )
-
-        reply_kb = await kb.get_courier_kb("run_first")
-
-        new_message = await event.bot.send_photo(
-            chat_id=chat_id,
-            photo=ttl,
-            caption=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-        await handler.catch(
-            bot=courier_bot,
-            chat_id=chat_id,
-            user_id=tg_id,
-            new_message=new_message,
-            current_message=None,
-            delete_previous=True,
-        )
+        if isinstance(event, CallbackQuery):
+            await event.message.answer(
+                text=text,
+                reply_markup=reply_kb,
+                show_alert=True,
+            )
+        else:
+            await event.answer(
+                text=text,
+                reply_markup=reply_kb,
+                disable_notification=True,
+            )
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-
-@courier_r.callback_query(
-    F.data == "lets_go_first",
-)
-async def data_lets_go_first(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик коллбэка 'lets_go_first' для курьера."""
-
-    await callback_query.answer("🚀 Начать работу", show_alert=False)
-
-    current_state = CourierState.location.state
-    tg_id = callback_query.from_user.id
-    chat_id = callback_query.message.chat.id
-    current_active_orders_count = await courier_data.get_courier_active_orders_count(
-        tg_id
-    )
-
-    reply_kb = await kb.get_courier_kb("/run")
-
-    if current_active_orders_count < 3:
-
-        text = (
-            "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
-            "<i>*Доступно только с мобильных устройств</i>"
-        )
-
-        await callback_query.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=reply_kb,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-    else:
-
-        current_state = CourierState.default.state
-
-        text = (
-            "Вы уже выполняете максимальное количество заказов.\n\n"
-            "Пожалуйста, завершите текущие заказы, чтобы начать новые."
-        )
-
-        await callback_query.message.answer(
-            text=text,
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    await callback_query.message.delete()
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-    await rediska.set_read_info(courier_bot_id, tg_id, True)
 
 
 @courier_r.message(
@@ -669,6 +636,9 @@ async def data_lets_go_first(
 )
 @courier_r.callback_query(
     F.data == "back_location",
+)
+@courier_r.callback_query(
+    F.data == "refresh_orders",
 )
 async def get_location(
     event: Message | CallbackQuery,
@@ -1076,8 +1046,6 @@ async def accept_order(
             new_status=OrderStatus.IN_PROGRESS,
         )
 
-        # customer_tg_id = await order_data.get_customer_tg_id(current_order_id)
-        customer_tg_link = await customer_data.get_customer_tg_link(customer_tg_id)
         await customer_bot.send_message(
             chat_id=customer_tg_id,
             text=(
@@ -1096,7 +1064,6 @@ async def accept_order(
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
             f"Заказчик: {customer_name}\n"
             f"Телефон: {customer_phone}\n"
-            f"Telegram: {customer_tg_link}\n\n"
             f"<i>*Принимайте оплату наличными или переводом!</i>\n\n"
             f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
             f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>"
@@ -1604,7 +1571,7 @@ async def change_name(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-    name = message.text
+    new_name = message.text
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -1612,7 +1579,10 @@ async def change_name(
     _ = await courier_data.update_courier_name(tg_id, name)
     _ = await rediska.set_name(courier_bot_id, tg_id, name)
 
-    text = f"Имя было изменено на {name} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+    text = (
+        f"Имя было изменено на {new_name} 🎉\n\n"
+        f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+    )
 
     await message.answer(
         text,
@@ -1642,7 +1612,10 @@ async def change_phone(
     _ = await courier_data.update_courier_phone(tg_id, phone)
     _ = await rediska.set_phone(courier_bot_id, tg_id, phone)
 
-    text = f"Номер был изменен на {phone} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+    text = (
+        f"Номер был изменен на {phone} 🎉\n\n"
+        f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+    )
 
     await message.answer(
         text,
@@ -1680,7 +1653,10 @@ async def change_city(
     else:
 
         current_state = CourierState.default.state
-        text = f"Город был изменен на {city} 🎉\n\n" f"▼ <b>Выберите действие ...</b>"
+        text = (
+            f"Город был изменен на {city} 🎉\n\n"
+            f"▼ <b>Выберите действие в • ≡ Меню •</b>"
+        )
 
         _ = await courier_data.update_courier_city(tg_id, city)
         _ = await rediska.set_city(courier_bot_id, tg_id, city)
@@ -1953,12 +1929,17 @@ async def get_courier_statistic(
 )
 async def payment_invoice(
     event: Message | CallbackQuery,
+    state: FSMContext,
 ):
     """Обрабатывает запрос на оплату подписки. /subs, pay_sub"""
 
     chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
     moscow_time = await Time.get_moscow_time()
+
+    current_state = CourierState.default.state
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     if isinstance(event, CallbackQuery):
         await event.answer("💵 Оформить подписку", show_alert=False)

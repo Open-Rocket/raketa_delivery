@@ -117,7 +117,7 @@ class Customer(Base):
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_city: Mapped[stringData]
-    customer_tg_link: Mapped[stringData]
+
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
@@ -155,6 +155,7 @@ class Courier(Base):
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
+
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[datetimeData]
 
