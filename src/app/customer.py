@@ -559,7 +559,6 @@ async def _process_order_logic(
     )
 
     if show_discount:
-
         await message.answer(
             text=f"🪙 Ваша скидка 50% = <s>{price}₽</s> {discount_price}₽",
             disable_notification=True,
@@ -681,9 +680,6 @@ async def set_order_to_db(
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
-# ---
-
-
 @customer_r.callback_query(
     F.data == "cancel_order",
 )
@@ -731,41 +727,6 @@ async def cmd_order(
 
     log.info(f"set_key: {is_set_key}")
 
-    if not is_set_key:
-
-        if isinstance(event, CallbackQuery):
-            await event.answer(f"окей, пропустим", show_alert=False)
-            await event.message.delete()
-
-        current_state = CustomerState.default.state
-
-        skip_counter = await rediska.get_skip_counter(customer_bot_id, tg_id)
-
-        if skip_counter > 9:
-            skip_counter = 1
-
-        await rediska.set_skip_counter(customer_bot_id, tg_id, skip_counter + 1)
-
-        log.info(f"skip_counter: {skip_counter}")
-
-        indexes_of_retry = [0, 3, 5, 9]
-
-        if isinstance(event, Message) and skip_counter in indexes_of_retry:
-
-            discount_offer = await admin_data.get_first_order_discount()
-
-            text = f"Введите PROMOKOD и получите <b>{discount_offer}% скидку</b> на текущий заказ"
-            reply_kb = await kb.get_customer_kb("key")
-
-            await event.answer(
-                text=text,
-                reply_markup=reply_kb,
-                disable_notification=True,
-                parse_mode="HTML",
-            )
-
-            return
-
     if is_read_info:
 
         if isinstance(event, CallbackQuery):
@@ -784,9 +745,6 @@ async def cmd_order(
         )
 
     else:
-
-        # if isinstance(event, CallbackQuery):
-        #     await event.message.delete()
 
         current_state = CustomerState.default.state
         photo_title = await title.get_title_customer("/order")
@@ -854,26 +812,34 @@ async def data_ai(
 
 
 # ---
+# ---
 
 
-@customer_r.callback_query(
-    F.data == "PROMOKOD",
-)
-async def data_set_PROMOKOD(
-    callback_query: CallbackQuery,
+@customer_r.message(F.text == "/promo")
+async def cmd_promo(
+    message: Message,
     state: FSMContext,
 ):
-    """Обработчик коллбэка 'PROMOKOD' для клиента."""
+    """Обработчик команды /promo для клиента."""
 
-    await callback_query.message.delete()
-    await callback_query.answer("% PROMOKOD", show_alert=False)
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
 
-    current_state = CustomerState.set_seed_key.state
-    tg_id = callback_query.from_user.id
+    discount_offer = await admin_data.get_first_order_discount()
+    is_set_key = await customer_data.is_set_key(tg_id)
 
-    text = f"Ваш PROMOKOD:"
+    if is_set_key:
+        text = f"Вы уже применили свой PROMOKOD!\n\n"
+    else:
+        current_state = CustomerState.set_seed_key.state
 
-    await callback_query.message.answer(
+        text = (
+            f"<b>PROMOKOD</b>\n\n"
+            f"Введите PROMOKOD и получите <b>{discount_offer}% скидку</b> на текущий заказ!\n\n"
+            f"Ваш PROMOKOD:"
+        )
+
+    await message.answer(
         text=text,
         disable_notification=True,
         parse_mode="HTML",
@@ -921,6 +887,7 @@ async def data_PROMOKOD(
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
+# ---
 # ---
 
 
