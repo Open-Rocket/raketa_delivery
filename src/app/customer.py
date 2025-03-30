@@ -526,6 +526,12 @@ async def _process_order_logic(
     reply_kb = await kb.get_customer_kb("voice_order_accept")
 
     await message.answer(
+        text=f"Проверяйте правильность заказа!",
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await message.answer(
         text=order_info,
         reply_markup=reply_kb,
         disable_notification=False,

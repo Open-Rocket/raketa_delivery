@@ -97,12 +97,12 @@ class OrderFormatter:
         order_forma = (
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
-            f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n"
+            f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n\n"
             f"{addresses_text}\n\n"
             f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
-            f"<b>Стоимость доставки:</b> {price}₽\n"
+            f"<b>Стоимость доставки:</b> {price} ₽\n"
             f"<i>Наличными или переводом!\n\n</i>"
             f"<b>Описание:</b> {description}\n\n"
         )

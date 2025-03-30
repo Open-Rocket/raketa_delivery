@@ -21,6 +21,7 @@ from ._deps import (
     partner_r,
     partner_fallback,
     partner_data,
+    admin_data,
     handler,
     kb,
     title,
@@ -216,6 +217,7 @@ async def data_city(
     tg_id = message.from_user.id
     russian_cities = await cities.get_cities()
     city, _ = await find_closest_city(message.text, russian_cities)
+    refund_percent = await admin_data.get_refund_percent()
 
     if not city:
         await message.answer(
@@ -235,7 +237,7 @@ async def data_city(
             f"Как это работает?\n"
             f"1️⃣ После генерации ключа вы сможете передавать его курьерам и клиентам.\n"
             f"2️⃣ Курьеры, регистрируясь в системе с вашим ключом, становятся вашими рефералами.\n"
-            f"3️⃣ С каждого оплаченного месяца подписки курьера вы будете получать 30% от её стоимости.\n"
+            f"3️⃣ С каждого оплаченного месяца подписки курьера вы будете получать {refund_percent}% от её стоимости.\n"
             f"4️⃣ Чем больше активных курьеров и клиентов привязано к вашему ключу, тем выше ваш доход.\n\n"
         )
 
@@ -310,16 +312,16 @@ async def partner_generate_seed(
                 log.info(f"Generated unique seed key: {seed_key}")
 
                 is_create = await partner_data.create_new_seed_key(partner_id, seed_key)
+                refund_percent = await admin_data.get_refund_percent()
                 await rediska.set_seed_key(partner_bot_id, tg_id, seed_key)
 
                 if is_create:
                     text = (
                         f"🔑 <b>Ваш ключ:</b> <b><code>{seed_key}</code></b>\n\n"
-                        f"- Этот ключ служит промокодом для ваших клиентов. Используя его при первом заказе, они получат скидку на доставку.\n\n"
-                        f"- Для курьеров это также промокод, который дает скидку на подписку. Таким образом, курьеры могут снизить свои затраты на участие в сервисе.\n\n"
+                        f"- Этот ключ служит промокодом для пользователей. Используя его они получают скидки и могут участвовать в акциях сервиса.\n\n"
                         f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
-                        f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете 30% с подписки курьеров каждый месяц.\n\n"
-                        f"▼ <b>Выберите действие в Меню ...</b>"
+                        f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете {refund_percent}% с подписки курьеров каждый месяц.\n\n"
+                        f"▼ <b>Выберите действие в • ≡ Меню •</b>"
                     )
 
                     new_message = await callback_query.message.answer(
@@ -332,9 +334,10 @@ async def partner_generate_seed(
                     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
                 else:
-                    new_message = await callback_query.message.answer(
+                    new_message = await callback_query.answer(
                         text="<b>‼️ Произошла ошибка при создании ключа, попробуйте позже еще раз!</b>\n\n",
                         disable_notification=True,
+                        show_alert=True,
                         parse_mode="HTML",
                     )
 
@@ -383,9 +386,16 @@ async def partner_generate_seed(
 # ---
 
 
-@partner_r.message(F.text == "/refs")
-@partner_r.callback_query(F.data == "refresh_refs")
-async def cmd_refs(event: Message | CallbackQuery, state: FSMContext):
+@partner_r.message(
+    F.text == "/refs",
+)
+@partner_r.callback_query(
+    F.data == "refresh_refs",
+)
+async def cmd_refs(
+    event: Message | CallbackQuery,
+    state: FSMContext,
+):
     """Обрабатывает команду /refs"""
 
     tg_id = event.from_user.id
@@ -502,9 +512,16 @@ async def cmd_info(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.message(F.text == "/balance")
-@partner_r.callback_query(F.data == "refresh_balance")
-async def cmd_balance(event: Message | CallbackQuery, state: FSMContext):
+@partner_r.message(
+    F.text == "/balance",
+)
+@partner_r.callback_query(
+    F.data == "refresh_balance",
+)
+async def cmd_balance(
+    event: Message | CallbackQuery,
+    state: FSMContext,
+):
     """Обрабатывает команду /balance"""
 
     tg_id = event.from_user.id
@@ -593,8 +610,12 @@ async def cmd_adv(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.callback_query(F.data == "business_card_courier")
-@partner_r.callback_query(F.data == "business_card_customer")
+@partner_r.callback_query(
+    F.data == "business_card_courier",
+)
+@partner_r.callback_query(
+    F.data == "business_card_customer",
+)
 async def data_business_card(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -645,8 +666,12 @@ async def data_business_card(
         await callback_query.message.answer(f"Ошибка при генерации визитки: {str(e)}")
 
 
-@partner_r.callback_query(F.data == "buklet_courier")
-@partner_r.callback_query(F.data == "buklet_customer")
+@partner_r.callback_query(
+    F.data == "buklet_courier",
+)
+@partner_r.callback_query(
+    F.data == "buklet_customer",
+)
 async def data_buklet(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -695,8 +720,12 @@ async def data_buklet(
         await callback_query.message.answer(f"Ошибка при генерации буклета: {str(e)}")
 
 
-@partner_r.callback_query(F.data == "QR_courier")
-@partner_r.callback_query(F.data == "QR_customer")
+@partner_r.callback_query(
+    F.data == "QR_courier",
+)
+@partner_r.callback_query(
+    F.data == "QR_customer",
+)
 async def data_qr_courier(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -749,7 +778,8 @@ async def data_qr_courier(
             ]
         )
         await callback_query.message.answer(
-            text,
+            text=text,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -761,7 +791,9 @@ async def data_qr_courier(
         await callback_query.message.answer(f"Ошибка при генерации QR-кода")
 
 
-@partner_r.callback_query(F.data == "logo")
+@partner_r.callback_query(
+    F.data == "logo",
+)
 async def data_logo(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -830,7 +862,9 @@ async def data_logo(
         await callback_query.message.answer(f"Ошибка при генерации логотипа")
 
 
-@partner_r.callback_query(F.data == "seed_key")
+@partner_r.callback_query(
+    F.data == "seed_key",
+)
 async def data_seed_key_svg(
     callback_query: CallbackQuery,
     state: FSMContext,

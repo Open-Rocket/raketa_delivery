@@ -93,6 +93,7 @@ class GlobalSettings(Base):
     order_max_price: Mapped[intData] = mapped_column(Integer, default=100)
     subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
     discount_percent_courier: Mapped[intData] = mapped_column(Integer, default=15)
+    refund_percent: Mapped[intData] = mapped_column(Integer, default=30)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
 
 

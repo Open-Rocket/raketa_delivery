@@ -269,7 +269,7 @@ class Keyboard:
                     [
                         InlineKeyboardButton(
                             text="🚀 Начать работу",
-                            callback_data="lets_go",
+                            callback_data="lets_go_first",
                         )
                     ]
                 ]
@@ -542,6 +542,7 @@ class Keyboard:
 
         my_orders_kb = InlineKeyboardMarkup(
             inline_keyboard=[
+                [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")],
                 [
                     InlineKeyboardButton(
                         text=f"Завершеные {completed_count}",
@@ -551,7 +552,6 @@ class Keyboard:
                         text=f"Активные {active_count}", callback_data="active_orders"
                     ),
                 ],
-                [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")],
             ]
         )
 
@@ -568,20 +568,18 @@ class Keyboard:
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text=f"Заказы в городе {city_orders_len}",
-                        callback_data="show_city_orders",
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=f"Заказы рядом {available_orders_len}",
-                        callback_data="show_nearby_orders",
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
                         text=f"🔄 Обновить данные",
                         callback_data="refresh_orders",
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"Город {city_orders_len}",
+                        callback_data="show_city_orders",
+                    ),
+                    InlineKeyboardButton(
+                        text=f"Рядом {available_orders_len}",
+                        callback_data="show_nearby_orders",
                     ),
                 ],
             ]

@@ -872,6 +872,37 @@ class AdminData:
 
             return (customers, couriers, partners)
 
+    # ---
+
+    async def set_refund_percent(self, percent: int):
+        """Обновляет процент возврата"""
+        async with self.async_session_factory() as session:
+
+            if percent > 100:
+                percent = 100
+            elif percent < 0:
+                percent = 0
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.refund_percent = percent
+            else:
+                settings = GlobalSettings(refund_percent=percent)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_refund_percent(self) -> int:
+        """Возвращает процент возврата"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings.refund_percent))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.refund_percent if settings else 30
+
+    # ---
+
 
 class PartnerData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):

@@ -519,13 +519,7 @@ async def cmd_run(
     """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
 
     if isinstance(event, CallbackQuery):
-        # Проверяем, что событие содержит сообщение, прежде чем пытаться его удалить
-        if event.message:
-            try:
-                await event.message.delete()  # Попытка удалить сообщение
-            except Exception as e:
-                log.error(f"Ошибка удаления сообщения: {e}")
-
+        await event.message.delete()  # Попытка удалить сообщение
         await event.answer("🚀 Начать работу", show_alert=False)
 
     current_state = CourierState.default.state
@@ -626,6 +620,62 @@ async def cmd_run(
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+
+@courier_r.callback_query(
+    F.data == "lets_go_first",
+)
+async def data_lets_go_first(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик коллбэка 'lets_go_first' для курьера."""
+
+    await callback_query.answer("🚀 Начать работу", show_alert=False)
+
+    current_state = CourierState.location.state
+    tg_id = callback_query.from_user.id
+    chat_id = callback_query.message.chat.id
+    current_active_orders_count = await courier_data.get_courier_active_orders_count(
+        tg_id
+    )
+
+    reply_kb = await kb.get_courier_kb("/run")
+
+    if current_active_orders_count < 3:
+
+        text = (
+            "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
+            "<i>*Доступно только с мобильных устройств</i>"
+        )
+
+        await callback_query.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+    else:
+
+        current_state = CourierState.default.state
+
+        text = (
+            "Вы уже выполняете максимальное количество заказов.\n\n"
+            "Пожалуйста, завершите текущие заказы, чтобы начать новые."
+        )
+
+        await callback_query.message.answer(
+            text=text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    await rediska.set_read_info(courier_bot_id, tg_id, True)
 
 
 @courier_r.message(
@@ -1099,7 +1149,7 @@ async def accept_order(
         text = (
             f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
             f"Заказчик: {customer_name}\n"
-            f"Телефон: {customer_phone}\n"
+            f"Телефон: {customer_phone}\n\n"
             f"<i>*Принимайте оплату наличными или переводом!</i>\n\n"
             f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
             f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>"
@@ -1397,7 +1447,7 @@ async def get_my_orders(
         )
     else:
         reply_markup = await kb.get_courier_kb(
-            "one_my_order" if len(orders_data) == 1 else "completed_orders"
+            "one_my_order" if len(orders_data) == 1 else "complete_orders"
         )
 
     await callback_query.message.edit_text(
@@ -1945,7 +1995,7 @@ async def get_courier_statistic(
         f"Завершенные заказы: {completed_orders}\n"
         f"Среднее время выполнения: {average_execution_time / 60:.2f} мин\n"
         f"Средняя скорость: {average_speed:.2f} км/ч\n"
-        f"Общая сумма заработка: {total_money_earned} руб.\n"
+        f"Общая сумма заработка: {total_money_earned} ₽\n"
     )
 
     reply_kb = await kb.get_courier_kb("go_back")
