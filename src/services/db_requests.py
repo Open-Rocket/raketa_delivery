@@ -13,7 +13,8 @@ from src.models import (
     Order,
     Subscription,
 )
-from sqlalchemy import select, delete, update, func
+from sqlalchemy import select, delete, func
+from sqlalchemy.sql.functions import min
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
 from typing import Optional
@@ -674,6 +675,33 @@ class AdminData:
                 await session.rollback()
                 log.error(f"Ошибка при удалении администратора: {e}")
                 return False
+
+    # ---
+
+    async def change_partner_program(self, status: bool):
+        """Изменяет статут партнерской программы, включает и приостанавливает ее"""
+
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.partner_program_is_active = status
+            else:
+                settings = GlobalSettings(partner_program_is_active=status)
+                session.add(settings)
+            await session.commit()
+
+    async def get_partner_program_status(self) -> bool:
+        """Возвращает статус партнерской программы"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            if not settings:
+                return True
+
+            return settings.partner_program_is_active
 
     # ---
 
@@ -1817,6 +1845,26 @@ class OrderData:
                 completed_orders,
                 canceled_orders,
             )
+
+    # ---
+
+    async def get_fastest_order_ever(self) -> Optional[Order]:
+        """Возвращает самый быстрый заказ"""
+        async with self.async_session_factory() as session:
+            stmt = (
+                select(Order)
+                .where(Order.order_status == OrderStatus.COMPLETED)
+                .order_by(
+                    (
+                        Order.completed_at_moscow_time - Order.started_at_moscow_time
+                    ).asc()
+                )
+                .limit(1)
+            )
+
+            query = await session.execute(stmt)
+            fastest_order = query.scalars().first()
+            return fastest_order if fastest_order else None
 
 
 customer_data = CustomerData(async_session_factory)

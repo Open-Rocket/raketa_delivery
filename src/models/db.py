@@ -87,6 +87,7 @@ class GlobalSettings(Base):
     global_settings_id: Mapped[intPK]
 
     service_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    partner_program_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
     order_price_per_km: Mapped[intData] = mapped_column(Integer, default=38)

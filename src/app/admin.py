@@ -267,6 +267,7 @@ async def cmd_global(
         return
 
     service_status = await admin_data.get_service_status()
+    partner_program_status = await admin_data.get_partner_program_status()
     common_price, max_price = await admin_data.get_order_prices()
     subs_price = await admin_data.get_subscription_price() // 100
     discount_percent_courier = await admin_data.get_discount_percent_courier()
@@ -310,6 +311,14 @@ async def cmd_global(
 
     refund_percent = await admin_data.get_refund_percent()
 
+    fastest_order_ever = await order_data.get_fastest_order_ever()
+
+    log.info(f"fastest_order_ever: {fastest_order_ever}")
+
+    fastest_order_ever_speed = (
+        fastest_order_ever.speed_kmh if fastest_order_ever else "..."
+    )
+
     global_state_data = {
         "common_price": common_price,
         "max_price": max_price,
@@ -346,12 +355,15 @@ async def cmd_global(
         f"<b>🌎 Глобальное управление сервисом</b>\n\n"
         f"Здесь вы можете управлять всеми настройками сервиса и получать актуальную информацию.\n\n"
         f"<b>⚙️ Сервис и Данные</b>\n"
-        f" ▸ Состояние сервиса: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+        f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+        f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
         f" •\n"
         f" ▸ Пользователей: <b>{all_users}</b>\n"
         f" ▸ Заказов: <b>{all_orders}</b>\n"
         f" ▸ Оборот: <b>{turnover}₽</b>\n"
         f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+        f"🏆 <b>Рекорды</b>\n"
+        f"  ▸ Самый быстрый заказ: {fastest_order_ever_speed} км/ч\n\n"
         f"💰 <b>Цены и Тарифы</b>\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
@@ -450,7 +462,9 @@ async def data_service_data(
 
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
+
     service_status = await admin_data.get_service_status()
+    partner_program_status = await admin_data.get_partner_program_status()
 
     data = await state.get_data()
     global_state_data: dict = data.get("global_state_data")
@@ -468,7 +482,8 @@ async def data_service_data(
 
     text = (
         f"<b>⚙️ Сервис и Данные</b>\n\n"
-        f" ▸ Состояние сервиса: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+        f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+        f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
         f" •\n"
         f" ▸ Пользователей: <b>{all_users}</b>\n"
         f"   ‣ Клиентов: <b>{customers}</b>\n"
@@ -500,8 +515,8 @@ async def data_service_data(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.callback_query(F.data == "turn_on")
-@admin_r.callback_query(F.data == "turn_off")
+@admin_r.callback_query(F.data == "turn_on_service")
+@admin_r.callback_query(F.data == "turn_off_service")
 async def data_status_service(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -513,13 +528,13 @@ async def data_status_service(
 
     service_status = await admin_data.get_service_status()
 
-    if callback_query.data == "turn_on":
+    if callback_query.data == "turn_on_service":
         await admin_data.change_service_status(status=True)
         await callback_query.message.answer(
             text=f"✅ Сервис включен! \n\n",
         )
 
-    elif callback_query.data == "turn_off":
+    elif callback_query.data == "turn_off_service":
         await admin_data.change_service_status(status=False)
 
         await callback_query.message.answer(
@@ -531,6 +546,36 @@ async def data_status_service(
 
     await callback_query.message.delete()
 
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(F.data == "turn_on_partner")
+@admin_r.callback_query(F.data == "turn_off_partner")
+async def data_status_service(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Включить/Выключить партнерки" для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    partner_program_status = await admin_data.get_partner_program_status()
+
+    if callback_query.data == "turn_on_partner":
+        await admin_data.change_partner_program(status=True)
+        await callback_query.message.answer(
+            text=f"✅ Партнерская программа включена! \n\n",
+        )
+    elif callback_query.data == "turn_off_partner":
+        await admin_data.change_partner_program(status=False)
+        await callback_query.message.answer(
+            text=f"❌ Партнерская программа выключена!",
+        )
+    partner_program_status = await admin_data.get_partner_program_status()
+    log.info(f"partner_program_status: {partner_program_status}")
+    await callback_query.message.delete()
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 

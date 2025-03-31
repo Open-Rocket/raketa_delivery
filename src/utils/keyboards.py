@@ -666,6 +666,12 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
+                            text="🏆 Рекорды",
+                            callback_data="records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
                             text="💰 Цены и Тарифы",
                             callback_data="prices_and_tariffs",
                         )
@@ -841,7 +847,8 @@ class Keyboard:
     @staticmethod
     async def get_turn_status_kb(
         key: str,
-        status: bool = True,
+        status_service: bool = True,
+        status_partner: bool = True,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
@@ -850,8 +857,14 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text=f"{'Включить ✅' if status else 'Выключить ❌'}",
-                            callback_data=f"{'turn_on' if status else 'turn_off'}",
+                            text=f"{'Включить сервис ✅' if status_service else 'Выключить сервис ❌'}",
+                            callback_data=f"{'turn_on_service' if status_service else 'turn_off_service'}",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Включить партнерку ✅' if status_partner else 'Выключить партнерку ❌'}",
+                            callback_data=f"{'turn_on_partner' if status_partner else 'turn_off_partner'}",
                         ),
                     ],
                     [
