@@ -210,6 +210,11 @@ async def cmd_admins(
     tg_id = message.from_user.id
     current_state = AdminState.default.state
 
+    if tg_id != SUPER_ADMIN_TG_ID:
+        await message.answer(
+            text="❌ У вас нет доступа к этой команде.",
+        )
+
     admins = await admin_data.get_all_admins()
     admins_phone = [admin.phone for admin in admins]
 
@@ -249,6 +254,12 @@ async def cmd_global(
     tg_id = event.from_user.id
     current_state = AdminState.default.state
 
+    if tg_id != SUPER_ADMIN_TG_ID:
+        await event.answer(
+            text="❌ У вас нет доступа к этой команде.",
+        )
+        return
+
     service_status = await admin_data.get_service_status()
     common_price, max_price = await admin_data.get_order_prices()
     subs_price = await admin_data.get_subscription_price() // 100
@@ -267,29 +278,59 @@ async def cmd_global(
         _,
     ) = await order_data.get_all_orders()
 
-    superadmin_data = (
-        f" - Пользователей: <b>{all_users}</b>\n"
-        f" - Всего заказов: <b>{len(all_orders)}</b>\n"
-        f" - Прибыль: <b>{profit}₽</b>\n"
-        f" - Оборот: <b>{profit}₽</b>\n\n"
-    )
+    coefficient_less_5km = await admin_data.get_distance_coefficient_less_5()
+    coefficient_5_10_km = await admin_data.get_distance_coefficient_5_10()
+    coefficient_10_20_km = await admin_data.get_distance_coefficient_10_20()
+    coefficient_more_20_km = await admin_data.get_distance_coefficient_more_20()
+
+    coefficient_00_06 = await admin_data.get_time_coefficient_00_06()
+    coefficient_06_12 = await admin_data.get_time_coefficient_06_12()
+    coefficient_12_18 = await admin_data.get_time_coefficient_12_18()
+    coefficient_18_21 = await admin_data.get_time_coefficient_18_21()
+    coefficient_21_00 = await admin_data.get_time_coefficient_21_00()
+
+    coefficient_big_cities = await admin_data.get_big_cities_coefficient()
+    coefficient_small_cities = await admin_data.get_small_cities_coefficient()
+
+    refund_percent = await admin_data.get_refund_percent()
 
     text = (
         f"<b>🌎 Глобальное управление сервисом</b>\n\n"
         f"Здесь вы можете управлять всеми настройками сервиса и получать актуальную информацию.\n\n"
         f"<b>⚙️ Сервис и Данные</b>\n"
-        f" - Текущее состояние сервиса: <b>{'Активен' if service_status else 'На профилактике'}</b>\n"
-        f"{superadmin_data if tg_id == SUPER_ADMIN_TG_ID else ''}"
-        f"<b>💰 Цены и Тарифы</b>\n"
+        f" - Состояние сервиса: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+        f" •\n"
+        f" - Пользователей: <b>{all_users}</b>\n"
+        f" - Всего заказов: <b>{len(all_orders)}</b>\n"
+        f" - Прибыль: <b>{profit}₽</b>\n"
+        f" - Оборот: <b>{turnover}₽</b>\n\n"
+        f"💰 <b>Цены и Тарифы</b>\n"
         f" - Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" - Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
-        f" - Максимальная цена заказа за 1км: <b>{max_price}₽</b>\n\n"
-        f"<b>🎉 Акции и Скидки %</b>\n"
+        f" - Максимальная цена заказа за 1км: <b>{max_price}₽</b>\n"
+        f" •\n"
+        f" - Коэффициент 0 - 5 км: <b>{coefficient_less_5km}</b>\n"
+        f" - Коэффициент 5 - 10 км: <b>{coefficient_5_10_km}</b>\n"
+        f" - Коэффициент 10 - 20 км: <b>{coefficient_10_20_km}</b>\n"
+        f" - Коэффициент 20 - ... км: <b>{coefficient_more_20_km}</b>\n"
+        f" •\n"
+        f" - Коэффициент 00 - 06: <b>{coefficient_00_06}</b>\n"
+        f" - Коэффициент 06 - 12: <b>{coefficient_06_12}</b>\n"
+        f" - Коэффициент 12 - 18: <b>{coefficient_12_18}</b>\n"
+        f" - Коэффициент 18 - 21: <b>{coefficient_18_21}</b>\n"
+        f" - Коэффициент 21 - 00: <b>{coefficient_21_00}</b>\n"
+        f" •\n"
+        f" - Коэффициент в больших городах: <b>{coefficient_big_cities}</b>\n"
+        f" - Коэффициент в остальных городах: <b>{coefficient_small_cities}</b>\n\n"
+        f"🎉 <b>Акции и Скидки %</b>\n"
         f" - Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" - Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
-        f" - Бесплатный период: <b>{free_period_days} дней</b>\n\n"
-        f"Выберите действие:\n"
+        f" - Бесплатный период: <b>{free_period_days} дней</b>\n"
+        f" •\n"
+        f" - Партнерский процент: <b>{refund_percent}%</b>\n\n"
+        f"<b>Выберите действие:</b>\n"
     )
+
     reply_kb = await kb.get_admin_kb("/global")
 
     state_data = await state.get_data()
@@ -321,10 +362,78 @@ async def cmd_global(
             )
 
     await state.set_state(current_state)
-    await state.update_data(message_text_global=text, message_kb_global=new_kb_json)
+    await state.update_data(
+        message_text_global=text,
+        message_kb_global=new_kb_json,
+    )
     await rediska.set_state(admin_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
 # ---
 # ---
+# ---
+
+
+@admin_r.callback_query(F.data == "service_data")
+async def cmd_service_data(callback_query: CallbackQuery):
+    """Обработчик кнопки "Сервисные данные" для админа."""
+
+    current_state = AdminState.default.state
+
+    service_status = await admin_data.get_service_status()
+
+    log.info(f"service_status: {service_status}")
+
+    if callback_query.data == "service_data":
+
+        await callback_query.answer(
+            text="⚙️ Сервис и Данные.",
+            show_alert=False,
+        )
+
+    text = (
+        f"<b>⚙️ Сервис и Данные.</b>\n\n"
+        f" - Состояние сервиса: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
+    )
+
+    reply_kb = await kb.get_turn_status_kb(
+        status=service_status,
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+
+    await rediska.set_state(admin_bot_id, SUPER_ADMIN_TG_ID, current_state)
+
+
+@admin_r.callback_query(F.data == "turn_on")
+@admin_r.callback_query(F.data == "turn_off")
+async def data_status_service(
+    callback_query: CallbackQuery,
+):
+    """Обработчик кнопки "Включить/Выключить сервис" для админа."""
+
+    service_status = await admin_data.get_service_status()
+    log.info(f"service_status_1: {service_status}")
+
+    if callback_query.data == "turn_on":
+        await admin_data.change_service_status(status=True)
+        await callback_query.message.answer(
+            text="✅ Сервис включен.",
+            show_alert=False,
+        )
+
+    elif callback_query.data == "turn_off":
+        await admin_data.change_service_status(status=False)
+        await callback_query.message.answer(
+            text="❌ Сервис выключен.",
+        )
+
+    service_status = await admin_data.get_service_status()
+    log.info(f"service_status_2: {service_status}")
+
+    await callback_query.message.delete()

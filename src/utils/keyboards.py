@@ -588,7 +588,9 @@ class Keyboard:
         return near_kb
 
     @staticmethod
-    async def get_admin_kb(key: str) -> InlineKeyboardMarkup:
+    async def get_admin_kb(
+        key: str,
+    ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
         kb = {
@@ -652,6 +654,12 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
+                            text="🔄 Обновить",
+                            callback_data="refresh_global_data",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
                             text="⚙️ Сервис и Данные",
                             callback_data="service_data",
                         )
@@ -674,17 +682,42 @@ class Keyboard:
                             callback_data="send_message",
                         )
                     ],
-                    [
-                        InlineKeyboardButton(
-                            text="🔄 Обновить данные",
-                            callback_data="refresh_global_data",
-                        )
-                    ],
                 ]
             ),
         }
 
         return kb[key]
+
+    @staticmethod
+    async def get_turn_status_kb(
+        status: bool = True,
+    ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для админа"""
+
+        kb = {
+            "false": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"Включить ✅",
+                            callback_data="turn_on",
+                        ),
+                    ],
+                ]
+            ),
+            "true": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"Выключить ❌",
+                            callback_data="turn_off",
+                        ),
+                    ],
+                ]
+            ),
+        }
+
+        return kb[str(status).lower()]
 
     @staticmethod
     async def get_partner_kb(key: str) -> InlineKeyboardMarkup:
@@ -714,6 +747,16 @@ class Keyboard:
                     [
                         InlineKeyboardButton(
                             text="🔑 Сгенерировать",
+                            callback_data="generate_seed_key",
+                        )
+                    ]
+                ]
+            ),
+            "try_again_seed": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Попробовать еще раз",
                             callback_data="generate_seed_key",
                         )
                     ]

@@ -119,14 +119,7 @@ class RouteMaster:
         city=None,
         over_price=0,
     ) -> int:
-        """
-        Рассчитывает стоимость доставки.
-        :param distance: расстояние в км
-        :param order_time: время заказа (datetime)
-        :param city: город (опционально)
-        :param over_price: надбавка к стоимости
-        :return: стоимость доставки
-        """
+        """Рассчитывает стоимость доставки."""
 
         millions_cities = await cities.get_millions_cities()
         small_cities = await cities.get_small_cities()
@@ -134,10 +127,13 @@ class RouteMaster:
         common_price, max_price = await admin_data.get_order_prices()
 
         base_price_per_km = max_price if 0 < distance <= 2 else common_price
+
         city_coefficient = 1.0
+        time_coefficient = 1.0
+        distance_coefficient = 1.0
 
         if city in millions_cities:
-            city_coefficient = 1.045
+            city_coefficient = 1.3
 
         if city in small_cities:
             city_coefficient = 0.9
@@ -148,15 +144,17 @@ class RouteMaster:
             time_coefficient = 1.0
         elif 12 <= order_time.hour < 18:
             time_coefficient = 1.1
+        elif 18 <= order_time.hour < 21:
+            time_coefficient = 1.25
         else:
-            time_coefficient = 1.07
+            time_coefficient = 1.1
 
         if distance <= 5:
-            distance_coefficient = 0.9
+            distance_coefficient = 1.25
         elif 5 < distance <= 10:
-            distance_coefficient = 1.0
+            distance_coefficient = 1.1
         elif 10 < distance <= 20:
-            distance_coefficient = 0.8
+            distance_coefficient = 0.85
         else:
             distance_coefficient = 0.7
 

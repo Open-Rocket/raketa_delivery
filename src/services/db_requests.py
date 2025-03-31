@@ -631,6 +631,8 @@ class AdminData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
+    # ---
+
     async def set_new_admin(
         self,
         tg_id: int,
@@ -688,14 +690,19 @@ class AdminData:
                 settings = GlobalSettings(service_is_active=status)
                 session.add(settings)
 
+            log.info(f"Статус сервиса изменён на {status}")
+
             await session.commit()
 
     async def get_service_status(self) -> bool:
         """Возвращает статус сервиса"""
         async with self.async_session_factory() as session:
-            result = await session.execute(select(GlobalSettings.service_is_active))
+            result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.service_is_active if settings else True
+            if not settings:
+                return True
+
+            return settings.service_is_active
 
     # ---
 
@@ -727,11 +734,19 @@ class AdminData:
                     GlobalSettings.order_price_per_km, GlobalSettings.order_max_price
                 )
             )
-            settings: GlobalSettings = result.scalar_one_or_none()
-            return (
-                settings.order_price_per_km if settings else 38,
-                settings.order_max_price if settings else 100,
-            )
+            settings = result.scalar_one_or_none()
+
+            if not settings:
+                return 38, 100
+
+            if isinstance(settings, GlobalSettings):
+                return (
+                    settings.order_price_per_km if settings.order_price_per_km else 38,
+                    settings.order_max_price if settings.order_max_price else 100,
+                )
+            else:
+
+                return 38, 100
 
     # ---
 
@@ -754,8 +769,9 @@ class AdminData:
         """Возвращает цену подписки"""
         async with self.async_session_factory() as session:
             result = await session.execute(select(GlobalSettings.subs_price))
-            settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.subs_price if settings else 99000
+
+            subs_price = result.scalar_one_or_none()
+            return subs_price if subs_price is not None else 99000
 
     # ---
 
@@ -800,22 +816,26 @@ class AdminData:
             await session.commit()
 
     async def get_discount_percent_courier(self) -> int:
-        """Возвращает процент скидки"""
+        """Возвращает процент скидки для курьера."""
         async with self.async_session_factory() as session:
-            result = await session.execute(
-                select(GlobalSettings.discount_percent_courier)
-            )
+            result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.discount_percent_courier if settings else 15
+
+            if settings is not None:
+                return settings.discount_percent_courier
+
+            return 15
 
     async def get_first_order_discount(self) -> float:
         """Возвращает процент скидки на первый заказ"""
         async with self.async_session_factory() as session:
-            result = await session.execute(
-                select(GlobalSettings.discount_percent_first_order)
-            )
+            result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.discount_percent_first_order if settings else 15
+
+            if settings is not None:
+                return settings.discount_percent_first_order
+
+            return 15
 
     # ---
 
@@ -837,9 +857,12 @@ class AdminData:
     async def get_free_period_days(self) -> int:
         """Возвращает количество дней бесплатного периода"""
         async with self.async_session_factory() as session:
-            result = await session.execute(select(GlobalSettings.free_period_days))
+            result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.free_period_days if settings else 10
+
+            if settings is not None:
+                return settings.free_period_days
+            return 10
 
     # ---
 
@@ -897,9 +920,330 @@ class AdminData:
     async def get_refund_percent(self) -> int:
         """Возвращает процент возврата"""
         async with self.async_session_factory() as session:
-            result = await session.execute(select(GlobalSettings.refund_percent))
+            result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.refund_percent if settings else 30
+
+            if settings is not None:
+                return settings.refund_percent
+            return 30
+
+    # ---
+
+    async def update_distance_coefficient_less_5(self, coefficient: float):
+        """Обновляет коэффициент для расстояний меньше 5 км"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.distance_coefficient_less_5 = coefficient
+            else:
+                settings = GlobalSettings(distance_coefficient_less_5=coefficient)
+                session.add(settings)
+
+    async def update_distance_coefficient_5_10(self, coefficient: float):
+        """Обновляет коэффициент для расстояний от 5 до 10 км"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.distance_coefficient_5_10 = coefficient
+            else:
+                settings = GlobalSettings(distance_coefficient_5_10=coefficient)
+                session.add(settings)
+
+    async def update_distance_coefficient_10_20(self, coefficient: float):
+        """Обновляет коэффициент для расстояний от 10 до 20 км"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.distance_coefficient_10_20 = coefficient
+            else:
+                settings = GlobalSettings(distance_coefficient_10_20=coefficient)
+                session.add(settings)
+
+    async def update_distance_coefficient_more_20(self, coefficient: float):
+        """Обновляет коэффициент для расстояний больше 20 км"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.distance_coefficient_more_20 = coefficient
+            else:
+                settings = GlobalSettings(distance_coefficient_more_20=coefficient)
+                session.add(settings)
+
+    # ---
+
+    async def get_distance_coefficient_less_5(self) -> float:
+        """Возвращает коэффициент для расстояний меньше 5 км"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            return settings.distance_coefficient_less_5 if settings else 1.0
+
+    async def get_distance_coefficient_5_10(self) -> float:
+        """Возвращает коэффициент для расстояний от 5 до 10 км"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.distance_coefficient_5_10 if settings else 1.0
+
+    async def get_distance_coefficient_10_20(self) -> float:
+        """Возвращает коэффициент для расстояний от 10 до 20 км"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.distance_coefficient_10_20 if settings else 1.0
+
+    async def get_distance_coefficient_more_20(self) -> float:
+        """Возвращает коэффициент для расстояний больше 20 км"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.distance_coefficient_more_20 if settings else 1.0
+
+    # ---
+
+    async def update_time_coefficient_00_06(self, coefficient: float):
+        """Обновляет коэффициент для времени от 0 до 6 часов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.time_coefficient_00_06 = coefficient
+            else:
+                settings = GlobalSettings(time_coefficient_0_6=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    async def update_time_coefficient_06_12(self, coefficient: float):
+        """Обновляет коэффициент для времени от 6 до 12 часов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.time_coefficient_06_12 = coefficient
+            else:
+                settings = GlobalSettings(time_coefficient_6_12=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    async def update_time_coefficient_12_18(self, coefficient: float):
+        """Обновляет коэффициент для времени от 12 до 18 часов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.time_coefficient_12_18 = coefficient
+            else:
+                settings = GlobalSettings(time_coefficient_12_18=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    async def update_time_coefficient_18_21(self, coefficient: float):
+        """Обновляет коэффициент для времени от 18 до 21 часов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.time_coefficient_18_21 = coefficient
+            else:
+                settings = GlobalSettings(time_coefficient_18_21=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    async def update_time_coefficient_21_00(self, coefficient: float):
+        """Обновляет коэффициент для времени от 21 до 0 часов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.time_coefficient_21_00 = coefficient
+            else:
+                settings = GlobalSettings(time_coefficient_21_0=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    # ---
+
+    async def get_time_coefficient_00_06(self) -> float:
+        """Возвращает коэффициент для времени от 0 до 6 часов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.time_coefficient_00_06 if settings else 1.0
+
+    async def get_time_coefficient_06_12(self) -> float:
+        """Возвращает коэффициент для времени от 6 до 12 часов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.time_coefficient_06_12 if settings else 1.0
+
+    async def get_time_coefficient_12_18(self) -> float:
+        """Возвращает коэффициент для времени от 12 до 18 часов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.time_coefficient_12_18 if settings else 1.0
+
+    async def get_time_coefficient_18_21(self) -> float:
+        """Возвращает коэффициент для времени от 18 до 21 часов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.time_coefficient_18_21 if settings else 1.0
+
+    async def get_time_coefficient_21_00(self) -> float:
+        """Возвращает коэффициент для времени от 21 до 0 часов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.time_coefficient_21_00 if settings else 1.0
+
+    # ---
+
+    async def update_big_cities_coefficient(self, coefficient: float):
+        """Обновляет коэффициент для больших городов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.big_cities_coefficient = coefficient
+            else:
+                settings = GlobalSettings(big_cities_coefficient=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    async def update_small_cities_coefficient(self, coefficient: float):
+        """Обновляет коэффициент для маленьких городов"""
+
+        if coefficient < 0:
+            coefficient = 1
+        elif coefficient > 3.0:
+            coefficient = 3.0
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.small_cities_coefficient = coefficient
+            else:
+                settings = GlobalSettings(small_cities_coefficient=coefficient)
+                session.add(settings)
+                await session.commit()
+
+    # ---
+
+    async def get_big_cities_coefficient(self) -> float:
+        """Возвращает коэффициент для больших городов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.big_cities_coefficient if settings else 1.0
+
+    async def get_small_cities_coefficient(self) -> float:
+        """Возвращает коэффициент для маленьких городов"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.small_cities_coefficient if settings else 1.0
+
+    # ---
+
+    async def get_all_coefficients(self) -> dict:
+        """Возвращает все коэффициенты"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            if settings:
+                return {
+                    "big_cities_coefficient": settings.big_cities_coefficient,
+                    "small_cities_coefficient": settings.small_cities_coefficient,
+                    "distance_coefficient_less_5": settings.distance_coefficient_less_5,
+                    "distance_coefficient_5_10": settings.distance_coefficient_5_10,
+                    "distance_coefficient_10_20": settings.distance_coefficient_10_20,
+                    "distance_coefficient_more_20": settings.distance_coefficient_more_20,
+                    "time_coefficient_00_06": settings.time_coefficient_00_06,
+                    "time_coefficient_06_12": settings.time_coefficient_06_12,
+                    "time_coefficient_12_18": settings.time_coefficient_12_18,
+                    "time_coefficient_18_21": settings.time_coefficient_18_21,
+                    "time_coefficient_21_00": settings.time_coefficient_21_00,
+                }
+            return {}
 
     # ---
 
@@ -908,62 +1252,38 @@ class PartnerData:
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
-    async def set_new_partner(
+    # ---
+
+    async def create_new_partner(
         self,
         tg_id: int,
-        name: str,
-        phone: str,
-        city: str,
-    ) -> bool:
+    ) -> int | bool:
         """Добавляет в БД нового партнера, если такого еще нет."""
 
         async with self.async_session_factory() as session:
             try:
-                # Проверяем, существует ли партнер с таким tg_id
                 existing_partner = await session.scalar(
                     select(Partner).where(Partner.partner_tg_id == tg_id)
                 )
                 if existing_partner:
                     log.error(f"Партнёр с tg_id {tg_id} уже существует.")
-                    return False  # Партнёр уже существует
+                    return False
 
                 new_partner = Partner(
                     partner_tg_id=tg_id,
-                    partner_name=name,
-                    partner_phone=phone,
-                    partner_city=city,
                     partner_registration_date=await Time.get_moscow_time(),
                 )
                 session.add(new_partner)
                 await session.flush()
+                new_partner_id = new_partner.partner_id
                 await session.commit()
-                return True
+                return new_partner_id
             except Exception as e:
                 await session.rollback()
                 log.error(f"Ошибка при добавлении партнера: {e}")
                 return False
 
     # ---
-
-    async def get_partner_info(self, tg_id: int) -> tuple:
-        """Возвращает имя, номер и город партнера из БД"""
-        async with self.async_session_factory() as session:
-            partner = await session.scalar(
-                select(Partner).where(Partner.partner_tg_id == tg_id)
-            )
-            if partner:
-                return (
-                    partner.partner_id or None,
-                    partner.partner_name or None,
-                    partner.partner_phone or None,
-                    partner.partner_city or None,
-                )
-            return (
-                None,
-                None,
-                None,
-                None,
-            )
 
     async def get_all_seed_keys(self) -> list:
         """Возвращает все seed ключи"""

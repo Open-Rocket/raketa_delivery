@@ -96,6 +96,21 @@ class GlobalSettings(Base):
     refund_percent: Mapped[intData] = mapped_column(Integer, default=30)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
 
+    distance_coefficient_less_5: Mapped[floatData] = mapped_column(Float, default=1.25)
+    distance_coefficient_5_10: Mapped[floatData] = mapped_column(Float, default=1.1)
+    distance_coefficient_10_20: Mapped[floatData] = mapped_column(Float, default=0.85)
+    distance_coefficient_more_20: Mapped[floatData] = mapped_column(Float, default=0.75)
+
+    time_coefficient_00_06: Mapped[floatData] = mapped_column(Float, default=1.15)
+    time_coefficient_06_12: Mapped[floatData] = mapped_column(Float, default=1.0)
+    time_coefficient_12_18: Mapped[floatData] = mapped_column(Float, default=1.1)
+    time_coefficient_18_21: Mapped[floatData] = mapped_column(Float, default=1.25)
+    time_coefficient_21_00: Mapped[floatData] = mapped_column(Float, default=1.1)
+
+    city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
+    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.3)
+    small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
+
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -178,9 +193,6 @@ class Partner(Base):
     partner_id: Mapped[intPK]
 
     partner_tg_id: Mapped[intDataUnique]
-    partner_name: Mapped[stringData]
-    partner_phone: Mapped[stringData]
-    partner_city: Mapped[stringData]
     partner_registration_date: Mapped[datetimeData]
 
     balance: Mapped[intData] = mapped_column(Integer, default=0)

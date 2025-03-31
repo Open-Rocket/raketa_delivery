@@ -275,6 +275,30 @@ class RedisService:
             log.error(f"Ошибка чтения счётчика пропусков из Redis: {e}")
             return 0
 
+    # ---
+
+    async def set_partner_tg_id(
+        self, bot_id: int, user_id: int, partner_tg_id: int
+    ) -> bool:
+        """Сохраняет tg_id партнера в Redis"""
+        key = RedisKey(bot_id, user_id)
+        try:
+            await self.redis.hset(f"user_info:{key}", "partner_tg_id", partner_tg_id)
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи tg_id партнера в Redis: {e}")
+            return False
+
+    async def get_partner_tg_id(self, bot_id: int, user_id: int) -> int | None:
+        """Получает tg_id партнера из Redis"""
+        key = RedisKey(bot_id, user_id)
+        try:
+            partner_tg_id = await self.redis.hget(f"user_info:{key}", "partner_tg_id")
+            return int(partner_tg_id) if partner_tg_id else None
+        except Exception as e:
+            log.error(f"Ошибка чтения tg_id партнера из Redis: {e}")
+            return None
+
 
 async def create_redis_service() -> RedisService:
     """Асинхронная фабрика для создания экземпляра RedisService"""
