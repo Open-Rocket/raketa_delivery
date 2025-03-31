@@ -5,7 +5,7 @@ import zlib
 import json
 from random import randint
 from aiogram import Router, filters, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.enums import ContentType
 from datetime import datetime, timedelta
@@ -71,6 +71,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "StateFilter",
     "randint",
     "io",
     "zlib",

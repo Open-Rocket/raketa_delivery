@@ -706,23 +706,33 @@ class AdminData:
 
     # ---
 
-    async def update_order_prices(self, min_price: int | None, max_piece: int | None):
-        """Обновляет минимальную и максимальную цену заказа"""
+    async def change_standard_order_price(self, price: int):
+        """Обновляет стандартную цену заказа"""
         async with self.async_session_factory() as session:
 
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
 
             if settings:
-                if min_price:
-                    settings.order_price_per_km = min_price
-                if max_piece:
-                    settings.order_max_price = max_piece
+                settings.order_price_per_km = price
             else:
-                settings = GlobalSettings(
-                    order_price_per_km=min_price, order_max_price=max_piece
-                )
-                session.add(settings)  # Добавляем только если создаём новый объект
+                settings = GlobalSettings(order_price_per_km=price)
+                session.add(settings)
+
+            await session.commit()
+
+    async def change_max_order_price(self, price: int):
+        """Обновляет максимальную цену заказа"""
+        async with self.async_session_factory() as session:
+
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.order_max_price = price
+            else:
+                settings = GlobalSettings(order_max_price=price)
+                session.add(settings)
 
             await session.commit()
 
@@ -750,7 +760,7 @@ class AdminData:
 
     # ---
 
-    async def update_subscription_price(self, price: int):
+    async def change_subscription_price(self, price: int):
         """Обновляет цену подписки"""
         async with self.async_session_factory() as session:
 
@@ -758,9 +768,9 @@ class AdminData:
             settings: GlobalSettings = result.scalar_one_or_none()
 
             if settings:
-                settings.subs_price = price
+                settings.subs_price = price * 100
             else:
-                settings = GlobalSettings(subs_price=price)
+                settings = GlobalSettings(subs_price=price * 100)
                 session.add(settings)
 
             await session.commit()
@@ -775,12 +785,12 @@ class AdminData:
 
     # ---
 
-    async def update_discount_percent_courier(self, percent: int):
+    async def change_discount_percent_courier(self, percent: int):
         """Обновляет процент скидки курьеру"""
         async with self.async_session_factory() as session:
 
-            if percent > 100:
-                percent = 100
+            if percent > 75:
+                percent = 75
             elif percent < 0:
                 percent = 0
 
@@ -795,12 +805,12 @@ class AdminData:
 
             await session.commit()
 
-    async def update_discount_percent_first_order(self, percent: int):
+    async def change_first_order_discount(self, percent: int):
         """Обновляет процент скидки на первый заказ"""
         async with self.async_session_factory() as session:
 
-            if percent > 100:
-                percent = 100
+            if percent > 75:
+                percent = 75
             elif percent < 0:
                 percent = 0
 
@@ -839,12 +849,17 @@ class AdminData:
 
     # ---
 
-    async def update_free_period_days(self, days: int):
+    async def change_free_period_days(self, days: int):
         """Обновляет количество дней бесплатного периода"""
         async with self.async_session_factory() as session:
 
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
+
+            if days < 0:
+                days = 0
+            elif days > 30:
+                days = 30
 
             if settings:
                 settings.free_period_days = days
@@ -876,7 +891,11 @@ class AdminData:
     async def get_turnover(self) -> int:
         """Возвращает оборот сервиса"""
         async with self.async_session_factory() as session:
-            result = await session.execute(select(func.sum(Order.price_rub)))
+            result = await session.execute(
+                select(func.sum(Order.price_rub)).where(
+                    Order.order_status == OrderStatus.COMPLETED
+                )
+            )
             turnover = result.scalar_one_or_none()
             return turnover if turnover else 0
 
@@ -897,14 +916,14 @@ class AdminData:
 
     # ---
 
-    async def set_refund_percent(self, percent: int):
+    async def change_refund_percent(self, percent: int):
         """Обновляет процент возврата"""
         async with self.async_session_factory() as session:
 
-            if percent > 100:
-                percent = 100
-            elif percent < 0:
-                percent = 0
+            if percent > 50:
+                percent = 50
+            elif percent < 15:
+                percent = 15
 
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
@@ -929,7 +948,7 @@ class AdminData:
 
     # ---
 
-    async def update_distance_coefficient_less_5(self, coefficient: float):
+    async def change_distance_coefficient_less_5(self, coefficient: float):
         """Обновляет коэффициент для расстояний меньше 5 км"""
 
         if coefficient < 0:
@@ -947,7 +966,7 @@ class AdminData:
                 settings = GlobalSettings(distance_coefficient_less_5=coefficient)
                 session.add(settings)
 
-    async def update_distance_coefficient_5_10(self, coefficient: float):
+    async def change_distance_coefficient_5_10(self, coefficient: float):
         """Обновляет коэффициент для расстояний от 5 до 10 км"""
 
         if coefficient < 0:
@@ -965,7 +984,7 @@ class AdminData:
                 settings = GlobalSettings(distance_coefficient_5_10=coefficient)
                 session.add(settings)
 
-    async def update_distance_coefficient_10_20(self, coefficient: float):
+    async def change_distance_coefficient_10_20(self, coefficient: float):
         """Обновляет коэффициент для расстояний от 10 до 20 км"""
 
         if coefficient < 0:
@@ -983,7 +1002,7 @@ class AdminData:
                 settings = GlobalSettings(distance_coefficient_10_20=coefficient)
                 session.add(settings)
 
-    async def update_distance_coefficient_more_20(self, coefficient: float):
+    async def change_distance_coefficient_more_20(self, coefficient: float):
         """Обновляет коэффициент для расстояний больше 20 км"""
 
         if coefficient < 0:
@@ -1034,7 +1053,7 @@ class AdminData:
 
     # ---
 
-    async def update_time_coefficient_00_06(self, coefficient: float):
+    async def change_time_coefficient_00_06(self, coefficient: float):
         """Обновляет коэффициент для времени от 0 до 6 часов"""
 
         if coefficient < 0:
@@ -1053,7 +1072,7 @@ class AdminData:
                 session.add(settings)
                 await session.commit()
 
-    async def update_time_coefficient_06_12(self, coefficient: float):
+    async def change_time_coefficient_06_12(self, coefficient: float):
         """Обновляет коэффициент для времени от 6 до 12 часов"""
 
         if coefficient < 0:
@@ -1072,7 +1091,7 @@ class AdminData:
                 session.add(settings)
                 await session.commit()
 
-    async def update_time_coefficient_12_18(self, coefficient: float):
+    async def change_time_coefficient_12_18(self, coefficient: float):
         """Обновляет коэффициент для времени от 12 до 18 часов"""
 
         if coefficient < 0:
@@ -1091,7 +1110,7 @@ class AdminData:
                 session.add(settings)
                 await session.commit()
 
-    async def update_time_coefficient_18_21(self, coefficient: float):
+    async def change_time_coefficient_18_21(self, coefficient: float):
         """Обновляет коэффициент для времени от 18 до 21 часов"""
 
         if coefficient < 0:
@@ -1110,7 +1129,7 @@ class AdminData:
                 session.add(settings)
                 await session.commit()
 
-    async def update_time_coefficient_21_00(self, coefficient: float):
+    async def change_time_coefficient_21_00(self, coefficient: float):
         """Обновляет коэффициент для времени от 21 до 0 часов"""
 
         if coefficient < 0:
@@ -1168,7 +1187,7 @@ class AdminData:
 
     # ---
 
-    async def update_big_cities_coefficient(self, coefficient: float):
+    async def change_big_cities_coefficient(self, coefficient: float):
         """Обновляет коэффициент для больших городов"""
 
         if coefficient < 0:
@@ -1187,7 +1206,7 @@ class AdminData:
                 session.add(settings)
                 await session.commit()
 
-    async def update_small_cities_coefficient(self, coefficient: float):
+    async def change_small_cities_coefficient(self, coefficient: float):
         """Обновляет коэффициент для маленьких городов"""
 
         if coefficient < 0:
@@ -1793,7 +1812,6 @@ class OrderData:
             ]
 
             return (
-                all_orders,
                 pending_orders,
                 active_orders,
                 completed_orders,

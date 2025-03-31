@@ -667,13 +667,13 @@ class Keyboard:
                     [
                         InlineKeyboardButton(
                             text="💰 Цены и Тарифы",
-                            callback_data="prices",
+                            callback_data="prices_and_tariffs",
                         )
                     ],
                     [
                         InlineKeyboardButton(
                             text="🎉 Акции и Скидки %",
-                            callback_data="discounts",
+                            callback_data="discounts_and_promotions",
                         )
                     ],
                     [
@@ -684,40 +684,187 @@ class Keyboard:
                     ],
                 ]
             ),
+            "prices_and_tariffs": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Стоимость подписки",
+                            callback_data="subscription_price",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Стандартная цена за 1 км",
+                            callback_data="standard_order_price",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Максимальная цена заказа",
+                            callback_data="max_order_price",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 0-5 км",
+                            callback_data="distance_coefficient_less_5",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 5-10 км",
+                            callback_data="distance_coefficient_5_10",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 10-20 км",
+                            callback_data="distance_coefficient_10_20",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 20+ км",
+                            callback_data="distance_coefficient_more_20",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 00-06",
+                            callback_data="time_coefficient_00_06",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 06-12",
+                            callback_data="time_coefficient_06_12",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 12-18",
+                            callback_data="time_coefficient_12_18",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 18-21",
+                            callback_data="time_coefficient_18_21",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент 21-00",
+                            callback_data="time_coefficient_21_00",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент по большим городам",
+                            callback_data="big_cities_coefficient",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Коэффициент по остальным городам",
+                            callback_data="small_cities_coefficient",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "discounts_and_promotions": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Скидка на подписку курьеру",
+                            callback_data="change_subscription_discount",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Скидка на первый заказ",
+                            callback_data="change_first_order_discount",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Бесплатный период",
+                            callback_data="change_free_period",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Партнерский процент",
+                            callback_data="change_refund_percent",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "send_message": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Отправить сообщение",
+                            callback_data="send_message_to_users",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Отправить рассылку",
+                            callback_data="send_broadcast_message",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
         }
 
         return kb[key]
 
     @staticmethod
     async def get_turn_status_kb(
+        key: str,
         status: bool = True,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
         kb = {
-            "false": InlineKeyboardMarkup(
+            "service_and_data": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text=f"Включить ✅",
-                            callback_data="turn_on",
+                            text=f"{'Включить ✅' if status else 'Выключить ❌'}",
+                            callback_data=f"{'turn_on' if status else 'turn_off'}",
                         ),
                     ],
-                ]
-            ),
-            "true": InlineKeyboardMarkup(
-                inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text=f"Выключить ❌",
-                            callback_data="turn_off",
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
                         ),
                     ],
                 ]
             ),
         }
 
-        return kb[str(status).lower()]
+        return kb[key]
 
     @staticmethod
     async def get_partner_kb(key: str) -> InlineKeyboardMarkup:
