@@ -56,12 +56,12 @@ class Base(AsyncAttrs, DeclarativeBase):
     repr_cols_num = 3
     repr_cols = tuple()
 
-    def __repr__(self):
-        cols = []
-        for idx, col in enumerate(self.__table__.columns.keys()):
-            if col in self.repr_cols or idx < self.repr_cols_num:
-                cols.append(f"{col}={getattr(self, col)}")
-        return f"<{self.__class__.__name__}{','.join(cols)}>"
+    # def __repr__(self):
+    #     cols = []
+    #     for idx, col in enumerate(self.__table__.columns.keys()):
+    #         if col in self.repr_cols or idx < self.repr_cols_num:
+    #             cols.append(f"{col}={getattr(self, col)}")
+    #     return f"<{self.__class__.__name__}{','.join(cols)}>"
 
 
 class Role(enum.Enum):
@@ -111,6 +111,8 @@ class GlobalSettings(Base):
     city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
     big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.3)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
+
+    reward_for_fastest_speed: Mapped[intData] = mapped_column(Integer, default=100)
 
 
 class Customer(Base):
@@ -254,8 +256,8 @@ class Order(Base):
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     started_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    speed_kmh = Mapped[floatData]
 
+    speed_kmh: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     order_city: Mapped[stringData]
 
     customer_name: Mapped[stringData]

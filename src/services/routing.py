@@ -133,30 +133,30 @@ class RouteMaster:
         distance_coefficient = 1.0
 
         if city in millions_cities:
-            city_coefficient = 1.3
+            city_coefficient = await admin_data.get_big_cities_coefficient()
 
         if city in small_cities:
-            city_coefficient = 0.9
+            city_coefficient = await admin_data.get_small_cities_coefficient()
 
         if 0 <= order_time.hour < 6:
-            time_coefficient = 1.15
+            time_coefficient = await admin_data.get_time_coefficient_00_06()
         elif 6 <= order_time.hour < 12:
-            time_coefficient = 1.0
+            time_coefficient = await admin_data.get_time_coefficient_06_12()
         elif 12 <= order_time.hour < 18:
-            time_coefficient = 1.1
+            time_coefficient = await admin_data.get_time_coefficient_12_18()
         elif 18 <= order_time.hour < 21:
-            time_coefficient = 1.25
+            time_coefficient = await admin_data.get_time_coefficient_18_21()
         else:
-            time_coefficient = 1.1
+            time_coefficient = await admin_data.get_time_coefficient_21_00()
 
         if distance <= 5:
-            distance_coefficient = 1.25
+            distance_coefficient = await admin_data.get_distance_coefficient_less_5()
         elif 5 < distance <= 10:
-            distance_coefficient = 1.1
+            distance_coefficient = await admin_data.get_distance_coefficient_5_10()
         elif 10 < distance <= 20:
-            distance_coefficient = 0.85
+            distance_coefficient = await admin_data.get_distance_coefficient_10_20()
         else:
-            distance_coefficient = 0.7
+            distance_coefficient = await admin_data.get_distance_coefficient_more_20()
 
         total_coefficient = city_coefficient * time_coefficient * distance_coefficient
         total_price = base_price_per_km * distance * total_coefficient

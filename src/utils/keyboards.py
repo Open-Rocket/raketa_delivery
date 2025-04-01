@@ -840,6 +840,22 @@ class Keyboard:
                     ],
                 ]
             ),
+            "records": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D",
+                            callback_data="full_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
         }
 
         return kb[key]

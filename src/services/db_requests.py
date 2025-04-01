@@ -489,7 +489,7 @@ class CourierData:
         """Получает количество дней бесплатного периода."""
         async with self.async_session_factory() as session:
             try:
-                result = await session.execute(select(GlobalSettings.free_period_days))
+                result = await session.execute(select(GlobalSettings))
                 free_period: GlobalSettings = result.scalar_one_or_none()
                 return free_period.free_period_days if free_period else 10
 
@@ -691,6 +691,7 @@ class AdminData:
             else:
                 settings = GlobalSettings(partner_program_is_active=status)
                 session.add(settings)
+
             await session.commit()
 
     async def get_partner_program_status(self) -> bool:
@@ -994,6 +995,8 @@ class AdminData:
                 settings = GlobalSettings(distance_coefficient_less_5=coefficient)
                 session.add(settings)
 
+            await session.commit()
+
     async def change_distance_coefficient_5_10(self, coefficient: float):
         """Обновляет коэффициент для расстояний от 5 до 10 км"""
 
@@ -1011,6 +1014,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(distance_coefficient_5_10=coefficient)
                 session.add(settings)
+
+            await session.commit()
 
     async def change_distance_coefficient_10_20(self, coefficient: float):
         """Обновляет коэффициент для расстояний от 10 до 20 км"""
@@ -1030,6 +1035,8 @@ class AdminData:
                 settings = GlobalSettings(distance_coefficient_10_20=coefficient)
                 session.add(settings)
 
+            await session.commit()
+
     async def change_distance_coefficient_more_20(self, coefficient: float):
         """Обновляет коэффициент для расстояний больше 20 км"""
 
@@ -1047,6 +1054,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(distance_coefficient_more_20=coefficient)
                 session.add(settings)
+
+            await session.commit()
 
     # ---
 
@@ -1098,7 +1107,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(time_coefficient_0_6=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     async def change_time_coefficient_06_12(self, coefficient: float):
         """Обновляет коэффициент для времени от 6 до 12 часов"""
@@ -1117,7 +1127,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(time_coefficient_6_12=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     async def change_time_coefficient_12_18(self, coefficient: float):
         """Обновляет коэффициент для времени от 12 до 18 часов"""
@@ -1136,7 +1147,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(time_coefficient_12_18=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     async def change_time_coefficient_18_21(self, coefficient: float):
         """Обновляет коэффициент для времени от 18 до 21 часов"""
@@ -1155,7 +1167,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(time_coefficient_18_21=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     async def change_time_coefficient_21_00(self, coefficient: float):
         """Обновляет коэффициент для времени от 21 до 0 часов"""
@@ -1174,7 +1187,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(time_coefficient_21_0=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     # ---
 
@@ -1232,7 +1246,8 @@ class AdminData:
             else:
                 settings = GlobalSettings(big_cities_coefficient=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     async def change_small_cities_coefficient(self, coefficient: float):
         """Обновляет коэффициент для маленьких городов"""
@@ -1246,12 +1261,15 @@ class AdminData:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
 
+            log.info(f"settings: {settings}")
+
             if settings:
                 settings.small_cities_coefficient = coefficient
             else:
                 settings = GlobalSettings(small_cities_coefficient=coefficient)
                 session.add(settings)
-                await session.commit()
+
+            await session.commit()
 
     # ---
 
@@ -1293,6 +1311,27 @@ class AdminData:
             return {}
 
     # ---
+
+    async def change_reward_for_fastest_speed(self, reward: int):
+        """Обновляет вознаграждение за самую быструю скорость"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.reward_for_fastest_speed = reward
+            else:
+                settings = GlobalSettings(reward_for_fastest_speed=reward)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_reward_for_fastest_speed(self) -> int:
+        """Возвращает вознаграждение за самую быструю скорость"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.reward_for_fastest_speed if settings else 0
 
 
 class PartnerData:
@@ -1848,8 +1887,8 @@ class OrderData:
 
     # ---
 
-    async def get_fastest_order_ever(self) -> Optional[Order]:
-        """Возвращает самый быстрый заказ"""
+    async def get_fastest_order_speed_ever(self) -> Optional[float]:
+        """Возвращает скорость самого быстрого заказа"""
         async with self.async_session_factory() as session:
             stmt = (
                 select(Order)
@@ -1863,8 +1902,63 @@ class OrderData:
             )
 
             query = await session.execute(stmt)
-            fastest_order = query.scalars().first()
-            return fastest_order if fastest_order else None
+            order = query.scalar_one_or_none()
+
+            if order:
+                log.info(f"Скорость самого быстрого заказа: {order.speed_kmh}")
+                return order.speed_kmh
+            return None
+
+    async def get_fastest_order_by_date(self, date: datetime) -> Optional[Order]:
+        """Возвращает самый быстрый заказ за указанную дату"""
+        async with self.async_session_factory() as session:
+            try:
+                start_of_day = datetime(date.year, date.month, date.day, 0, 0, 0)
+                end_of_day = datetime(date.year, date.month, date.day, 23, 59, 59)
+
+                result = await session.execute(
+                    select(Order)
+                    .where(
+                        Order.completed_at_moscow_time >= start_of_day,
+                        Order.completed_at_moscow_time <= end_of_day,
+                        Order.order_status == OrderStatus.COMPLETED,
+                    )
+                    .order_by(
+                        (
+                            Order.completed_at_moscow_time
+                            - Order.started_at_moscow_time
+                        ).asc()
+                    )
+                )
+                fastest_order = result.scalars().first()
+                return (
+                    (
+                        fastest_order.order_id,
+                        fastest_order.courier_tg_id,
+                        fastest_order.courier_name,
+                        fastest_order.courier_phone,
+                        fastest_order.order_city,
+                        fastest_order.speed_kmh,
+                        fastest_order.created_at_moscow_time,
+                        fastest_order.completed_at_moscow_time,
+                        fastest_order.distance_km,
+                    )
+                    if fastest_order
+                    else (
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                )
+            except Exception as e:
+                log.error(f"Ошибка при получении самого быстрого заказа: {e}")
+                return None
 
 
 customer_data = CustomerData(async_session_factory)

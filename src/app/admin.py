@@ -2,6 +2,7 @@ from ._deps import (
     CommandStart,
     FSMContext,
     AdminState,
+    datetime,
     ContentType,
     ReplyKeyboardRemove,
     filters,
@@ -242,6 +243,11 @@ async def cmd_admins(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
+# ---
+# ---
+# ---
+
+
 @admin_r.message(
     F.text == "/global",
 )
@@ -311,12 +317,9 @@ async def cmd_global(
 
     refund_percent = await admin_data.get_refund_percent()
 
-    fastest_order_ever = await order_data.get_fastest_order_ever()
-
-    log.info(f"fastest_order_ever: {fastest_order_ever}")
-
+    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
     fastest_order_ever_speed = (
-        fastest_order_ever.speed_kmh if fastest_order_ever else "..."
+        fastest_order_ever_speed if fastest_order_ever_speed else "..."
     )
 
     global_state_data = {
@@ -363,25 +366,25 @@ async def cmd_global(
         f" ▸ Оборот: <b>{turnover}₽</b>\n"
         f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
         f"🏆 <b>Рекорды</b>\n"
-        f"  ▸ Самый быстрый заказ: {fastest_order_ever_speed} км/ч\n\n"
+        f"  ▸ Самый быстрый заказ: <b>{fastest_order_ever_speed:.2f} км/ч </b>\n\n"
         f"💰 <b>Цены и Тарифы</b>\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
-        f" ▸ Максимальная цена заказа за 1км: <b>{max_price}₽</b>\n"
+        f" ▸ Повышенная цена заказа за 1км: <b>{max_price}₽</b>\n"
         f" •\n"
-        f" ▸ Коэффициент 0 - 5 км: <b>{coefficient_less_5km}</b>\n"
-        f" ▸ Коэффициент 5 - 10 км: <b>{coefficient_5_10_km}</b>\n"
-        f" ▸ Коэффициент 10 - 20 км: <b>{coefficient_10_20_km}</b>\n"
-        f" ▸ Коэффициент 20+ км: <b>{coefficient_more_20_km}</b>\n"
+        f" ▸ Коэфф. 0 - 5 км: <b>{coefficient_less_5km}</b>\n"
+        f" ▸ Коэфф. 5 - 10 км: <b>{coefficient_5_10_km}</b>\n"
+        f" ▸ Коэфф. 10 - 20 км: <b>{coefficient_10_20_km}</b>\n"
+        f" ▸ Коэфф. 20+ км: <b>{coefficient_more_20_km}</b>\n"
         f" •\n"
-        f" ▸ Коэффициент 00 - 06: <b>{coefficient_00_06}</b>\n"
-        f" ▸ Коэффициент 06 - 12: <b>{coefficient_06_12}</b>\n"
-        f" ▸ Коэффициент 12 - 18: <b>{coefficient_12_18}</b>\n"
-        f" ▸ Коэффициент 18 - 21: <b>{coefficient_18_21}</b>\n"
-        f" ▸ Коэффициент 21 - 00: <b>{coefficient_21_00}</b>\n"
+        f" ▸ Коэфф. 00 - 06: <b>{coefficient_00_06}</b>\n"
+        f" ▸ Коэфф. 06 - 12: <b>{coefficient_06_12}</b>\n"
+        f" ▸ Коэфф. 12 - 18: <b>{coefficient_12_18}</b>\n"
+        f" ▸ Коэфф. 18 - 21: <b>{coefficient_18_21}</b>\n"
+        f" ▸ Коэфф. 21 - 00: <b>{coefficient_21_00}</b>\n"
         f" •\n"
-        f" ▸ Коэффициент в больших городах: <b>{coefficient_big_cities}</b>\n"
-        f" ▸ Коэффициент в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
+        f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
+        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
         f"🎉 <b>Акции и Скидки %</b>\n"
         f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
@@ -403,6 +406,7 @@ async def cmd_global(
         await event.answer(
             text=text,
             reply_markup=reply_kb,
+            disable_notification=True,
             parse_mode="HTML",
         )
 
@@ -443,12 +447,12 @@ async def cmd_global(
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
-# ---
-# ---
-# ---
+# --- Сервис и данные
 
 
-@admin_r.callback_query(F.data == "service_data")
+@admin_r.callback_query(
+    F.data == "service_data",
+)
 async def data_service_data(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -502,7 +506,8 @@ async def data_service_data(
 
     reply_kb = await kb.get_turn_status_kb(
         key="service_and_data",
-        status=not service_status,
+        status_service=not service_status,
+        status_partner=not partner_program_status,
     )
 
     await callback_query.message.edit_text(
@@ -515,9 +520,13 @@ async def data_service_data(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.callback_query(F.data == "turn_on_service")
-@admin_r.callback_query(F.data == "turn_off_service")
-async def data_status_service(
+@admin_r.callback_query(
+    F.data == "turn_on_service",
+)
+@admin_r.callback_query(
+    F.data == "turn_off_service",
+)
+async def call_status_service(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -550,9 +559,13 @@ async def data_status_service(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.callback_query(F.data == "turn_on_partner")
-@admin_r.callback_query(F.data == "turn_off_partner")
-async def data_status_service(
+@admin_r.callback_query(
+    F.data == "turn_on_partner",
+)
+@admin_r.callback_query(
+    F.data == "turn_off_partner",
+)
+async def change_status_partner(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -580,12 +593,152 @@ async def data_status_service(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# ---
-# ---
+# --- Рекорды
 
 
-@admin_r.callback_query(F.data == "prices_and_tariffs")
-async def data_prices_and_tariffs(callback_query: CallbackQuery, state: FSMContext):
+@admin_r.callback_query(
+    F.data == "records",
+)
+async def data_records(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Рекорды" для админа."""
+    await callback_query.answer(
+        text="🏆 Рекорды",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
+    fastest_order_ever_speed = (
+        fastest_order_ever_speed if fastest_order_ever_speed else "..."
+    )
+
+    text = (
+        f"🏆 <b>Рекорды</b>\n\n"
+        f"Самый быстрый заказ: <b>{fastest_order_ever_speed:.2f}</b> км/ч\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("records")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_report_by_date",
+)
+async def call_full_report_by_date(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_date, нужно ввести дату"""
+
+    await callback_query.answer(
+        text="📅 Полный отчет по дате",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_report_by_date.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите дату в формате <b>YYYY-MM-DD</b>.\n\n"
+        f"Пример: <code>{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_report_by_date))
+async def get_full_report_by_date(message: Message, state: FSMContext):
+    """Обработчик ввода даты для полного отчета."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    date_str = message.text.strip()
+
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    (
+        order_id,
+        courier_tg_id,
+        courier_name,
+        courier_phone,
+        city,
+        speed,
+        created,
+        completed,
+        distance,
+    ) = await order_data.get_fastest_order_by_date(date)
+
+    if order_id:
+
+        tg_link = f"https://t.me/{courier_tg_id}"
+        reward = await admin_data.get_reward_for_fastest_speed()
+        order_execution_time = created - completed
+
+        text = (
+            f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
+            f"Самый быстрый заказ: №<b>{order_id}</b>\n"
+            f"Город: <b>{city}</b>\n"
+            f"Дистанция: <b>{distance} км</b>\n"
+            f"Время выполнения: <b>{order_execution_time} мин</b>\n"
+            f"Скорость: <b>{speed} км/ч</b>\n"
+            f"Курьер: <b>{courier_name}</b>\n"
+            f"Номер курьера: <b>{courier_phone}</b>\n"
+            f"Telegram курьера: {tg_link}\n"
+            f" •\n"
+            f"Награда: <b>{reward}₽</b>\n"
+        )
+
+    else:
+        text = f"📅 Полный отчет за <b>{date_str}</b>:\n" f"Данных не найдено."
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# --- Цены и тарифы
+
+
+@admin_r.callback_query(
+    F.data == "prices_and_tariffs",
+)
+async def data_prices_and_tariffs(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
     """Обработчик кнопки "Цены и Тарифы" для админа."""
 
     await callback_query.answer(
@@ -617,21 +770,21 @@ async def data_prices_and_tariffs(callback_query: CallbackQuery, state: FSMConte
         f"<b>💰 Цены и Тарифы</b>\n\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
-        f" ▸ Максимальная цена заказа за 1км: <b>{max_price}₽</b>\n"
+        f" ▸ Повышенная цена заказа за 1км: <b>{max_price}₽</b>\n"
         f" •\n"
-        f" ▸ Коэффициент 0 - 5 км: <b>{coefficient_less_5km}</b>\n"
-        f" ▸ Коэффициент 5 - 10 км: <b>{coefficient_5_10_km}</b>\n"
-        f" ▸ Коэффициент 10 - 20 км: <b>{coefficient_10_20_km}</b>\n"
-        f" ▸ Коэффициент 20+ км: <b>{coefficient_more_20_km}</b>\n"
+        f" ▸ Коэфф. 0 - 5 км: <b>{coefficient_less_5km}</b>\n"
+        f" ▸ Коэфф. 5 - 10 км: <b>{coefficient_5_10_km}</b>\n"
+        f" ▸ Коэфф. 10 - 20 км: <b>{coefficient_10_20_km}</b>\n"
+        f" ▸ Коэфф. 20+ км: <b>{coefficient_more_20_km}</b>\n"
         f" •\n"
-        f" ▸ Коэффициент 00 - 06: <b>{coefficient_00_06}</b>\n"
-        f" ▸ Коэффициент 06 - 12: <b>{coefficient_06_12}</b>\n"
-        f" ▸ Коэффициент 12 - 18: <b>{coefficient_12_18}</b>\n"
-        f" ▸ Коэффициент 18 - 21: <b>{coefficient_18_21}</b>\n"
-        f" ▸ Коэффициент 21 - 00: <b>{coefficient_21_00}</b>\n"
+        f" ▸ Коэфф. 00 - 06: <b>{coefficient_00_06}</b>\n"
+        f" ▸ Коэфф. 06 - 12: <b>{coefficient_06_12}</b>\n"
+        f" ▸ Коэфф. 12 - 18: <b>{coefficient_12_18}</b>\n"
+        f" ▸ Коэфф. 18 - 21: <b>{coefficient_18_21}</b>\n"
+        f" ▸ Коэфф. 21 - 00: <b>{coefficient_21_00}</b>\n"
         f" •\n"
-        f" ▸ Коэффициент в больших городах: <b>{coefficient_big_cities}</b>\n"
-        f" ▸ Коэффициент в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
+        f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
+        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("prices_and_tariffs")
@@ -666,7 +819,7 @@ async def data_prices_and_tariffs(callback_query: CallbackQuery, state: FSMConte
         ]
     )
 )
-async def data_change_price(
+async def call_change_price(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -726,7 +879,10 @@ async def data_change_price(
     log.info(f"current_state:, {current_state}")
 
     tg_id = callback_query.from_user.id
-    await callback_query.message.answer(text)
+    await callback_query.message.answer(
+        text,
+        disable_notification=True,
+    )
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
@@ -757,12 +913,14 @@ async def change_prices_filer(
 
     new_value = message.text
 
+    log.info(f"new_value: {new_value}")
+
     if isinstance(new_value, str):
-        if new_value.isdigit():
-            new_value = float(new_value)
-        else:
+        try:
+            new_value = float(new_value.replace(",", "."))  # Заменяем запятую на точку
+        except ValueError:
             await message.answer(
-                text="❌ Ошибка! Введите корректное значение.",
+                text="❌ Ошибка! Введите корректное число (например, 0.8)."
             )
             return
 
@@ -834,13 +992,21 @@ async def change_prices_filer(
     tg_id = message.from_user.id
     current_state = AdminState.default.state
 
-    await message.answer(text=text)
+    await message.answer(
+        text=text,
+        disable_notification=True,
+    )
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.callback_query(F.data == "discounts_and_promotions")
+# --- Акции и скидки
+
+
+@admin_r.callback_query(
+    F.data == "discounts_and_promotions",
+)
 async def data_discounts_and_promotions(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -893,7 +1059,7 @@ async def data_discounts_and_promotions(
         ]
     )
 )
-async def data_change_discount_and_promotions(
+async def call_change_discount_and_promotions(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -923,7 +1089,10 @@ async def data_change_discount_and_promotions(
     log.info(f"current_state:, {current_state}")
 
     tg_id = callback_query.from_user.id
-    await callback_query.message.answer(text)
+    await callback_query.message.answer(
+        text,
+        disable_notification=True,
+    )
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
@@ -1005,7 +1174,10 @@ async def change_discount_and_promotions(
     tg_id = message.from_user.id
     current_state = AdminState.default.state
 
-    await message.answer(text=text)
+    await message.answer(
+        text=text,
+        disable_notification=True,
+    )
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)

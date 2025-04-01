@@ -268,7 +268,9 @@ async def data_city_courier(
     )
 
 
-@courier_r.callback_query(F.data == "accept_tou")
+@courier_r.callback_query(
+    F.data == "accept_tou",
+)
 async def courier_accept_tou(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -375,7 +377,9 @@ async def courier_accept_tou(
 # ---
 
 
-@courier_r.message(F.text == "/promo")
+@courier_r.message(
+    F.text == "/promo",
+)
 async def cmd_promo(
     message: Message,
     state: FSMContext,
@@ -1251,7 +1255,7 @@ async def complete_order(
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             new_status=OrderStatus.COMPLETED,
-            speed_kmh=speed,
+            speed_kmh=round(speed, 2),
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 

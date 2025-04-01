@@ -75,6 +75,8 @@ class AdminState(StatesGroup):
     change_free_period = State()
     change_refund_percent = State()
 
+    full_report_by_date = State()
+
 
 class PartnerState(StatesGroup):
 
