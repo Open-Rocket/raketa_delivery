@@ -86,7 +86,7 @@ class GlobalSettings(Base):
 
     global_settings_id: Mapped[intPK]
 
-    service_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    service_is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     partner_program_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
@@ -264,6 +264,9 @@ class Order(Base):
     customer_phone: Mapped[stringData]
     customer_tg_id: Mapped[intData]
 
+    customer_username: Mapped[stringData]
+    courier_username: Mapped[stringData]
+
     courier_tg_id: Mapped[intData]
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
@@ -287,13 +290,13 @@ class Subscription(Base):
 
     subscription_id: Mapped[intPK]
 
-    end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-
     courier_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("couriers.courier_id"),
         nullable=False,
     )
+
+    end_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     couriers = relationship("Courier", back_populates="subscription")
 

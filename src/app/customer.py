@@ -624,6 +624,7 @@ async def set_order_to_db(
 
         order_number = await order_data.create_order(
             tg_id=tg_id,
+            username=callback_query.from_user.username,
             data=data,
             order_forma=order_forma,
         )

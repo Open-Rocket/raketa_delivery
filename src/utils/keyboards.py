@@ -660,8 +660,14 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="⚙️ Сервис и Данные",
+                            text="⚙️ Сервис",
                             callback_data="service_data",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🤑 Финансы",
+                            callback_data="finance",
                         )
                     ],
                     [
@@ -863,7 +869,7 @@ class Keyboard:
     @staticmethod
     async def get_turn_status_kb(
         key: str,
-        status_service: bool = True,
+        status_service: bool = False,
         status_partner: bool = True,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""

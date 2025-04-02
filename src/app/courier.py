@@ -33,6 +33,7 @@ from ._deps import (
     log,
     F,
     find_closest_city,
+    ceil,
     customer_bot,
 )
 
@@ -486,7 +487,7 @@ async def data_PROMOKOD(
             subscription_status = (
                 f"<b>Подписка:</b> Активна 🚀\n"
                 f"📅 Действует до: {end_date.strftime('%d.%m.%Y')}\n"
-                f"🕒 Осталось дней: {remaining_days}\n\n"
+                f"🕒 Осталось дней: {remaining_days - 1}\n\n"
             )
 
         text = (
@@ -1254,6 +1255,7 @@ async def complete_order(
 
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
+            courier_username=callback_query.from_user.username,
             new_status=OrderStatus.COMPLETED,
             speed_kmh=round(speed, 2),
         )

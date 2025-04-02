@@ -147,17 +147,23 @@ async def cmd_orders(
     current_state = AdminState.default.state
 
     (
-        all_orders,
         pending_orders,
         active_orders,
         completed_orders,
         canceled_orders,
     ) = await order_data.get_all_orders()
 
+    len_all_orders = (
+        len(pending_orders)
+        + len(active_orders)
+        + len(completed_orders)
+        + len(canceled_orders)
+    )
+
     text = (
         f"<b>📋 Заказы</b>\n\n"
         f"Здесь вы можете просмотреть текущую статистику по заказам на платформе.\n\n"
-        f" - Всего заказов: <b>{len(all_orders)}</b>\n"
+        f" - Всего заказов: <b>{len_all_orders}</b>\n"
         f" - Ожидают курьера: <b>{len(pending_orders)}</b>\n"
         f" - Выполняются: <b>{len(active_orders)}</b>\n"
         f" - Завершенные: <b>{len(completed_orders)}</b>\n"
@@ -366,7 +372,7 @@ async def cmd_global(
         f" ▸ Оборот: <b>{turnover}₽</b>\n"
         f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
         f"🏆 <b>Рекорды</b>\n"
-        f"  ▸ Самый быстрый заказ: <b>{fastest_order_ever_speed:.2f} км/ч </b>\n\n"
+        f"  ▸ Самый быстрый заказ: <b>{fastest_order_ever_speed} км/ч </b>\n\n"
         f"💰 <b>Цены и Тарифы</b>\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
@@ -447,7 +453,7 @@ async def cmd_global(
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
-# --- Сервис и данные
+# --- Сервис
 
 
 @admin_r.callback_query(
@@ -460,7 +466,7 @@ async def data_service_data(
     """Обработчик кнопки "Сервисные данные" для админа."""
 
     await callback_query.answer(
-        text="⚙️ Сервис и Данные",
+        text="⚙️ Сервис",
         show_alert=False,
     )
 
@@ -593,52 +599,20 @@ async def change_status_partner(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# --- Рекорды
+# --- Финансы
 
 
 @admin_r.callback_query(
-    F.data == "records",
+    F.data == "finance",
 )
-async def data_records(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик кнопки "Рекорды" для админа."""
-    await callback_query.answer(
-        text="🏆 Рекорды",
-        show_alert=False,
-    )
-
-    tg_id = callback_query.from_user.id
-    current_state = AdminState.default.state
-
-    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
-    fastest_order_ever_speed = (
-        fastest_order_ever_speed if fastest_order_ever_speed else "..."
-    )
-
-    text = (
-        f"🏆 <b>Рекорды</b>\n\n"
-        f"Самый быстрый заказ: <b>{fastest_order_ever_speed:.2f}</b> км/ч\n"
-    )
-
-    reply_kb = await kb.get_admin_kb("records")
-
-    await callback_query.message.edit_text(
-        text=text,
-        reply_markup=reply_kb,
-        disable_web_page_preview=True,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
+async def data_finance(callback_query: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки "Финансы" для админа."""
 
 
 @admin_r.callback_query(
-    F.data == "full_report_by_date",
+    F.data == "fincance_full_report_by_date",
 )
-async def call_full_report_by_date(
+async def call_finance_full_report_by_date(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -670,8 +644,89 @@ async def call_full_report_by_date(
 
 
 @admin_r.message(StateFilter(AdminState.full_report_by_date))
-async def get_full_report_by_date(message: Message, state: FSMContext):
-    """Обработчик ввода даты для полного отчета."""
+async def get_finance_full_report_by_date(message: Message, state: FSMContext):
+    """Обработчик ввода даты для полного отчета по финансам."""
+
+
+# --- Рекорды
+
+
+@admin_r.callback_query(
+    F.data == "records",
+)
+async def data_records(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Рекорды" для админа."""
+    await callback_query.answer(
+        text="🏆 Рекорды",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
+    fastest_order_ever_speed = (
+        fastest_order_ever_speed if fastest_order_ever_speed else "..."
+    )
+
+    text = (
+        f"🏆 <b>Рекорды</b>\n\n"
+        f"Самый быстрый заказ: <b>{fastest_order_ever_speed}</b> км/ч\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("records")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_report_by_date",
+)
+async def call_records_full_report_by_date(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_date, нужно ввести дату"""
+
+    await callback_query.answer(
+        text="📅 Полный отчет по дате",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_report_by_date.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите дату в формате <b>YYYY-MM-DD</b>.\n\n"
+        f"Пример: <code>{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_report_by_date))
+async def get_records_full_report_by_date(message: Message, state: FSMContext):
+    """Обработчик ввода даты для полного отчета по рекордам."""
 
     tg_id = message.from_user.id
     current_state = AdminState.default.state
@@ -688,6 +743,7 @@ async def get_full_report_by_date(message: Message, state: FSMContext):
         order_id,
         courier_tg_id,
         courier_name,
+        courier_username,
         courier_phone,
         city,
         speed,
@@ -698,9 +754,13 @@ async def get_full_report_by_date(message: Message, state: FSMContext):
 
     if order_id:
 
-        tg_link = f"https://t.me/{courier_tg_id}"
+        tg_link = (
+            f"<a href='tg://user?id={courier_tg_id}'>Написать</a>"
+            if not courier_username
+            else f"<a href='https://t.me/{courier_username}'>{courier_username}</a>"
+        )
         reward = await admin_data.get_reward_for_fastest_speed()
-        order_execution_time = created - completed
+        order_execution_time = completed - created
 
         text = (
             f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
@@ -710,7 +770,7 @@ async def get_full_report_by_date(message: Message, state: FSMContext):
             f"Время выполнения: <b>{order_execution_time} мин</b>\n"
             f"Скорость: <b>{speed} км/ч</b>\n"
             f"Курьер: <b>{courier_name}</b>\n"
-            f"Номер курьера: <b>{courier_phone}</b>\n"
+            f"Номер курьера: {courier_phone}\n"
             f"Telegram курьера: {tg_link}\n"
             f" •\n"
             f"Награда: <b>{reward}₽</b>\n"
@@ -722,6 +782,7 @@ async def get_full_report_by_date(message: Message, state: FSMContext):
     await message.answer(
         text=text,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 

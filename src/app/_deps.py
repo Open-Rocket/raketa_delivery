@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from aiogram.types import LabeledPrice, InputMediaDocument
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from aiogram.types import ReplyKeyboardRemove
+from math import ceil
 
 
 from src.services import (
@@ -71,6 +72,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "ceil",
     "StateFilter",
     "randint",
     "io",

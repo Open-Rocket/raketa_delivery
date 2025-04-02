@@ -25,6 +25,7 @@ from geopy.distance import geodesic
 
 
 class CustomerData:
+
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
@@ -177,6 +178,7 @@ class CustomerData:
 
 
 class CourierData:
+
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
@@ -629,6 +631,7 @@ class CourierData:
 
 
 class AdminData:
+
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
@@ -637,8 +640,6 @@ class AdminData:
     async def set_new_admin(
         self,
         tg_id: int,
-        name: str,
-        phone: str,
     ) -> bool:
         """Добавляет в БД нового администратора"""
 
@@ -646,8 +647,6 @@ class AdminData:
             try:
                 new_admin = Admin(
                     admin_tg_id=tg_id,
-                    admin_name=name,
-                    admin_phone=phone,
                 )
                 session.add(new_admin)
                 await session.flush()
@@ -665,10 +664,10 @@ class AdminData:
             query = await session.execute(select(Admin))
             return query.scalars().all()
 
-    async def del_admin(self, phone: str):
+    async def del_admin(self, tg_id: int):
         async with self.async_session_factory() as session:
             try:
-                await session.execute(delete(Admin).where(Admin.admin_phone == phone))
+                await session.execute(delete(Admin).where(Admin.admin_tg_id == tg_id))
                 await session.commit()
                 return True
             except Exception as e:
@@ -680,7 +679,6 @@ class AdminData:
 
     async def change_partner_program(self, status: bool):
         """Изменяет статут партнерской программы, включает и приостанавливает ее"""
-
         async with self.async_session_factory() as session:
 
             result = await session.execute(select(GlobalSettings))
@@ -729,7 +727,7 @@ class AdminData:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
             if not settings:
-                return True
+                return False
 
             return settings.service_is_active
 
@@ -1335,6 +1333,7 @@ class AdminData:
 
 
 class PartnerData:
+
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
@@ -1494,6 +1493,7 @@ class PartnerData:
 
 
 class OrderData:
+
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
 
@@ -1502,6 +1502,7 @@ class OrderData:
     async def create_order(
         self,
         tg_id: int,
+        username: str,
         data: dict,
         order_forma: str,
     ) -> int:
@@ -1518,6 +1519,7 @@ class OrderData:
                     customer_id=customer.customer_id,
                     order_city=data.get("city"),
                     delivery_object=data.get("delivery_object"),
+                    customer_username=username,
                     customer_name=customer.customer_name,
                     customer_phone=customer.customer_phone,
                     customer_tg_id=customer.customer_tg_id,
@@ -1656,6 +1658,7 @@ class OrderData:
     async def update_order_status_and_completed_time(
         self,
         order_id: int,
+        courier_username: str,
         new_status: OrderStatus,
         speed_kmh: float,
     ) -> bool:
@@ -1668,6 +1671,7 @@ class OrderData:
                 return False
 
             order.order_status = new_status
+            order.courier_username = courier_username
             order.completed_at_moscow_time = await Time.get_moscow_time()
             order.speed_kmh = speed_kmh
 
@@ -1936,6 +1940,7 @@ class OrderData:
                         fastest_order.order_id,
                         fastest_order.courier_tg_id,
                         fastest_order.courier_name,
+                        fastest_order.courier_username,
                         fastest_order.courier_phone,
                         fastest_order.order_city,
                         fastest_order.speed_kmh,
@@ -1945,6 +1950,7 @@ class OrderData:
                     )
                     if fastest_order
                     else (
+                        None,
                         None,
                         None,
                         None,
