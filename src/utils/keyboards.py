@@ -846,12 +846,40 @@ class Keyboard:
                     ],
                 ]
             ),
-            "records": InlineKeyboardMarkup(
+            "speed_records": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
                             text="Y-M-D",
-                            callback_data="full_report_by_date",
+                            callback_data="full_speed_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D : Y-M-D",
+                            callback_data="full_speed_report_by_period",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "finance_report": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D",
+                            callback_data="full_finance_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D : Y-M-D",
+                            callback_data="full_finance_report_by_period",
                         )
                     ],
                     [

@@ -3,42 +3,42 @@ from ._deps import (
     FSMContext,
     AdminState,
     datetime,
-    ContentType,
     ReplyKeyboardRemove,
-    filters,
     Message,
     CallbackQuery,
+    StateFilter,
+    json,
+    relativedelta,
+    ContentType,
+    filters,
     OrderStatus,
     PreCheckoutQuery,
     LabeledPrice,
     zlib,
     Time,
-    json,
-    StateFilter,
-    F,
     find_closest_city,
+    SUPER_ADMIN_TG_ID,
+    F,
     admin_data,
+    kb,
+    order_data,
+    rediska,
+    log,
+    admin_r,
+    admin_bot_id,
+    admin_fallback,
     courier_bot_id,
     handler,
     courier_r,
     courier_fallback,
     courier_data,
     payment_r,
-    kb,
     title,
     courier_bot_id,
-    order_data,
-    rediska,
     cities,
     payment_provider,
-    log,
     courier_bot,
     customer_bot,
-    admin_r,
-    admin_fallback,
-    admin_bot_id,
-    admin_bot,
-    SUPER_ADMIN_TG_ID,
 )
 
 
@@ -292,8 +292,6 @@ async def cmd_global(
     partners = len([p.partner_id for p in partners])
     all_users = customers + couriers + partners
 
-    profit = await admin_data.get_profit()
-    turnover = await admin_data.get_turnover()
     (
         pending_orders,
         active_orders,
@@ -322,6 +320,10 @@ async def cmd_global(
     coefficient_other_cities = await admin_data.get_small_cities_coefficient()
 
     refund_percent = await admin_data.get_refund_percent()
+
+    all_payments = await admin_data.get_all_payments()
+    profit = await admin_data.get_profit()
+    turnover = await admin_data.get_turnover()
 
     fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
     fastest_order_ever_speed = (
@@ -369,6 +371,8 @@ async def cmd_global(
         f" •\n"
         f" ▸ Пользователей: <b>{all_users}</b>\n"
         f" ▸ Заказов: <b>{all_orders}</b>\n"
+        f"🤑 <b>Финансы</b>\n"
+        f" ▸ Подписки: <b>{len(all_payments)}</b>\n\n"
         f" ▸ Оборот: <b>{turnover}₽</b>\n"
         f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
         f"🏆 <b>Рекорды</b>\n"
@@ -608,9 +612,40 @@ async def change_status_partner(
 async def data_finance(callback_query: CallbackQuery, state: FSMContext):
     """Обработчик кнопки "Финансы" для админа."""
 
+    await callback_query.answer(
+        text="🤑 Финансы",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    all_payments = await admin_data.get_all_payments()
+    profit = await admin_data.get_profit()
+    turnover = await admin_data.get_turnover()
+
+    text = (
+        f"🤑 <b>Финансы</b>\n\n"
+        f" ▸ Подписки: <b>{len(all_payments)}</b>\n\n"
+        f" ▸ Оборот: <b>{turnover}₽</b>\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("finance")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
 
 @admin_r.callback_query(
-    F.data == "fincance_full_report_by_date",
+    F.data == "full_finance_report_by_date",
 )
 async def call_finance_full_report_by_date(
     callback_query: CallbackQuery,
@@ -618,13 +653,8 @@ async def call_finance_full_report_by_date(
 ):
     """Обработчик кнопки full_report_by_date, нужно ввести дату"""
 
-    await callback_query.answer(
-        text="📅 Полный отчет по дате",
-        show_alert=False,
-    )
-
     tg_id = callback_query.from_user.id
-    current_state = AdminState.full_report_by_date.state
+    current_state = AdminState.full_financial_report_by_date.state
 
     today = datetime.today().strftime("%Y-%m-%d")
 
@@ -643,16 +673,118 @@ async def call_finance_full_report_by_date(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_report_by_date))
+@admin_r.callback_query(
+    F.data == "full_finance_report_by_period",
+)
+async def call_finance_full_report_by_period(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_period, нужно ввести даты"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_financial_report_by_period.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+    month_ago = today - relativedelta(months=1)
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
+        f"Пример: <code>{month_ago}:{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_financial_report_by_period))
+async def get_finance_full_report_by_period(message: Message, state: FSMContext):
+    """Обработчик ввода для полного отчета по финансам за период."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    start_date_str, end_date_str = message.text.strip().split(":")
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    if start_date > end_date:
+        await message.answer(
+            text="❌ Начальная дата больше конечной. Попробуйте снова."
+        )
+        return
+
+    payments = await admin_data.get_period_payments(start_date, end_date)
+    turnover = await admin_data.get_turnover_by_period(start_date, end_date)
+    profit = await admin_data.get_profit_by_period(start_date, end_date)
+
+    text = (
+        f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n\n"
+        f" ▸ Подписки: <b>{len(payments)}</b>\n\n"
+        f" ▸ Оборот: <b>{turnover}₽</b>\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+    )
+
+    await message.answer(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_financial_report_by_date))
 async def get_finance_full_report_by_date(message: Message, state: FSMContext):
-    """Обработчик ввода даты для полного отчета по финансам."""
+    """Обработчик ввода для полного отчета по финансам за дату."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    date_str = message.text.strip()
+
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    payments = await admin_data.get_date_payments(date)
+    turnover = await admin_data.get_date_turnover(date)
+    profit = await admin_data.get_date_profit(date)
+
+    text = (
+        f"📅 Полный отчет за <b>{date}</b>:\n\n"
+        f" ▸ Подписки: <b>{len(payments)}</b>\n\n"
+        f" ▸ Оборот: <b>{turnover}₽</b>\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+    )
+
+    await message.answer(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
 # --- Рекорды
 
 
 @admin_r.callback_query(
-    F.data == "records",
+    F.data == "speed_records",
 )
 async def data_records(
     callback_query: CallbackQuery,
@@ -691,7 +823,7 @@ async def data_records(
 
 
 @admin_r.callback_query(
-    F.data == "full_report_by_date",
+    F.data == "full_speed_report_by_date",
 )
 async def call_records_full_report_by_date(
     callback_query: CallbackQuery,
@@ -699,13 +831,8 @@ async def call_records_full_report_by_date(
 ):
     """Обработчик кнопки full_report_by_date, нужно ввести дату"""
 
-    await callback_query.answer(
-        text="📅 Полный отчет по дате",
-        show_alert=False,
-    )
-
     tg_id = callback_query.from_user.id
-    current_state = AdminState.full_report_by_date.state
+    current_state = AdminState.full_speed_report_by_date.state
 
     today = datetime.today().strftime("%Y-%m-%d")
 
@@ -724,9 +851,39 @@ async def call_records_full_report_by_date(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_report_by_date))
+@admin_r.callback_query(
+    F.data == "full_finance_report_by_period",
+)
+async def call_records_full_report_by_period(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_speed_report_by_period, нужно ввести даты"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_speed_report_by_period.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+    month_ago = today - relativedelta(months=1)
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
+        f"Пример: <code>{month_ago}:{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_speed_report_by_date))
 async def get_records_full_report_by_date(message: Message, state: FSMContext):
-    """Обработчик ввода даты для полного отчета по рекордам."""
+    """Обработчик ввода для полного отчета по рекордам за дату."""
 
     tg_id = message.from_user.id
     current_state = AdminState.default.state
@@ -759,7 +916,8 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
             if not courier_username
             else f"<a href='https://t.me/{courier_username}'>{courier_username}</a>"
         )
-        reward = await admin_data.get_reward_for_fastest_speed()
+        day_reward = await admin_data.get_reward_for_day_fastest_speed()
+        month_reward = await admin_data.get_reward_for_month_fastest_speed()
         order_execution_time = completed - created
 
         text = (
@@ -773,11 +931,85 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
             f"Номер курьера: {courier_phone}\n"
             f"Telegram курьера: {tg_link}\n"
             f" •\n"
-            f"Награда: <b>{reward}₽</b>\n"
+            f"Дневная награда: <b>{day_reward}₽</b>\n"
+            f"Месячная награда: <b>{month_reward}₽</b>\n"
         )
 
     else:
         text = f"📅 Полный отчет за <b>{date_str}</b>:\n" f"Данных не найдено."
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_speed_report_by_period))
+async def get_records_full_report_by_date(message: Message, state: FSMContext):
+    """Обработчик ввода для полного отчета по рекордам за период."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    start_date_str, end_date_str = message.text.strip().split(":")
+
+    try:
+
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    (
+        order_id,
+        courier_tg_id,
+        courier_name,
+        courier_username,
+        courier_phone,
+        city,
+        speed,
+        created,
+        completed,
+        distance,
+    ) = await order_data.get_fastest_order_by_period(start_date, end_date)
+
+    if order_id:
+
+        tg_link = (
+            f"<a href='tg://user?id={courier_tg_id}'>Написать</a>"
+            if not courier_username
+            else f"<a href='https://t.me/{courier_username}'>{courier_username}</a>"
+        )
+        day_reward = await admin_data.get_reward_for_day_fastest_speed()
+        month_reward = await admin_data.get_reward_for_month_fastest_speed()
+        order_execution_time = completed - created
+
+        text = (
+            f"📅 Полный отчет за <b>{start_date_str}:{end_date_str}</b>:\n\n"
+            f"Самый быстрый заказ: №<b>{order_id}</b>\n"
+            f"Город: <b>{city}</b>\n"
+            f"Дистанция: <b>{distance} км</b>\n"
+            f"Время выполнения: <b>{order_execution_time} мин</b>\n"
+            f"Скорость: <b>{speed} км/ч</b>\n"
+            f"Курьер: <b>{courier_name}</b>\n"
+            f"Номер курьера: {courier_phone}\n"
+            f"Telegram курьера: {tg_link}\n"
+            f" •\n"
+            f"Дневная награда: <b>{day_reward}₽</b>\n"
+            f"Месячная награда: <b>{month_reward}₽</b>\n"
+        )
+
+    else:
+        text = (
+            f"📅 Полный отчет за <b>{start_date_str}:{end_date_str}</b>:\n"
+            f"Данных не найдено."
+        )
 
     await message.answer(
         text=text,

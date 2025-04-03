@@ -13,6 +13,7 @@ from aiogram.types import LabeledPrice, InputMediaDocument
 from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from aiogram.types import ReplyKeyboardRemove
 from math import ceil
+from dateutil.relativedelta import relativedelta
 
 
 from src.services import (
@@ -72,6 +73,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "relativedelta",
     "ceil",
     "StateFilter",
     "randint",

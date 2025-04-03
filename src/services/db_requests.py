@@ -908,24 +908,6 @@ class AdminData:
 
     # ---
 
-    async def get_profit(self) -> int:
-        """Возвращает прибыль сервиса"""
-        async with self.async_session_factory() as session:
-            result = await session.execute(select(func.sum(Payment.payment_sum_rub)))
-            profit = result.scalar_one_or_none()
-            return profit if profit else 0
-
-    async def get_turnover(self) -> int:
-        """Возвращает оборот сервиса"""
-        async with self.async_session_factory() as session:
-            result = await session.execute(
-                select(func.sum(Order.price_rub)).where(
-                    Order.order_status == OrderStatus.COMPLETED
-                )
-            )
-            turnover = result.scalar_one_or_none()
-            return turnover if turnover else 0
-
     # ---
 
     async def get_all_users(self) -> tuple:
@@ -1324,12 +1306,125 @@ class AdminData:
 
             await session.commit()
 
-    async def get_reward_for_fastest_speed(self) -> int:
-        """Возвращает вознаграждение за самую быструю скорость"""
+    async def get_reward_for_day_fastest_speed(self) -> int:
+        """Возвращает вознаграждение за самую быструю дневную скорость"""
         async with self.async_session_factory() as session:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.reward_for_fastest_speed if settings else 0
+            return settings.reward_for_day_fastest_speed if settings else 0
+
+    async def get_reward_for_month_fastest_speed(self) -> int:
+        """Возвращает вознаграждение за самую быструю месячную скорость"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.reward_for_month_fastest_speed if settings else 0
+
+    # ---
+
+    async def get_date_payments(self, date: datetime) -> list:
+        """Возвращает все платежи за определенную дату"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Payment).where(Payment.payment_date == date)
+            )
+            payments = query.scalars().all()
+            return payments
+
+    async def get_date_turnover(self, date: datetime) -> int:
+        """Возвращает оборот за определенную дату"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.sum(Order.price_rub)).where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    Order.order_date == date,
+                )
+            )
+            turnover = result.scalar_one_or_none()
+            return turnover if turnover else 0
+
+    async def get_date_profit(self, date: datetime) -> int:
+        """Возвращает прибыль за определенную дату"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.sum(Payment.payment_sum_rub)).where(
+                    Payment.payment_date == date
+                )
+            )
+            profit = result.scalar_one_or_none()
+            return profit if profit else 0
+
+    # ---
+
+    async def get_period_payments(
+        self, start_date: datetime, end_date: datetime
+    ) -> list:
+        """Возвращает все платежи за определенный период"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Payment).where(
+                    Payment.payment_date >= start_date,
+                    Payment.payment_date <= end_date,
+                )
+            )
+            payments = query.scalars().all()
+            return payments
+
+    async def get_turnover_by_period(
+        self, start_date: datetime, end_date: datetime
+    ) -> int:
+        """Возвращает оборот за определенный период"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.sum(Order.price_rub)).where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    Order.order_date >= start_date,
+                    Order.order_date <= end_date,
+                )
+            )
+            turnover = result.scalar_one_or_none()
+            return turnover if turnover else 0
+
+    async def get_profit_by_period(
+        self, start_date: datetime, end_date: datetime
+    ) -> int:
+        """Возвращает прибыль за определенный период"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.sum(Payment.payment_sum_rub)).where(
+                    Payment.payment_date >= start_date,
+                    Payment.payment_date <= end_date,
+                )
+            )
+            profit = result.scalar_one_or_none()
+            return profit if profit else 0
+
+    # ---
+
+    async def get_all_payments(self) -> list:
+        """Возвращает все платежи"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Payment))
+            payments = query.scalars().all()
+            return payments
+
+    async def get_turnover(self) -> int:
+        """Возвращает оборот сервиса"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(func.sum(Order.price_rub)).where(
+                    Order.order_status == OrderStatus.COMPLETED
+                )
+            )
+            turnover = result.scalar_one_or_none()
+            return turnover if turnover else 0
+
+    async def get_profit(self) -> int:
+        """Возвращает прибыль сервиса"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(func.sum(Payment.payment_sum_rub)))
+            profit = result.scalar_one_or_none()
+            return profit if profit else 0
 
 
 class PartnerData:
@@ -1925,6 +2020,58 @@ class OrderData:
                     .where(
                         Order.completed_at_moscow_time >= start_of_day,
                         Order.completed_at_moscow_time <= end_of_day,
+                        Order.order_status == OrderStatus.COMPLETED,
+                    )
+                    .order_by(
+                        (
+                            Order.completed_at_moscow_time
+                            - Order.started_at_moscow_time
+                        ).asc()
+                    )
+                )
+                fastest_order = result.scalars().first()
+                return (
+                    (
+                        fastest_order.order_id,
+                        fastest_order.courier_tg_id,
+                        fastest_order.courier_name,
+                        fastest_order.courier_username,
+                        fastest_order.courier_phone,
+                        fastest_order.order_city,
+                        fastest_order.speed_kmh,
+                        fastest_order.created_at_moscow_time,
+                        fastest_order.completed_at_moscow_time,
+                        fastest_order.distance_km,
+                    )
+                    if fastest_order
+                    else (
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
+                )
+            except Exception as e:
+                log.error(f"Ошибка при получении самого быстрого заказа: {e}")
+                return None
+
+    async def get_fastest_order_by_period(
+        self, date_1: datetime, date_2: datetime
+    ) -> Optional[Order]:
+        """Возвращает самый быстрый заказ за указанный период"""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Order)
+                    .where(
+                        Order.completed_at_moscow_time >= date_1,
+                        Order.completed_at_moscow_time <= date_2,
                         Order.order_status == OrderStatus.COMPLETED,
                     )
                     .order_by(
