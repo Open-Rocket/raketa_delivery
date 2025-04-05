@@ -112,9 +112,10 @@ class GlobalSettings(Base):
     big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.3)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
 
-    reward_for_day_fastest_speed: Mapped[intData] = mapped_column(Integer, default=1000)
+    reward_for_day_fastest_speed: Mapped[intData] = mapped_column(Integer, default=100)
     reward_for_month_fastest_speed: Mapped[intData] = mapped_column(
-        Integer, default=100
+        Integer,
+        default=1000,
     )
 
 
@@ -261,6 +262,11 @@ class Order(Base):
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     speed_kmh: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+    execution_time_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=True,
+        default=0,
+    )
     order_city: Mapped[stringData]
 
     customer_name: Mapped[stringData]

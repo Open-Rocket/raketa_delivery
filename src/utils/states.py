@@ -80,6 +80,11 @@ class AdminState(StatesGroup):
     full_financial_report_by_date = State()
     full_financial_report_by_period = State()
 
+    set_new_admin = State()
+    del_admin = State()
+
+    reg_adminPhone = State()
+
 
 class PartnerState(StatesGroup):
 

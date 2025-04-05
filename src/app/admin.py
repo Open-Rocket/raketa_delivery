@@ -56,25 +56,103 @@ async def cmd_start_admin(
     """Обработчик команды /start для админа."""
 
     tg_id = message.from_user.id
-    current_state = AdminState.default.state
 
-    admin_status = "Super Admin" if tg_id == SUPER_ADMIN_TG_ID else "Admin"
+    all_admins = await admin_data.get_all_admins()
 
-    text = f"Вы вошли как <b>{admin_status}</b>.\n\n▼ <b>Выберите действие ...</b>"
+    if tg_id == SUPER_ADMIN_TG_ID or tg_id in [
+        admin.admin_tg_id for admin in all_admins
+    ]:
+        current_state = AdminState.default.state
+        admin_status = "Super Admin" if tg_id == SUPER_ADMIN_TG_ID else "Admin"
+        text = f"Вы <b>{admin_status}</b>.\n\n▼ <b>Выберите действие ...</b>"
+        await message.answer(
+            text=text,
+            reply_markup=ReplyKeyboardRemove(),
+            disable_notification=True,
+            parse_mode="HTML",
+        )
 
-    await message.answer(
-        text=text,
-        reply_markup=ReplyKeyboardRemove(),
-        disable_notification=True,
-        parse_mode="HTML",
-    )
+    else:
+        current_state = AdminState.reg_adminPhone.state
+
+        text = "Отправьте свой номер телефона для проверки вашего статуса."
+        reply_kb = await kb.get_admin_kb("phone_kb")
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+        )
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(F.text == "/users")
-@admin_r.callback_query(F.data == "refresh_users")
+@admin_r.message(
+    filters.StateFilter(AdminState.reg_adminPhone),
+)
+async def reg_admin_phone(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода номера телефона для админа."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    if not message.contact or message.contact.user_id != tg_id:
+        await message.answer(
+            '❗️Пожалуйста, нажмите кнопку "Отправить мой номер", а не пересылайте чужой контакт.',
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await state.set_state(current_state)
+        await rediska.set_state(admin_bot_id, tg_id, current_state)
+        return
+
+    phone = message.contact.phone_number
+    str_phone = "+" + str(phone)
+
+    all_admins = await admin_data.get_all_admins()
+
+    log.info(f"phone: {phone}")
+    log.info(f"pho_db: {[admin.admin_phone for admin in all_admins]}")
+
+    if "+" + str(phone) in [admin.admin_phone for admin in all_admins]:
+
+        _ = await admin_data.reg_admin_tg_id(tg_id=tg_id, phone=str_phone)
+
+        text = "✅ Доступ разрешен!\nПодтвердите ваш вход в систему."
+
+        await message.answer(
+            text="👍",
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode="HTML",
+        )
+        await message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+    else:
+        text = "❌ Вы не являетесь администратором!"
+        await message.answer(
+            text=text,
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode="HTML",
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+# ---
+
+
+@admin_r.message(
+    F.text == "/users",
+)
+@admin_r.callback_query(
+    F.data == "refresh_users",
+)
 async def cmd_users(
     event: Message | CallbackQuery,
     state: FSMContext,
@@ -82,6 +160,17 @@ async def cmd_users(
     """Обработчик команды /users и обновления списка пользователей."""
 
     tg_id = event.from_user.id
+
+    all_admins = await admin_data.get_all_admins()
+
+    if tg_id != SUPER_ADMIN_TG_ID and tg_id not in [
+        admin.admin_tg_id for admin in all_admins
+    ]:
+        await event.answer(
+            text="❌ У вас нет доступа к этой команде.",
+        )
+        return
+
     current_state = AdminState.default.state
 
     customers, couriers, partners = await admin_data.get_all_users()
@@ -136,7 +225,9 @@ async def cmd_users(
 @admin_r.message(
     F.text == "/orders",
 )
-@admin_r.callback_query(F.data == "refresh_orders")
+@admin_r.callback_query(
+    F.data == "refresh_orders",
+)
 async def cmd_orders(
     event: Message | CallbackQuery,
     state: FSMContext,
@@ -144,6 +235,17 @@ async def cmd_orders(
     """Обработчик команды /orders для админа."""
 
     tg_id = event.from_user.id
+
+    all_admins = await admin_data.get_all_admins()
+
+    if tg_id != SUPER_ADMIN_TG_ID and tg_id not in [
+        admin.admin_tg_id for admin in all_admins
+    ]:
+        await event.answer(
+            text="❌ У вас нет доступа к этой команде.",
+        )
+        return
+
     current_state = AdminState.default.state
 
     (
@@ -206,6 +308,10 @@ async def cmd_orders(
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
+# ---
+# ---
+
+
 @admin_r.message(
     F.text == "/admins",
 )
@@ -222,17 +328,26 @@ async def cmd_admins(
         await message.answer(
             text="❌ У вас нет доступа к этой команде.",
         )
+        return
 
     admins = await admin_data.get_all_admins()
-    admins_phone = [admin.phone for admin in admins]
+
+    admins_name = [admin.admin_name for admin in admins]
+    admins_phone = [admin.admin_phone for admin in admins]
 
     admins_text = "\n".join(
-        f" - {i+1}. {phone}" for i, phone in enumerate(admins_phone)
+        f" - {i+1}. {name} {phone}"
+        for i, (name, phone) in enumerate(
+            zip(
+                admins_name,
+                admins_phone,
+            )
+        )
     )
 
     text = (
         f"<b>👨‍💼 Администраторы</b>\n\n"
-        f" - Всего администраторов: {len(admins)}\n"
+        f"Всего администраторов: {len(admins)}\n\n"
         f"{admins_text if admins_text else ''}"
     )
 
@@ -243,6 +358,124 @@ async def cmd_admins(
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+
+
+@admin_r.callback_query(
+    F.data == "set_admin",
+)
+async def set_admin(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Добавить администратора" для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.set_new_admin.state
+
+    text = (
+        f"<b>👨‍💼 Добавить администратора</b>\n\n"
+        f"Введите имя и телефон администратора в формате <b>+79998887766</b>.\n\n"
+        f"Пример: <code>Имя, +79998887766</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.set_new_admin),
+)
+async def set_new_admin(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода телефона нового администратора."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    name, phone = message.text.strip().split(", ")
+
+    if not phone.startswith("+") or len(phone) != 12:
+        await message.answer(
+            text="❌ Неверный формат телефона. Попробуйте еще раз.",
+        )
+        return
+
+    await admin_data.set_new_admin(name=name, phone=phone)
+    await message.answer(
+        text=f"✅ Администратор {name} с номером {phone} добавлен!",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+
+
+@admin_r.callback_query(
+    F.data == "del_admin",
+)
+async def del_admin(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Удалить администратора" для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.del_admin.state
+
+    text = (
+        f"<b>👨‍💼 Удалить администратора</b>\n\n"
+        f"Введите номер телефона администратора в формате <b>+79998887766</b>.\n\n"
+        f"Пример: <code>+79998887766</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    filters.StateFilter(AdminState.del_admin),
+)
+async def del_new_admin(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода телефона удаляемого администратора."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    phone = message.text.strip()
+
+    if not phone.startswith("+") or len(phone) != 12:
+        await message.answer(
+            text="❌ Неверный формат телефона. Попробуйте еще раз.",
+        )
+        return
+
+    await admin_data.del_admin(phone=phone)
+    await message.answer(
+        text=f"✅ Администратор с номером {phone} удален!",
     )
 
     await state.set_state(current_state)
@@ -365,19 +598,19 @@ async def cmd_global(
     text = (
         f"<b>🌎 Глобальное управление сервисом</b>\n\n"
         f"Здесь вы можете управлять всеми настройками сервиса и получать актуальную информацию.\n\n"
-        f"<b>⚙️ Сервис и Данные</b>\n"
+        f"<b>⚙️ Сервис</b>\n"
         f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
         f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
         f" •\n"
-        f" ▸ Пользователей: <b>{all_users}</b>\n"
-        f" ▸ Заказов: <b>{all_orders}</b>\n"
+        f" Пользователей: <b>{all_users}</b>\n"
+        f" Заказов: <b>{all_orders}</b>\n\n"
         f"🤑 <b>Финансы</b>\n"
-        f" ▸ Подписки: <b>{len(all_payments)}</b>\n\n"
-        f" ▸ Оборот: <b>{turnover}₽</b>\n"
+        f" ▸ Подписки: <b>{len(all_payments)}</b>\n"
+        f" ▸ Оборот заказов: <b>{turnover}₽</b>\n"
         f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
         f"🏆 <b>Рекорды</b>\n"
         f"  ▸ Самый быстрый заказ: <b>{fastest_order_ever_speed} км/ч </b>\n\n"
-        f"💰 <b>Цены и Тарифы</b>\n"
+        f"💰 <b>Тарифы</b>\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
         f" ▸ Повышенная цена заказа за 1км: <b>{max_price}₽</b>\n"
@@ -395,7 +628,7 @@ async def cmd_global(
         f" •\n"
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
         f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
-        f"🎉 <b>Акции и Скидки %</b>\n"
+        f"🎉 <b>Акции</b>\n"
         f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
         f" ▸ Бесплатный период: <b>{free_period_days} дней</b>\n"
@@ -495,7 +728,7 @@ async def data_service_data(
     canceled_orders = global_state_data.get("canceled_orders")
 
     text = (
-        f"<b>⚙️ Сервис и Данные</b>\n\n"
+        f"<b>⚙️ Сервис</b>\n\n"
         f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
         f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
         f" •\n"
@@ -626,9 +859,9 @@ async def data_finance(callback_query: CallbackQuery, state: FSMContext):
 
     text = (
         f"🤑 <b>Финансы</b>\n\n"
-        f" ▸ Подписки: <b>{len(all_payments)}</b>\n\n"
+        f" ▸ Подписки: <b>{len(all_payments)}</b>\n"
         f" ▸ Оборот: <b>{turnover}₽</b>\n"
-        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n"
     )
 
     reply_kb = await kb.get_admin_kb("finance")
@@ -685,13 +918,14 @@ async def call_finance_full_report_by_period(
     tg_id = callback_query.from_user.id
     current_state = AdminState.full_financial_report_by_period.state
 
-    today = datetime.today().strftime("%Y-%m-%d")
+    today = datetime.today().date()
+    today_str = datetime.today().strftime("%Y-%m-%d")
     month_ago = today - relativedelta(months=1)
 
     text = (
         f"📅 <b>Полный отчет по дате</b>\n\n"
         f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
-        f"Пример: <code>{month_ago}:{today}</code>"
+        f"Пример: <code>{month_ago}:{today_str}</code>"
     )
 
     await callback_query.message.edit_text(
@@ -731,9 +965,9 @@ async def get_finance_full_report_by_period(message: Message, state: FSMContext)
 
     text = (
         f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n\n"
-        f" ▸ Подписки: <b>{len(payments)}</b>\n\n"
-        f" ▸ Оборот: <b>{turnover}₽</b>\n"
-        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+        f" ▸ Подписки: <b>{len(payments)}</b>\n"
+        f" ▸ Оборот заказов: <b>{turnover}₽</b>\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n"
     )
 
     await message.answer(
@@ -766,9 +1000,9 @@ async def get_finance_full_report_by_date(message: Message, state: FSMContext):
 
     text = (
         f"📅 Полный отчет за <b>{date}</b>:\n\n"
-        f" ▸ Подписки: <b>{len(payments)}</b>\n\n"
-        f" ▸ Оборот: <b>{turnover}₽</b>\n"
-        f" ▸ Прибыль: <b>{profit}₽</b>\n\n"
+        f" ▸ Подписки: <b>{len(payments)}</b>\n"
+        f" ▸ Оборот заказов: <b>{turnover}₽</b>\n"
+        f" ▸ Прибыль: <b>{profit}₽</b>\n"
     )
 
     await message.answer(
@@ -784,7 +1018,7 @@ async def get_finance_full_report_by_date(message: Message, state: FSMContext):
 
 
 @admin_r.callback_query(
-    F.data == "speed_records",
+    F.data == "records",
 )
 async def data_records(
     callback_query: CallbackQuery,
@@ -863,13 +1097,14 @@ async def call_records_full_report_by_period(
     tg_id = callback_query.from_user.id
     current_state = AdminState.full_speed_report_by_period.state
 
-    today = datetime.today().strftime("%Y-%m-%d")
+    today = datetime.today().date()
+    today_str = datetime.today().strftime("%Y-%m-%d")
     month_ago = today - relativedelta(months=1)
 
     text = (
         f"📅 <b>Полный отчет по дате</b>\n\n"
         f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
-        f"Пример: <code>{month_ago}:{today}</code>"
+        f"Пример: <code>{month_ago}:{today_str}</code>"
     )
 
     await callback_query.message.edit_text(
@@ -904,9 +1139,8 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
         courier_phone,
         city,
         speed,
-        created,
-        completed,
         distance,
+        execution_time_seconds,
     ) = await order_data.get_fastest_order_by_date(date)
 
     if order_id:
@@ -918,21 +1152,23 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
         )
         day_reward = await admin_data.get_reward_for_day_fastest_speed()
         month_reward = await admin_data.get_reward_for_month_fastest_speed()
-        order_execution_time = completed - created
+
+        execution_time_hours = int(execution_time_seconds // 3600)
+        execution_time_minutes = int(execution_time_seconds % 3600 // 60)
 
         text = (
             f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
-            f"Самый быстрый заказ: №<b>{order_id}</b>\n"
+            f"Заказ: №<b>{order_id}</b>\n"
             f"Город: <b>{city}</b>\n"
             f"Дистанция: <b>{distance} км</b>\n"
-            f"Время выполнения: <b>{order_execution_time} мин</b>\n"
+            f"Время доставки <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
             f"Скорость: <b>{speed} км/ч</b>\n"
             f"Курьер: <b>{courier_name}</b>\n"
             f"Номер курьера: {courier_phone}\n"
             f"Telegram курьера: {tg_link}\n"
             f" •\n"
-            f"Дневная награда: <b>{day_reward}₽</b>\n"
             f"Месячная награда: <b>{month_reward}₽</b>\n"
+            f"Дневная награда: <b>{day_reward}₽</b>\n"
         )
 
     else:
@@ -950,7 +1186,7 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
 
 
 @admin_r.message(StateFilter(AdminState.full_speed_report_by_period))
-async def get_records_full_report_by_date(message: Message, state: FSMContext):
+async def get_records_full_report_by_period(message: Message, state: FSMContext):
     """Обработчик ввода для полного отчета по рекордам за период."""
 
     tg_id = message.from_user.id
@@ -974,9 +1210,8 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
         courier_phone,
         city,
         speed,
-        created,
-        completed,
         distance,
+        execution_time_seconds,
     ) = await order_data.get_fastest_order_by_period(start_date, end_date)
 
     if order_id:
@@ -988,14 +1223,16 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
         )
         day_reward = await admin_data.get_reward_for_day_fastest_speed()
         month_reward = await admin_data.get_reward_for_month_fastest_speed()
-        order_execution_time = completed - created
+
+        execution_time_hours = int(execution_time_seconds // 3600)
+        execution_time_minutes = int(execution_time_seconds % 3600 // 60)
 
         text = (
             f"📅 Полный отчет за <b>{start_date_str}:{end_date_str}</b>:\n\n"
             f"Самый быстрый заказ: №<b>{order_id}</b>\n"
             f"Город: <b>{city}</b>\n"
             f"Дистанция: <b>{distance} км</b>\n"
-            f"Время выполнения: <b>{order_execution_time} мин</b>\n"
+            f"Время доставки <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
             f"Скорость: <b>{speed} км/ч</b>\n"
             f"Курьер: <b>{courier_name}</b>\n"
             f"Номер курьера: {courier_phone}\n"
@@ -1022,7 +1259,7 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# --- Цены и тарифы
+# --- Тарифы
 
 
 @admin_r.callback_query(
@@ -1060,7 +1297,7 @@ async def data_prices_and_tariffs(
     coefficient_other_cities = global_state_data.get("coefficient_other_cities")
 
     text = (
-        f"<b>💰 Цены и Тарифы</b>\n\n"
+        f"<b>💰 Тарифы</b>\n\n"
         f" ▸ Стоимость подписки: <b>{subs_price}₽</b>\n"
         f" ▸ Стандартная цена заказ за 1км: <b>{common_price}₽</b>\n"
         f" ▸ Повышенная цена заказа за 1км: <b>{max_price}₽</b>\n"
@@ -1294,7 +1531,7 @@ async def change_prices_filer(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# --- Акции и скидки
+# --- Акции
 
 
 @admin_r.callback_query(
@@ -1322,7 +1559,7 @@ async def data_discounts_and_promotions(
     refund_percent = global_state_data.get("refund_percent")
 
     text = (
-        f"<b>🎉 Акции и Скидки %</b>\n\n"
+        f"<b>🎉 Акции</b>\n\n"
         f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
         f" ▸ Бесплатный период: <b>{free_period_days} дней</b>\n"
@@ -1470,6 +1707,40 @@ async def change_discount_and_promotions(
     await message.answer(
         text=text,
         disable_notification=True,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# --- Сообщения
+
+
+@admin_r.callback_query(
+    F.data == "messages",
+)
+async def data_messages(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Сообщения" для админа."""
+    await callback_query.answer(
+        text="💬 Сообщения",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    text = f"💬 <b>Сообщения</b>\n\n" f"Выберите действие:"
+
+    reply_kb = await kb.get_admin_kb("messages")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
     )
 
     await state.set_state(current_state)

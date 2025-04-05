@@ -394,7 +394,7 @@ async def cmd_promo(
 
     if courier_seed_key:
         text = (
-            f"🎉 <b>PROMOKOD</b>\n\n"
+            f"🎉 <b>PROMO</b>\n\n"
             f"Вы являетесь участником PROMO акций!\n\n"
             f"Ваш PROMOKOD: <code>{courier_seed_key}</code>"
         )
@@ -428,7 +428,7 @@ async def cmd_promo(
 @courier_r.callback_query(
     F.data == "PROMOKOD",
 )
-async def data_set_PROMOKOD(
+async def data_set_PROMO(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -458,7 +458,7 @@ async def data_set_PROMOKOD(
 @courier_r.message(
     filters.StateFilter(CourierState.set_seed_key),
 )
-async def data_PROMOKOD(
+async def data_PROMO(
     message: Message,
     state: FSMContext,
 ):
@@ -1221,6 +1221,7 @@ async def complete_order(
         execution_time_seconds = (
             current_time - order.started_at_moscow_time
         ).total_seconds()
+
         execution_time_hours_for_speed = execution_time_seconds / 3600
         execution_time_hours = int(execution_time_seconds // 3600)
         execution_time_minutes = int(execution_time_seconds % 3600 // 60)
@@ -1258,6 +1259,7 @@ async def complete_order(
             courier_username=callback_query.from_user.username,
             new_status=OrderStatus.COMPLETED,
             speed_kmh=round(speed, 2),
+            execution_time_seconds=execution_time_seconds,
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
 

@@ -638,7 +638,7 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="➕ Зарегистрировать админа",
+                            text="+ Зарегистрировать админа",
                             callback_data="set_admin",
                         )
                     ],
@@ -678,20 +678,20 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="💰 Цены и Тарифы",
+                            text="💰 Тарифы",
                             callback_data="prices_and_tariffs",
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            text="🎉 Акции и Скидки %",
+                            text="🎉 Акции",
                             callback_data="discounts_and_promotions",
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            text="📢 Сообщения и Рассылки",
-                            callback_data="send_message",
+                            text="💬 Сообщения",
+                            callback_data="messages",
                         )
                     ],
                 ]
@@ -846,7 +846,7 @@ class Keyboard:
                     ],
                 ]
             ),
-            "speed_records": InlineKeyboardMarkup(
+            "records": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -868,7 +868,7 @@ class Keyboard:
                     ],
                 ]
             ),
-            "finance_report": InlineKeyboardMarkup(
+            "finance": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -889,6 +889,36 @@ class Keyboard:
                         ),
                     ],
                 ]
+            ),
+            "messages": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Сообщение",
+                            callback_data="send_message_to_users",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Рассылка",
+                            callback_data="send_broadcast_message",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "phone_kb": ReplyKeyboardMarkup(
+                keyboard=[
+                    [KeyboardButton(text="Поделиться номером", request_contact=True)],
+                ],
+                resize_keyboard=True,
+                one_time_keyboard=True,
+                input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
             ),
         }
 

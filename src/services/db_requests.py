@@ -64,21 +64,45 @@ class CustomerData:
     async def update_customer_name(self, tg_id: int, new_name: str):
         """Обновляет имя клиента в БД"""
         async with self.async_session_factory() as session:
-            customer = await session.get(Customer, tg_id)
+            query = await session.execute(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+
+            customer = query.scalar_one_or_none()
+
+            if not customer:
+                return False
+
             customer.customer_name = new_name
             await session.commit()
 
     async def update_customer_phone(self, tg_id: int, new_phone: str):
         """Обновляет номер клиента в БД"""
         async with self.async_session_factory() as session:
-            customer = await session.get(Customer, tg_id)
+            query = await session.execute(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+
+            customer = query.scalar_one_or_none()
+
+            if not customer:
+                return False
+
             customer.customer_phone = new_phone
             await session.commit()
 
     async def update_customer_city(self, tg_id: int, new_city: str):
         """Обновляет город клиента в БД"""
         async with self.async_session_factory() as session:
-            customer = await session.get(Customer, tg_id)
+            query = await session.execute(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+
+            customer = query.scalar_one_or_none()
+
+            if not customer:
+                return False
+
             customer.customer_city = new_city
             await session.commit()
 
@@ -254,7 +278,12 @@ class CourierData:
         """Обновляет имя курьера в БД"""
 
         async with self.async_session_factory() as session:
-            courier = await session.get(Courier, tg_id)
+            query = await session.execute(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+
+            courier = query.scalar_one_or_none()
+
             if not courier:
                 return False
 
@@ -270,7 +299,12 @@ class CourierData:
         """Обновляет номер курьера в БД"""
 
         async with self.async_session_factory() as session:
-            courier = await session.get(Courier, tg_id)
+            query = await session.execute(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+
+            courier = query.scalar_one_or_none()
+
             if not courier:
                 return False
 
@@ -286,7 +320,12 @@ class CourierData:
         """Обновляет город курьера в БД"""
 
         async with self.async_session_factory() as session:
-            courier = await session.get(Courier, tg_id)
+            query = await session.execute(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+
+            courier = query.scalar_one_or_none()
+
             if not courier:
                 return False
 
@@ -302,10 +341,10 @@ class CourierData:
                 result = await session.execute(
                     select(Courier).where(Courier.courier_tg_id == tg_id)
                 )
+
                 courier = result.scalar_one_or_none()
 
                 if not courier:
-                    log.error(f"Курьер с tg_id={tg_id} не найден.")
                     return False
 
                 now = await Time.get_moscow_time()
@@ -315,17 +354,16 @@ class CourierData:
                         Subscription.courier_id == courier.courier_id
                     )
                 )
+
                 subscription = result.scalar_one_or_none()
 
                 if subscription:
-
                     if subscription.end_date >= now:
                         subscription.end_date += timedelta(days=days)
                     else:
 
                         subscription.end_date = now + timedelta(days=days)
                 else:
-
                     new_subscription = Subscription(
                         end_date=now + timedelta(days=days),
                         courier_id=courier.courier_id,
@@ -639,17 +677,43 @@ class AdminData:
 
     async def set_new_admin(
         self,
-        tg_id: int,
+        name: str,
+        phone: str,
     ) -> bool:
         """Добавляет в БД нового администратора"""
-
         async with self.async_session_factory() as session:
             try:
                 new_admin = Admin(
-                    admin_tg_id=tg_id,
+                    admin_name=name,
+                    admin_phone=phone,
                 )
                 session.add(new_admin)
                 await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении администратора: {e}")
+                return False
+
+    async def reg_admin_tg_id(
+        self,
+        tg_id: int,
+        phone: str,
+    ) -> bool:
+        """Добавляет в БД нового администратора"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Admin).where(Admin.admin_phone == phone)
+            )
+
+            admin = result.scalar_one_or_none()
+
+            if not admin:
+                return False
+
+            try:
+                admin.admin_tg_id = tg_id
                 await session.commit()
                 return True
             except Exception as e:
@@ -664,10 +728,10 @@ class AdminData:
             query = await session.execute(select(Admin))
             return query.scalars().all()
 
-    async def del_admin(self, tg_id: int):
+    async def del_admin(self, phone: str):
         async with self.async_session_factory() as session:
             try:
-                await session.execute(delete(Admin).where(Admin.admin_tg_id == tg_id))
+                await session.execute(delete(Admin).where(Admin.admin_phone == phone))
                 await session.commit()
                 return True
             except Exception as e:
@@ -1326,9 +1390,12 @@ class AdminData:
         """Возвращает все платежи за определенную дату"""
         async with self.async_session_factory() as session:
             query = await session.execute(
-                select(Payment).where(Payment.payment_date == date)
+                select(Payment).where(
+                    func.date_trunc("day", Payment.payment_date) == date
+                )
             )
             payments = query.scalars().all()
+            log.info(f"payments by date {date}: {payments}")
             return payments
 
     async def get_date_turnover(self, date: datetime) -> int:
@@ -1337,7 +1404,7 @@ class AdminData:
             result = await session.execute(
                 select(func.sum(Order.price_rub)).where(
                     Order.order_status == OrderStatus.COMPLETED,
-                    Order.order_date == date,
+                    func.date_trunc(Order.completed_at_moscow_time) == date,
                 )
             )
             turnover = result.scalar_one_or_none()
@@ -1348,7 +1415,7 @@ class AdminData:
         async with self.async_session_factory() as session:
             result = await session.execute(
                 select(func.sum(Payment.payment_sum_rub)).where(
-                    Payment.payment_date == date
+                    func.date_trunc(Order.completed_at_moscow_time) == date
                 )
             )
             profit = result.scalar_one_or_none()
@@ -1357,17 +1424,18 @@ class AdminData:
     # ---
 
     async def get_period_payments(
-        self, start_date: datetime, end_date: datetime
+        self, start_date: datetime.date, end_date: datetime.date
     ) -> list:
         """Возвращает все платежи за определенный период"""
         async with self.async_session_factory() as session:
             query = await session.execute(
                 select(Payment).where(
-                    Payment.payment_date >= start_date,
-                    Payment.payment_date <= end_date,
+                    func.date_trunc("day", Payment.payment_date) >= start_date,
+                    func.date_trunc("day", Payment.payment_date) <= end_date,
                 )
             )
             payments = query.scalars().all()
+            log.info(f"payments by period {start_date}:{end_date}: {payments}")
             return payments
 
     async def get_turnover_by_period(
@@ -1378,8 +1446,9 @@ class AdminData:
             result = await session.execute(
                 select(func.sum(Order.price_rub)).where(
                     Order.order_status == OrderStatus.COMPLETED,
-                    Order.order_date >= start_date,
-                    Order.order_date <= end_date,
+                    func.date_trunc("day", Order.completed_at_moscow_time)
+                    >= start_date,
+                    func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
                 )
             )
             turnover = result.scalar_one_or_none()
@@ -1392,8 +1461,8 @@ class AdminData:
         async with self.async_session_factory() as session:
             result = await session.execute(
                 select(func.sum(Payment.payment_sum_rub)).where(
-                    Payment.payment_date >= start_date,
-                    Payment.payment_date <= end_date,
+                    func.date_trunc("day", Payment.payment_date) >= start_date,
+                    func.date_trunc("day", Payment.payment_date) <= end_date,
                 )
             )
             profit = result.scalar_one_or_none()
@@ -1755,6 +1824,7 @@ class OrderData:
         order_id: int,
         courier_username: str,
         new_status: OrderStatus,
+        execution_time_seconds: int,
         speed_kmh: float,
     ) -> bool:
         """Обновляет статус заказа и время завершения его выполнения"""
@@ -1769,6 +1839,7 @@ class OrderData:
             order.courier_username = courier_username
             order.completed_at_moscow_time = await Time.get_moscow_time()
             order.speed_kmh = speed_kmh
+            order.execution_time_seconds = execution_time_seconds
 
             await session.flush()
             await session.commit()
@@ -1992,11 +2063,7 @@ class OrderData:
             stmt = (
                 select(Order)
                 .where(Order.order_status == OrderStatus.COMPLETED)
-                .order_by(
-                    (
-                        Order.completed_at_moscow_time - Order.started_at_moscow_time
-                    ).asc()
-                )
+                .order_by((Order.execution_time_seconds).asc())
                 .limit(1)
             )
 
@@ -2012,22 +2079,14 @@ class OrderData:
         """Возвращает самый быстрый заказ за указанную дату"""
         async with self.async_session_factory() as session:
             try:
-                start_of_day = datetime(date.year, date.month, date.day, 0, 0, 0)
-                end_of_day = datetime(date.year, date.month, date.day, 23, 59, 59)
 
                 result = await session.execute(
                     select(Order)
                     .where(
-                        Order.completed_at_moscow_time >= start_of_day,
-                        Order.completed_at_moscow_time <= end_of_day,
+                        func.date_trunc("day", Order.completed_at_moscow_time) == date,
                         Order.order_status == OrderStatus.COMPLETED,
                     )
-                    .order_by(
-                        (
-                            Order.completed_at_moscow_time
-                            - Order.started_at_moscow_time
-                        ).asc()
-                    )
+                    .order_by((Order.execution_time_seconds).asc())
                 )
                 fastest_order = result.scalars().first()
                 return (
@@ -2039,12 +2098,12 @@ class OrderData:
                         fastest_order.courier_phone,
                         fastest_order.order_city,
                         fastest_order.speed_kmh,
-                        fastest_order.created_at_moscow_time,
-                        fastest_order.completed_at_moscow_time,
                         fastest_order.distance_km,
+                        fastest_order.execution_time_seconds,
                     )
                     if fastest_order
                     else (
+                        None,
                         None,
                         None,
                         None,
@@ -2070,16 +2129,14 @@ class OrderData:
                 result = await session.execute(
                     select(Order)
                     .where(
-                        Order.completed_at_moscow_time >= date_1,
-                        Order.completed_at_moscow_time <= date_2,
-                        Order.order_status == OrderStatus.COMPLETED,
+                        func.date_trunc("day", Order.completed_at_moscow_time)
+                        >= date_1,
+                        func.date_trunc("day", Order.completed_at_moscow_time)
+                        <= date_2,
+                        func.date_trunc("day", Order.order_status)
+                        == OrderStatus.COMPLETED,
                     )
-                    .order_by(
-                        (
-                            Order.completed_at_moscow_time
-                            - Order.started_at_moscow_time
-                        ).asc()
-                    )
+                    .order_by((Order.execution_time_seconds).asc())
                 )
                 fastest_order = result.scalars().first()
                 return (
@@ -2094,9 +2151,11 @@ class OrderData:
                         fastest_order.created_at_moscow_time,
                         fastest_order.completed_at_moscow_time,
                         fastest_order.distance_km,
+                        fastest_order.execution_time_seconds,
                     )
                     if fastest_order
                     else (
+                        None,
                         None,
                         None,
                         None,

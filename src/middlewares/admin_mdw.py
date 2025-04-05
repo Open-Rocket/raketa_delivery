@@ -85,13 +85,13 @@ async def _check_state_and_handle_message(
     if tg_id == SUPER_ADMIN_TG_ID:
         return await handler(event, data)
 
-    if tg_id not in admins_tg_id:
-        await admin_bot.send_message(
-            chat_id=chat_id,
-            text="У вас нет прав администрирования",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        return
+    # if tg_id not in admins_tg_id:
+    #     await admin_bot.send_message(
+    #         chat_id=chat_id,
+    #         text="У вас нет прав администрирования",
+    #         reply_markup=ReplyKeyboardRemove(),
+    #     )
+    #     return
 
     return await handler(event, data)
 
