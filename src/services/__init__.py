@@ -10,6 +10,7 @@ from .db_requests import (
 )
 from .fuzzy import cities, cities_2, find_closest_city
 from .seed import seed_maker
+from .earn_requests import pdf_creator
 
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "cities_2",
     "find_closest_city",
     "seed_maker",
+    "pdf_creator",
 ]

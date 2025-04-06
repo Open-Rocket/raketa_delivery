@@ -14,6 +14,8 @@ from src.middlewares import CustomerOuterMiddleware, CourierOuterMiddleware
 from aiogram.types import ReplyKeyboardRemove
 from math import ceil
 from dateutil.relativedelta import relativedelta
+from aiogram import Dispatcher
+from aiogram.types import Update
 
 
 from src.services import (
@@ -27,6 +29,7 @@ from src.services import (
     route,
     recognizer,
     seed_maker,
+    pdf_creator,
 )
 from src.models import OrderStatus
 from src.confredis import rediska
@@ -73,6 +76,8 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "Dispatcher",
+    "Update",
     "relativedelta",
     "ceil",
     "StateFilter",
@@ -147,4 +152,5 @@ __all__ = [
     "seed_maker",
     "BufferedInputFile",
     "InputMediaDocument",
+    "pdf_creator",
 ]

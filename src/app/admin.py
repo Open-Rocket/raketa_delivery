@@ -9,6 +9,8 @@ from ._deps import (
     StateFilter,
     json,
     relativedelta,
+    BufferedInputFile,
+    pdf_creator,
     ContentType,
     filters,
     OrderStatus,
@@ -16,6 +18,8 @@ from ._deps import (
     LabeledPrice,
     zlib,
     Time,
+    Dispatcher,
+    Update,
     find_closest_city,
     SUPER_ADMIN_TG_ID,
     F,
@@ -25,7 +29,10 @@ from ._deps import (
     rediska,
     log,
     admin_r,
+    admin_bot,
+    partner_bot,
     admin_bot_id,
+    partner_data,
     admin_fallback,
     courier_bot_id,
     handler,
@@ -143,8 +150,7 @@ async def reg_admin_phone(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# ---
-# ---
+# --- Пользователи
 
 
 @admin_r.message(
@@ -220,6 +226,9 @@ async def cmd_users(
     await state.update_data(message_text_users=text, message_kb_users=new_kb_json)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+
+
+# --- Заказы
 
 
 @admin_r.message(
@@ -310,180 +319,6 @@ async def cmd_orders(
 
 # ---
 # ---
-
-
-@admin_r.message(
-    F.text == "/admins",
-)
-async def cmd_admins(
-    message: Message,
-    state: FSMContext,
-):
-    """Обработчик команды /admins для админа."""
-
-    tg_id = message.from_user.id
-    current_state = AdminState.default.state
-
-    if tg_id != SUPER_ADMIN_TG_ID:
-        await message.answer(
-            text="❌ У вас нет доступа к этой команде.",
-        )
-        return
-
-    admins = await admin_data.get_all_admins()
-
-    admins_name = [admin.admin_name for admin in admins]
-    admins_phone = [admin.admin_phone for admin in admins]
-
-    admins_text = "\n".join(
-        f" - {i+1}. {name} {phone}"
-        for i, (name, phone) in enumerate(
-            zip(
-                admins_name,
-                admins_phone,
-            )
-        )
-    )
-
-    text = (
-        f"<b>👨‍💼 Администраторы</b>\n\n"
-        f"Всего администраторов: {len(admins)}\n\n"
-        f"{admins_text if admins_text else ''}"
-    )
-
-    reply_kb = await kb.get_admin_kb("/admins")
-
-    await message.answer(
-        text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-# ---
-
-
-@admin_r.callback_query(
-    F.data == "set_admin",
-)
-async def set_admin(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик кнопки "Добавить администратора" для админа."""
-
-    tg_id = callback_query.from_user.id
-    current_state = AdminState.set_new_admin.state
-
-    text = (
-        f"<b>👨‍💼 Добавить администратора</b>\n\n"
-        f"Введите имя и телефон администратора в формате <b>+79998887766</b>.\n\n"
-        f"Пример: <code>Имя, +79998887766</code>"
-    )
-
-    await callback_query.message.edit_text(
-        text=text,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-@admin_r.message(
-    StateFilter(AdminState.set_new_admin),
-)
-async def set_new_admin(
-    message: Message,
-    state: FSMContext,
-):
-    """Обработчик ввода телефона нового администратора."""
-
-    tg_id = message.from_user.id
-    current_state = AdminState.default.state
-
-    name, phone = message.text.strip().split(", ")
-
-    if not phone.startswith("+") or len(phone) != 12:
-        await message.answer(
-            text="❌ Неверный формат телефона. Попробуйте еще раз.",
-        )
-        return
-
-    await admin_data.set_new_admin(name=name, phone=phone)
-    await message.answer(
-        text=f"✅ Администратор {name} с номером {phone} добавлен!",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-# ---
-
-
-@admin_r.callback_query(
-    F.data == "del_admin",
-)
-async def del_admin(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик кнопки "Удалить администратора" для админа."""
-
-    tg_id = callback_query.from_user.id
-    current_state = AdminState.del_admin.state
-
-    text = (
-        f"<b>👨‍💼 Удалить администратора</b>\n\n"
-        f"Введите номер телефона администратора в формате <b>+79998887766</b>.\n\n"
-        f"Пример: <code>+79998887766</code>"
-    )
-
-    await callback_query.message.edit_text(
-        text=text,
-        parse_mode="HTML",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-@admin_r.message(
-    filters.StateFilter(AdminState.del_admin),
-)
-async def del_new_admin(
-    message: Message,
-    state: FSMContext,
-):
-    """Обработчик ввода телефона удаляемого администратора."""
-
-    tg_id = message.from_user.id
-    current_state = AdminState.default.state
-
-    phone = message.text.strip()
-
-    if not phone.startswith("+") or len(phone) != 12:
-        await message.answer(
-            text="❌ Неверный формат телефона. Попробуйте еще раз.",
-        )
-        return
-
-    await admin_data.del_admin(phone=phone)
-    await message.answer(
-        text=f"✅ Администратор с номером {phone} удален!",
-    )
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-# ---
-# ---
 # ---
 
 
@@ -563,6 +398,11 @@ async def cmd_global(
         fastest_order_ever_speed if fastest_order_ever_speed else "..."
     )
 
+    all_earn_waiting_requests = await partner_data.get_all_waiting_earn_requests()
+
+    min_refund_amount = await partner_data.get_min_refund_amount()
+    max_refund_amount = await partner_data.get_max_refund_amount()
+
     global_state_data = {
         "common_price": common_price,
         "max_price": max_price,
@@ -634,6 +474,10 @@ async def cmd_global(
         f" ▸ Бесплатный период: <b>{free_period_days} дней</b>\n"
         f" •\n"
         f" ▸ Партнерский процент: <b>{refund_percent}%</b>\n\n"
+        f"💬 <b>Сообщения</b>\n"
+        f" ▸ Запросы на выплату: <b>{len(all_earn_waiting_requests)}</b>\n"
+        f" ▸ Минимальная выплата <b>{min_refund_amount}₽</b>\n"
+        f" ▸ Максимальная выплата <b>{max_refund_amount}₽</b>\n"
         f"<b>Выберите действие:</b>\n"
     )
 
@@ -1346,6 +1190,8 @@ async def data_prices_and_tariffs(
             "time_coefficient_21_00",
             "big_cities_coefficient",
             "small_cities_coefficient",
+            "change_min_refund_amount",
+            "change_max_refund_amount",
         ]
     )
 )
@@ -1398,6 +1244,12 @@ async def call_change_price(
         case "small_cities_coefficient":
             current_state = AdminState.change_small_cities_coefficient.state
             text = "Введите новый коэффициент для остальных городов:"
+        case "change_min_refund_amount":
+            current_state = AdminState.change_min_refund_amount.state
+            text = "Введите новую минимальную сумму выплаты партнеру:"
+        case "change_max_refund_amount":
+            current_state = AdminState.change_max_refund_amount.state
+            text = "Введите новую максимальную сумму выплаты партнеру:"
         case _:
             await callback_query.answer(
                 "❌ Ошибка! Неизвестная команда.", show_alert=True
@@ -1433,6 +1285,8 @@ async def call_change_price(
         AdminState.change_time_coefficient_21_00,
         AdminState.change_big_cities_coefficient,
         AdminState.change_small_cities_coefficient,
+        AdminState.change_min_refund_amount,
+        AdminState.change_max_refund_amount,
     )
 )
 async def change_prices_filer(
@@ -1512,6 +1366,12 @@ async def change_prices_filer(
         case AdminState.change_small_cities_coefficient.state:
             await admin_data.change_small_cities_coefficient(new_value)
             text = f"✅ Новый коэффициент для остальных городов: {new_value}"
+        case AdminState.change_min_refund_amount.state:
+            await partner_data.set_min_refund_amount(new_value)
+            text = f"✅ Новая минимальная сумма выплаты партнеру: {new_value}₽"
+        case AdminState.change_max_refund_amount.state:
+            await partner_data.set_max_refund_amount(new_value)
+            text = f"✅ Новая максимальная сумма выплаты партнеру: {new_value}₽"
 
         case _:
             await message.answer(
@@ -1713,35 +1573,365 @@ async def change_discount_and_promotions(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# --- Сообщения
+# --- Админы
 
 
 @admin_r.callback_query(
-    F.data == "messages",
+    F.data == "admins",
 )
-async def data_messages(
+async def data_admins(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Обработчик кнопки "Сообщения" для админа."""
+    """Обработчик admins для админа."""
+
     await callback_query.answer(
-        text="💬 Сообщения",
+        text="👨‍💼 Администраторы",
         show_alert=False,
     )
 
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
 
-    text = f"💬 <b>Сообщения</b>\n\n" f"Выберите действие:"
+    if tg_id != SUPER_ADMIN_TG_ID:
+        await callback_query.message.answer(
+            text="❌ У вас нет доступа к этой команде.",
+        )
+        return
 
-    reply_kb = await kb.get_admin_kb("messages")
+    admins = await admin_data.get_all_admins()
+
+    admins_name = [admin.admin_name for admin in admins]
+    admins_phone = [admin.admin_phone for admin in admins]
+
+    admins_text = "\n".join(
+        f" - {i+1}. {name} {phone}"
+        for i, (name, phone) in enumerate(
+            zip(
+                admins_name,
+                admins_phone,
+            )
+        )
+    )
+
+    text = (
+        f"<b>👨‍💼 Администраторы</b>\n\n"
+        f"Всего администраторов: {len(admins)}\n\n"
+        f"{admins_text if admins_text else ''}"
+    )
+
+    reply_kb = await kb.get_admin_kb("admins")
 
     await callback_query.message.edit_text(
         text=text,
         reply_markup=reply_kb,
-        disable_web_page_preview=True,
+        disable_notification=True,
         parse_mode="HTML",
     )
+
+    await state.update_data(admins=text)
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "set_admin",
+)
+async def set_admin(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Добавить администратора" для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.set_new_admin.state
+
+    text = (
+        f"<b>👨‍💼 Добавить администратора</b>\n\n"
+        f"Введите имя и телефон администратора в формате <b>+79998887766</b>.\n\n"
+        f"Пример: <code>Имя, +79998887766</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.set_new_admin),
+)
+async def set_new_admin(
+    message: Message,
+    state: FSMContext,
+    dispatcher: Dispatcher,
+):
+    """Обработчик ввода телефона нового администратора."""
+
+    mdw_state = await state.get_state()
+
+    if mdw_state != AdminState.set_new_admin.state:
+        update = Update(update_id=0, message=message)
+        await dispatcher.feed_update(bot=admin_bot, update=update)
+        return
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    name, phone = message.text.strip().split(", ")
+
+    if not phone.startswith("+") or len(phone) != 12:
+        await message.answer(
+            text="❌ Неверный формат телефона. Попробуйте еще раз.",
+        )
+        return
+
+    await admin_data.set_new_admin(name=name, phone=phone)
+    await message.answer(
+        text=f"✅ Администратор {name} с номером {phone} добавлен!",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "del_admin",
+)
+async def del_admin(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Удалить администратора" для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.del_admin.state
+    admins = (await state.get_data()).get("admins")
+
+    text = (
+        f"<b>❌ Удалить администратора</b>\n\n"
+        f"Введите номер телефона администратора в формате <b>+79998887766</b>.\n\n"
+        f"----------------------\n"
+        f"{admins}"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    filters.StateFilter(AdminState.del_admin),
+)
+async def call_del_admin(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода телефона удаляемого администратора."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    phone = message.text.strip()
+
+    if not phone.startswith("+") or len(phone) != 12:
+        await message.answer(
+            text="❌ Неверный формат телефона. Попробуйте еще раз.",
+        )
+        return
+
+    await admin_data.del_admin(phone=phone)
+    await message.answer(
+        text=f"✅ Администратор с номером {phone} удален!",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# --- Сообщения
+
+
+@admin_r.callback_query(F.data == "messages")
+async def data_messages(callback_query: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Сообщения' для админа с PDF-файлом запросов."""
+    await callback_query.answer(text="💬 Сообщения", show_alert=False)
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    all_earn_waiting_requests = await partner_data.get_all_waiting_earn_requests()
+
+    log.info(f"all_earn_requests: {all_earn_waiting_requests}")
+
+    pdf_path = await pdf_creator.create_earn_requests_pdf(all_earn_waiting_requests)
+
+    with open(pdf_path, "rb") as f:
+        file_data = f.read()
+
+    await callback_query.message.answer_document(
+        document=BufferedInputFile(file_data, filename=pdf_path.name),
+        caption="📄 Список запросов на выплаты",
+    )
+
+    total_sum = sum(data[2] for data in all_earn_waiting_requests.values())
+
+    summary_text = (
+        f"💬 <b>Сообщения</b>\n\n"
+        f"<b>Запросы на выплату:</b> {len(all_earn_waiting_requests)}\n"
+        f"<b>Общая сумма к выплате:</b> {total_sum}₽"
+    )
+
+    reply_kb = await kb.get_admin_kb("messages")
+
+    await callback_query.message.answer(
+        text=summary_text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "process_request",
+)
+async def process_request(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки 'Обработать запрос' для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.process_request.state
+
+    text = (
+        f"<b>💰 Обработать запрос</b>\n\n"
+        f"Введите номер запроса на выплату в формате <b>123456789</b>.\n\n"
+        f"Пример: <code>123456789</code>"
+    )
+
+    await callback_query.message.answer(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.process_request),
+)
+async def process_request_input(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода номера запроса на выплату для админа."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    request_id = message.text.strip()
+
+    if not request_id.isdigit():
+        await state.set_state(current_state)
+        await message.answer(
+            text="❌ Неверный формат номера запроса. Попробуйте еще раз.",
+        )
+        return
+
+    else:
+        request_id = int(request_id)
+
+    partner_tg_id, partner_user_lin, amount, date = (
+        await partner_data.get_waiting_earn_request_by_id(request_id)
+    )
+
+    if not partner_tg_id:
+        await state.set_state(current_state)
+        await message.answer(
+            text="❌ Запрос не найден. Проверьте номер и попробуйте снова.",
+        )
+        return
+
+    reply_kb = await kb.get_admin_kb("process_request")
+
+    text = (
+        f"<b>Запрос на выплату №{request_id}</b>\n\n"
+        f"<b> - 👤 Пользователь:</b> {partner_user_lin}\n"
+        f"<b> - 💰 Сумма:</b> {amount}₽\n"
+        f"<b> - 📅 Дата запроса:</b> {date}\n\n"
+        f"После выплаты подтвердите его обработку!\n\n"
+    )
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.update_data(
+        request_id=request_id,
+        partner_tg_id=partner_tg_id,
+        amount=amount,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "confirm_request",
+)
+async def confirm_request(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки 'Подтвердить запрос' для админа."""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    data = await state.get_data()
+    request_id = data.get("request_id")
+    partner_tg_id = data.get("partner_tg_id")
+    amount = data.get("amount")
+
+    _ = await partner_data.update_earn_request_status_and_balance(
+        request_id=request_id,
+        partner_tg_id=partner_tg_id,
+    )
+
+    text = f"✅ Запрос на выплату №{request_id} обработан!\n\n"
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    try:
+        await partner_bot.send_message(
+            chat_id=partner_tg_id,
+            text=f"💰 Запрос на выплату №{request_id} обработан!\n\n"
+            f"Вам было отправлено {amount}₽.\n\n"
+            f"💸 Спасибо, что работаете с нами!",
+        )
+    except Exception as e:
+        log.error(f"Ошибка отправки сообщения пользователю {partner_tg_id}: {e}")
+
+    await callback_query.message.delete()
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)

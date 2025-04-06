@@ -634,7 +634,7 @@ class Keyboard:
                     ],
                 ]
             ),
-            "/admins": InlineKeyboardMarkup(
+            "admins": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -647,6 +647,12 @@ class Keyboard:
                             text="❌ Удалить админа",
                             callback_data="del_admin",
                         )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
                     ],
                 ]
             ),
@@ -686,6 +692,12 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="🎉 Акции",
                             callback_data="discounts_and_promotions",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="👨‍💼 Админы",
+                            callback_data="admins",
                         )
                     ],
                     [
@@ -780,6 +792,18 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="Коэффициент по остальным городам",
                             callback_data="small_cities_coefficient",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Минимальная сумма выплаты",
+                            callback_data="change_min_refund_amount",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Максимальная сумма выплаты",
+                            callback_data="change_max_refund_amount",
                         )
                     ],
                     [
@@ -894,22 +918,20 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Сообщение",
-                            callback_data="send_message_to_users",
+                            text="Обработать запрос №",
+                            callback_data="process_request",
                         )
                     ],
+                ]
+            ),
+            "process_request": InlineKeyboardMarkup(
+                inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Рассылка",
-                            callback_data="send_broadcast_message",
+                            text="✅ Обработан",
+                            callback_data="confirm_request",
                         )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="↩️ Назад",
-                            callback_data="back_global_data",
-                        ),
-                    ],
+                    ]
                 ]
             ),
             "phone_kb": ReplyKeyboardMarkup(

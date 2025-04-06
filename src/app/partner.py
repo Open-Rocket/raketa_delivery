@@ -112,6 +112,11 @@ async def partner_generate_seed(
 
     try:
 
+        user = callback_query.from_user
+
+        username = user.username  # может быть None
+        user_link = f"<a href='tg://user?id={tg_id}'>{username}</a>"
+
         partner_id = await partner_data.create_new_partner(tg_id)
 
         if partner_id:
@@ -739,17 +744,37 @@ async def data_earn(
     tg_id = callback_query.from_user.id
 
     balance = await partner_data.get_partner_balance(tg_id)
+    min_refund_amount = await partner_data.get_min_refund_amount()
+    max_refund_amount = await partner_data.get_max_refund_amount()
 
-    if balance < 1000:
-        text = (
-            f"🚫 <b>Минимальная сумма вывода:</b> 1000₽\n\n"
-            f"Ваш текущий баланс: <b>{balance}₽</b>\n\n"
-            f"Приглашайте больше клиентов и курьеров, чтобы увеличить свой доход!\n\n"
-        )
-    else:
+    if balance >= min_refund_amount:
+        if balance >= max_refund_amount:
+            additional_message = f"<i>*Ваш баланс превышает максимальную сумму вывода.\nВозможна выплата в несколько этапов!</i>\n"
+        else:
+            additional_message = ""
+
         text = (
             f"✅ Ваш запрос принят!\n\n"
             f"С вами свяжется наш менеджер для уточнения деталей.\n\n"
+            f"🔸 <b>Сумма вывода:</b> <b>{balance}₽</b>\n"
+            f"<i>*Подготовьте номер своей банковской карты на которую нужно совершить перевод или номер телефона в случае с переводом через СПБ.\nВам будет переведена вся сумма на вашем балансе!</i>.\n\n"
+            f"{additional_message}"
+        )
+
+        user = callback_query.from_user
+
+        username = user.username  # может быть None
+        user_link = (
+            f"<a href='tg://user?id={tg_id}'>{username if username else tg_id}</a>"
+        )
+
+        await partner_data.create_new_earn_request(tg_id, user_link, balance)
+
+    else:
+        text = (
+            f"🚫 <b>Минимальная сумма вывода:</b> {min_refund_amount}₽\n\n"
+            f"Ваш текущий баланс: <b>{balance}₽</b>\n\n"
+            f"Приглашайте больше клиентов и курьеров, чтобы увеличить свой доход!\n\n"
         )
 
     await callback_query.message.answer(

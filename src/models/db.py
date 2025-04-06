@@ -78,6 +78,11 @@ class OrderStatus(enum.Enum):
     CANCELLED = "Отменен"
 
 
+class RefundStatus(enum.Enum):
+    WAITING = "Ожидается выплата"
+    PAID = "Оплачен"
+
+
 # Tables
 
 
@@ -117,6 +122,9 @@ class GlobalSettings(Base):
         Integer,
         default=1000,
     )
+
+    min_refund_amount: Mapped[intData] = mapped_column(Integer, default=1000)
+    max_refund_amount: Mapped[intData] = mapped_column(Integer, default=100000)
 
 
 class Customer(Base):
@@ -208,6 +216,27 @@ class Partner(Base):
 
     couriers = relationship("Courier", back_populates="partner")
     customers = relationship("Customer", back_populates="partner")
+
+
+class EarnRequest(Base):
+    __tablename__ = "earn_requests"
+
+    earn_request_id: Mapped[intPK]
+    partner_user_link: Mapped[stringData]
+    partner_id = mapped_column(
+        Integer,
+        ForeignKey("partners.partner_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    partner_tg_id: Mapped[intDataUnique]
+    request_date: Mapped[datetimeData]
+    amount: Mapped[intData]
+
+    refund_status: Mapped[RefundStatus] = mapped_column(
+        Enum(RefundStatus),
+        nullable=False,
+        default=RefundStatus.WAITING,
+    )
 
 
 class SeedKey(Base):
@@ -333,8 +362,10 @@ __all__ = [
     "Payment",
     "Order",
     "OrderStatus",
+    "RefundStatus",
     "Subscription",
     "GlobalSettings",
+    "EarnRequest",
     "engine",
     "Base",
 ]

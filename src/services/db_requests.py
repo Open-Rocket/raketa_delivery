@@ -9,7 +9,9 @@ from src.models import (
     Payment,
     SeedKey,
     GlobalSettings,
+    EarnRequest,
     OrderStatus,
+    RefundStatus,
     Order,
     Subscription,
 )
@@ -1654,6 +1656,203 @@ class PartnerData:
             )
 
             return int(paid_count or 0)
+
+    # ---
+
+    async def create_new_earn_request(
+        self,
+        tg_id: int,
+        user_link: str,
+        amount: int,
+    ) -> bool:
+        """Создает новый запрос на выплату заработка или перезаписывает старый, если он еще не был обработан"""
+        async with self.async_session_factory() as session:
+            try:
+                partner = await session.scalar(
+                    select(Partner).where(Partner.partner_tg_id == tg_id)
+                )
+                if not partner:
+                    return False
+
+                existing_request = await session.scalar(
+                    select(EarnRequest).where(
+                        EarnRequest.partner_tg_id == tg_id,
+                        EarnRequest.refund_status == RefundStatus.WAITING,
+                    )
+                )
+
+                if existing_request:
+                    existing_request.partner_user_link = user_link
+                    existing_request.amount = amount
+                    existing_request.request_date = await Time.get_moscow_time()
+                    await session.flush()
+                else:
+
+                    request = EarnRequest(
+                        partner_id=partner.partner_id,
+                        partner_tg_id=tg_id,
+                        partner_user_link=user_link,
+                        request_date=await Time.get_moscow_time(),
+                        amount=amount,
+                        refund_status=RefundStatus.WAITING,
+                    )
+                    session.add(request)
+                    await session.flush()
+
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении запроса на выплату: {e}")
+                return False
+
+    async def get_all_waiting_earn_requests(self) -> dict:
+        """Возвращает словарь всех ожидающих выплат с данными по каждому запросу"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(EarnRequest).where(
+                    EarnRequest.refund_status == RefundStatus.WAITING
+                )
+            )
+            requests = query.scalars().all()
+
+            result = {
+                request.earn_request_id: (
+                    request.partner_tg_id,
+                    request.partner_user_link,
+                    request.amount,
+                    request.request_date.strftime("%d.%m.%Y %H:%M"),
+                )
+                for request in requests
+            }
+
+            return result
+
+    async def get_all_earn_requests(self) -> list:
+        """Возвращает все запросы на выплату заработка"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(EarnRequest))
+            requests = query.scalars().all()
+
+            result = {
+                request.earn_request_id: (
+                    request.partner_tg_id,
+                    request.partner_user_link,
+                    request.amount,
+                    request.request_date.strftime("%d.%m.%Y %H:%M"),
+                    (
+                        "Оплачено"
+                        if request.refund_status == RefundStatus.PAID
+                        else "Ожидает"
+                    ),
+                )
+                for request in requests
+            }
+
+            return result
+
+    async def get_waiting_earn_request_by_id(self, request_id: int) -> tuple:
+        """Возвращает запрос на выплату заработка по ID"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(EarnRequest).where(
+                    EarnRequest.earn_request_id == request_id,
+                    EarnRequest.refund_status == RefundStatus.WAITING,
+                )
+            )
+            request = query.scalar_one_or_none()
+
+            if not request:
+                return (
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+
+            return (
+                request.partner_tg_id,
+                request.partner_user_link,
+                request.amount,
+                request.request_date.strftime("%d.%m.%Y %H:%M"),
+            )
+
+    async def update_earn_request_status_and_balance(
+        self,
+        request_id: int,
+        partner_tg_id: int,
+    ) -> bool:
+        """Обновляет статус запроса на выплату заработка и баланс партнера"""
+        async with self.async_session_factory() as session:
+            try:
+
+                request = await session.execute(
+                    select(EarnRequest).where(
+                        EarnRequest.earn_request_id == request_id,
+                    )
+                )
+                request = request.scalar_one_or_none()
+                if not request:
+                    return False
+
+                partner = await session.execute(
+                    select(Partner).where(
+                        Partner.partner_tg_id == partner_tg_id,
+                    )
+                )
+                partner = partner.scalar_one_or_none()
+                if not partner:
+                    return False
+
+                request.refund_status = RefundStatus.PAID
+
+                partner.balance = 0
+
+                session.add(request)
+                session.add(partner)
+                await session.commit()
+
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении запроса или партнера: {e}")
+                return False
+
+    # ---
+
+    async def set_min_refund_amount(self, amount: int):
+        """Устанавливает минимальную сумму возврата"""
+        async with self.async_session_factory() as session:
+            settings = await session.scalar(select(GlobalSettings))
+            if settings:
+                settings.min_refund_amount = amount
+            else:
+                settings = GlobalSettings(min_refund_amount=amount)
+                session.add(settings)
+            await session.commit()
+
+    async def set_max_refund_amount(self, amount: int):
+        """Устанавливает минимальную сумму возврата"""
+        async with self.async_session_factory() as session:
+            settings = await session.scalar(select(GlobalSettings))
+            if settings:
+                settings.max_refund_amount = amount
+            else:
+                settings = GlobalSettings(max_refund_amount=amount)
+                session.add(settings)
+            await session.commit()
+
+    async def get_min_refund_amount(self) -> int:
+        """Возвращает минимальную сумму выплаты партнеру"""
+        async with self.async_session_factory() as session:
+            settings = await session.scalar(select(GlobalSettings))
+            return settings.min_refund_amount if settings else 0
+
+    async def get_max_refund_amount(self) -> int:
+        """Возвращает максимальную сумму выплаты партнеру"""
+        async with self.async_session_factory() as session:
+            settings = await session.scalar(select(GlobalSettings))
+            return settings.max_refund_amount if settings else 0
 
 
 class OrderData:

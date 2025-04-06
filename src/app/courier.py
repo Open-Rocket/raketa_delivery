@@ -440,6 +440,7 @@ async def data_set_PROMO(
     is_set_key = await courier_data.is_set_key(tg_id)
 
     if is_set_key:
+        current_state = CourierState.default.state
         text = f"Вы уже применили свой PROMOKOD!\n\n"
     else:
         current_state = CourierState.set_seed_key.state
@@ -1882,10 +1883,12 @@ async def cmd_become_partner(
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
+    refund_percent = await admin_data.get_refund_percent()
+
     text = (
         f"💼 <b>Станьте партнёром Raketa!</b>\n\n"
         f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
-        f"🔹 Приглашайте курьеров и получайте <b>30% с их подписки</b>\n"
+        f"🔹 Приглашайте курьеров и получайте <b>{refund_percent}% с их подписки</b>\n"
         f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
         f"🔹 Работайте когда хотите — без вложений и рисков!\n\n"
         f"💰 Чем больше курьеров — тем больше доход! Присоединяйтесь!"

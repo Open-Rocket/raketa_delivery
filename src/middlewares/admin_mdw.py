@@ -1,5 +1,6 @@
 import re
 import emoji
+import asyncio
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
@@ -71,27 +72,59 @@ async def _check_state_and_handle_message(
     chat_id: int,
     fsm_context: FSMContext,
     state: str,
-    event: Message,
+    event: Message | CallbackQuery,
     handler: Callable,
     data: Dict,
 ):
     """Проверка состояния курьера и обработка сообщения"""
 
-    admins = await admin_data.get_all_admins()
-    admins_tg_id = [admin.admin_tg_id for admin in admins]
+    RESTRICTED_COMMANDS = [
+        "/start",
+        "/users",
+        "/orders",
+        "/admins",
+        "/global",
+    ]
 
-    log.info(f"tg_id:{tg_id} SUPER_ADMIN_TG_ID:{SUPER_ADMIN_TG_ID} ")
+    log.info(f"state: {state} ")
 
-    if tg_id == SUPER_ADMIN_TG_ID:
-        return await handler(event, data)
-
-    # if tg_id not in admins_tg_id:
-    #     await admin_bot.send_message(
-    #         chat_id=chat_id,
-    #         text="У вас нет прав администрирования",
-    #         reply_markup=ReplyKeyboardRemove(),
-    #     )
-    #     return
+    if state in (
+        AdminState.default.state,
+        AdminState.change_standard_order_price.state,
+        AdminState.change_subscription_price.state,
+        AdminState.change_max_order_price.state,
+        AdminState.change_distance_coefficient_less_5.state,
+        AdminState.change_distance_coefficient_5_10.state,
+        AdminState.change_distance_coefficient_10_20.state,
+        AdminState.change_distance_coefficient_more_20.state,
+        AdminState.change_time_coefficient_00_06.state,
+        AdminState.change_time_coefficient_06_12.state,
+        AdminState.change_time_coefficient_12_18.state,
+        AdminState.change_time_coefficient_18_21.state,
+        AdminState.change_time_coefficient_21_00.state,
+        AdminState.change_big_cities_coefficient.state,
+        AdminState.change_small_cities_coefficient.state,
+        AdminState.change_subscription_discount.state,
+        AdminState.change_first_order_discount.state,
+        AdminState.change_free_period.state,
+        AdminState.change_refund_percent.state,
+        AdminState.full_speed_report_by_date.state,
+        AdminState.full_speed_report_by_period.state,
+        AdminState.full_financial_report_by_date.state,
+        AdminState.full_financial_report_by_period.state,
+        AdminState.set_new_admin.state,
+        AdminState.del_admin.state,
+        AdminState.reg_adminPhone.state,
+        AdminState.change_min_refund_amount.state,
+        AdminState.change_max_refund_amount.state,
+        AdminState.process_request.state,
+    ):
+        if event.text in RESTRICTED_COMMANDS:
+            await fsm_context.set_state(AdminState.default.state)
+            await asyncio.sleep(0.3)
+            new_state = await fsm_context.get_state()
+            log.info(f"new state: {new_state}")
+            return await handler(event, data)
 
     return await handler(event, data)
 

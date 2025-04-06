@@ -80,6 +80,11 @@ class AdminState(StatesGroup):
     full_financial_report_by_date = State()
     full_financial_report_by_period = State()
 
+    change_min_refund_amount = State()
+    change_max_refund_amount = State()
+
+    process_request = State()
+
     set_new_admin = State()
     del_admin = State()
 
