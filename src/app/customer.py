@@ -517,6 +517,7 @@ async def _process_order_logic(
 
     if len(order_info_data) == 3:
         order_info, price, discount_price = order_info_data
+        prepare_dict["price"] = discount_price
         show_discount = True
 
     elif len(order_info_data) == 1:

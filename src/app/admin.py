@@ -403,6 +403,10 @@ async def cmd_global(
     min_refund_amount = await partner_data.get_min_refund_amount()
     max_refund_amount = await partner_data.get_max_refund_amount()
 
+    base_order_XP = await admin_data.get_base_order_XP()
+    distance_XP = await admin_data.get_distance_XP()
+    speed_XP = await admin_data.get_speed_XP()
+
     global_state_data = {
         "common_price": common_price,
         "max_price": max_price,
@@ -433,6 +437,9 @@ async def cmd_global(
         "active_orders": active_orders,
         "completed_orders": completed_orders,
         "canceled_orders": canceled_orders,
+        "base_order_XP": base_order_XP,
+        "distance_XP": distance_XP,
+        "speed_XP": speed_XP,
     }
 
     text = (
@@ -466,6 +473,10 @@ async def cmd_global(
         f" ▸ Коэфф. 18 - 21: <b>{coefficient_18_21}</b>\n"
         f" ▸ Коэфф. 21 - 00: <b>{coefficient_21_00}</b>\n"
         f" •\n"
+        f" ▸ Базовый XP за заказ: <b>{base_order_XP}</b>\n"
+        f" ▸ XP за расстояние: <b>{distance_XP}</b>\n"
+        f" ▸ XP за скорость: <b>{speed_XP}</b>\n"
+        f" •\n"
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
         f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
         f"🎉 <b>Акции</b>\n"
@@ -477,7 +488,7 @@ async def cmd_global(
         f"💬 <b>Сообщения</b>\n"
         f" ▸ Запросы на выплату: <b>{len(all_earn_waiting_requests)}</b>\n"
         f" ▸ Минимальная выплата <b>{min_refund_amount}₽</b>\n"
-        f" ▸ Максимальная выплата <b>{max_refund_amount}₽</b>\n"
+        f" ▸ Максимальная выплата <b>{max_refund_amount}₽</b>\n\n"
         f"<b>Выберите действие:</b>\n"
     )
 
@@ -858,19 +869,59 @@ async def get_finance_full_report_by_date(message: Message, state: FSMContext):
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
+# ---
 # --- Рекорды
+# ---
 
 
 @admin_r.callback_query(
     F.data == "records",
 )
-async def data_records(
+async def data_records(callback_query: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки "Рекорды" для админа."""
+
+    await callback_query.answer(
+        text="🏆 Рекорды",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    text = (
+        f"🏆 <b>Рекорды</b>\n\n"
+        f"Выберите тип рекордов:\n"
+        f" - <b>Скорость</b>\n"
+        f" - <b>Общая дистанция</b>\n"
+        f" - <b>Количество заказов</b>\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("records")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# Скорость
+
+
+@admin_r.callback_query(
+    F.data == "speed_records",
+)
+async def data_records_speed(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
-    """Обработчик кнопки "Рекорды" для админа."""
+    """Обработчик кнопки "Скорость" для админа."""
     await callback_query.answer(
-        text="🏆 Рекорды",
+        text="💨 Скорость",
         show_alert=False,
     )
 
@@ -883,11 +934,11 @@ async def data_records(
     )
 
     text = (
-        f"🏆 <b>Рекорды</b>\n\n"
+        f"💨 <b>Скорость</b>\n\n"
         f"Самый быстрый заказ: <b>{fastest_order_ever_speed}</b> км/ч\n"
     )
 
-    reply_kb = await kb.get_admin_kb("records")
+    reply_kb = await kb.get_admin_kb("speed_records")
 
     await callback_query.message.edit_text(
         text=text,
@@ -930,7 +981,7 @@ async def call_records_full_report_by_date(
 
 
 @admin_r.callback_query(
-    F.data == "full_finance_report_by_period",
+    F.data == "full_speed_report_by_period",
 )
 async def call_records_full_report_by_period(
     callback_query: CallbackQuery,
@@ -1103,6 +1154,48 @@ async def get_records_full_report_by_period(message: Message, state: FSMContext)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
+# Дистанция
+
+
+@admin_r.callback_query(
+    F.data == "distance_records",
+)
+async def data_records_distance(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """
+    Обработчик кнопки "Общая дистанция" для админа.
+    Выводит рекорд по пройденной дистанции среди курьеров за все время.
+    - Курьер
+    - Дистанция
+    """
+
+    await callback_query.answer(
+        text="📏 Общая дистанция",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    distance_records = await order_data.get_distance_records()
+
+    text = f"📏 <b>Общая дистанция</b>\n\n" f"Дально: <b>{distance_records}</b> км\n"
+
+    reply_kb = await kb.get_admin_kb("distance_records")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
 # --- Тарифы
 
 
@@ -1139,6 +1232,9 @@ async def data_prices_and_tariffs(
     coefficient_21_00 = global_state_data.get("coefficient_21_00")
     coefficient_big_cities = global_state_data.get("coefficient_big_cities")
     coefficient_other_cities = global_state_data.get("coefficient_other_cities")
+    base_order_XP = global_state_data.get("base_order_XP")
+    distance_XP = global_state_data.get("distance_XP")
+    speed_XP = global_state_data.get("speed_XP")
 
     text = (
         f"<b>💰 Тарифы</b>\n\n"
@@ -1156,6 +1252,10 @@ async def data_prices_and_tariffs(
         f" ▸ Коэфф. 12 - 18: <b>{coefficient_12_18}</b>\n"
         f" ▸ Коэфф. 18 - 21: <b>{coefficient_18_21}</b>\n"
         f" ▸ Коэфф. 21 - 00: <b>{coefficient_21_00}</b>\n"
+        f" •\n"
+        f" ▸ Базовый XP за заказ: <b>{base_order_XP}</b>\n"
+        f" ▸ XP за расстояние: <b>{distance_XP}</b>\n"
+        f" ▸ XP за скорость: <b>{speed_XP}</b>\n"
         f" •\n"
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
         f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
@@ -1192,6 +1292,9 @@ async def data_prices_and_tariffs(
             "small_cities_coefficient",
             "change_min_refund_amount",
             "change_max_refund_amount",
+            "change_base_order_XP",
+            "change_distance_XP",
+            "change_speed_XP",
         ]
     )
 )
@@ -1250,6 +1353,16 @@ async def call_change_price(
         case "change_max_refund_amount":
             current_state = AdminState.change_max_refund_amount.state
             text = "Введите новую максимальную сумму выплаты партнеру:"
+        case "change_base_order_XP":
+            current_state = AdminState.change_base_order_XP.state
+            text = "Введите новый базовый XP за заказ:"
+        case "change_distance_XP":
+            current_state = AdminState.change_distance_XP.state
+            text = "Введите новый XP за дистанцию:"
+        case "change_speed_XP":
+            current_state = AdminState.change_speed_XP.state
+            text = "Введите новый XP за скорость:"
+
         case _:
             await callback_query.answer(
                 "❌ Ошибка! Неизвестная команда.", show_alert=True
@@ -1287,6 +1400,9 @@ async def call_change_price(
         AdminState.change_small_cities_coefficient,
         AdminState.change_min_refund_amount,
         AdminState.change_max_refund_amount,
+        AdminState.change_base_order_XP,
+        AdminState.change_distance_XP,
+        AdminState.change_speed_XP,
     )
 )
 async def change_prices_filer(
@@ -1366,12 +1482,26 @@ async def change_prices_filer(
         case AdminState.change_small_cities_coefficient.state:
             await admin_data.change_small_cities_coefficient(new_value)
             text = f"✅ Новый коэффициент для остальных городов: {new_value}"
+
         case AdminState.change_min_refund_amount.state:
             await partner_data.set_min_refund_amount(new_value)
             text = f"✅ Новая минимальная сумма выплаты партнеру: {new_value}₽"
+
         case AdminState.change_max_refund_amount.state:
             await partner_data.set_max_refund_amount(new_value)
             text = f"✅ Новая максимальная сумма выплаты партнеру: {new_value}₽"
+
+        case AdminState.change_base_order_XP.state:
+            await admin_data.change_base_order_XP(new_value)
+            text = f"✅ Новый базовый XP за заказ: {new_value}"
+
+        case AdminState.change_distance_XP.state:
+            await admin_data.change_distance_XP(new_value)
+            text = f"✅ Новый XP за дистанцию: {new_value}"
+
+        case AdminState.change_speed_XP.state:
+            await admin_data.change_speed_XP(new_value)
+            text = f"✅ Новый XP за скорость: {new_value}"
 
         case _:
             await message.answer(

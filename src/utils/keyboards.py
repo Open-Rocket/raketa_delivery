@@ -535,6 +535,34 @@ class Keyboard:
         return kb[key]
 
     @staticmethod
+    async def courier_XP_kb(
+        key: str,
+        rub: float,
+        current_xp: float,
+        new_price: float,
+    ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для курьера"""
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"Оплатить за {rub} ₽",
+                        callback_data="use_rub",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=f"Списать {current_xp} XP = {new_price} ₽",
+                        callback_data="use_XP",
+                    )
+                ],
+            ]
+        )
+
+        return kb
+
+    @staticmethod
     async def get_courier_orders_kb(
         active_count: int, completed_count: int
     ) -> InlineKeyboardMarkup:
@@ -808,6 +836,24 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
+                            text="Базовый XP за заказ",
+                            callback_data="change_base_order_XP",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="XP за расстояние",
+                            callback_data="change_distance_XP",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="XP за скорость",
+                            callback_data="change_speed_XP",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
                             text="↩️ Назад",
                             callback_data="back_global_data",
                         ),
@@ -870,7 +916,7 @@ class Keyboard:
                     ],
                 ]
             ),
-            "records": InlineKeyboardMarkup(
+            "speed_records": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -888,6 +934,34 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="↩️ Назад",
                             callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "records": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Скорость",
+                            callback_data="speed_records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Дистанция",
+                            callback_data="distance_records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Количество заказов",
+                            callback_data="orders_records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_records",
                         ),
                     ],
                 ]

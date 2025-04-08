@@ -118,6 +118,9 @@ async def _check_state_and_handle_message(
         AdminState.change_min_refund_amount.state,
         AdminState.change_max_refund_amount.state,
         AdminState.process_request.state,
+        AdminState.change_base_order_XP.state,
+        AdminState.change_distance_XP.state,
+        AdminState.change_speed_XP.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await fsm_context.set_state(AdminState.default.state)

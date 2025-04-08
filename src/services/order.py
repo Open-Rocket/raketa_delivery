@@ -92,7 +92,7 @@ class OrderFormatter:
 
         if discount:
             plus_price = int(price * 1.0)
-            price = f"{int(plus_price - discount * plus_price / 100)}"
+            price = int(plus_price - discount * plus_price / 100)
 
         order_forma = (
             f"<b>Город:</b> {city}\n\n"

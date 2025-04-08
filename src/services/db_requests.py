@@ -494,7 +494,7 @@ class CourierData:
                     average_speed,
                     total_money_earned,
                 )
-            return 0, 0, 0, 0, 0, 0
+            return (0,) * 5
 
     async def get_courier_active_orders_count(self, tg_id: int) -> int:
         """Возвращает количество активных заказов у курьера"""
@@ -668,6 +668,41 @@ class CourierData:
             except Exception as e:
                 log.error(f"Ошибка при получении местоположения курьера: {e}")
                 return None
+
+    # ---
+
+    async def update_courier_XP(self, tg_id: int, new_XP: float) -> bool:
+        """Обновляет XP курьера в БД"""
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return False
+
+                courier.courier_XP += new_XP
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении XP курьера: {e}")
+                return False
+
+    async def get_courier_XP(self, tg_id: int) -> int:
+        """Возвращает XP курьера из БД"""
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return 0
+
+                return courier.courier_XP
+            except Exception as e:
+                log.error(f"Ошибка при получении XP курьера: {e}")
+                return 0
 
 
 class AdminData:
@@ -1358,33 +1393,33 @@ class AdminData:
 
     # ---
 
-    async def change_reward_for_fastest_speed(self, reward: int):
+    async def change_reward_for_fastest_speed(self, reward: int | float):
         """Обновляет вознаграждение за самую быструю скорость"""
         async with self.async_session_factory() as session:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
 
             if settings:
-                settings.reward_for_fastest_speed = reward
+                settings.reward_for_day_fastest_speed = float(reward)
             else:
-                settings = GlobalSettings(reward_for_fastest_speed=reward)
+                settings = GlobalSettings(reward_for_day_fastest_speed=float(reward))
                 session.add(settings)
 
             await session.commit()
 
-    async def get_reward_for_day_fastest_speed(self) -> int:
+    async def get_reward_for_day_fastest_speed(self) -> float:
         """Возвращает вознаграждение за самую быструю дневную скорость"""
         async with self.async_session_factory() as session:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.reward_for_day_fastest_speed if settings else 0
+            return settings.reward_for_day_fastest_speed if settings else 0.0
 
-    async def get_reward_for_month_fastest_speed(self) -> int:
+    async def get_reward_for_month_fastest_speed(self) -> float:
         """Возвращает вознаграждение за самую быструю месячную скорость"""
         async with self.async_session_factory() as session:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
-            return settings.reward_for_month_fastest_speed if settings else 0
+            return settings.reward_for_month_fastest_speed if settings else 0.0
 
     # ---
 
@@ -1400,28 +1435,28 @@ class AdminData:
             log.info(f"payments by date {date}: {payments}")
             return payments
 
-    async def get_date_turnover(self, date: datetime) -> int:
+    async def get_date_turnover(self, date: datetime) -> float:
         """Возвращает оборот за определенную дату"""
         async with self.async_session_factory() as session:
             result = await session.execute(
                 select(func.sum(Order.price_rub)).where(
                     Order.order_status == OrderStatus.COMPLETED,
-                    func.date_trunc(Order.completed_at_moscow_time) == date,
+                    func.date_trunc("day", Order.completed_at_moscow_time) == date,
                 )
             )
             turnover = result.scalar_one_or_none()
-            return turnover if turnover else 0
+            return turnover if turnover else 0.0
 
-    async def get_date_profit(self, date: datetime) -> int:
+    async def get_date_profit(self, date: datetime) -> float:
         """Возвращает прибыль за определенную дату"""
         async with self.async_session_factory() as session:
             result = await session.execute(
                 select(func.sum(Payment.payment_sum_rub)).where(
-                    func.date_trunc(Order.completed_at_moscow_time) == date
+                    func.date_trunc("day", Payment.payment_date) == date
                 )
             )
             profit = result.scalar_one_or_none()
-            return profit if profit else 0
+            return profit if profit else 0.0
 
     # ---
 
@@ -1442,7 +1477,7 @@ class AdminData:
 
     async def get_turnover_by_period(
         self, start_date: datetime, end_date: datetime
-    ) -> int:
+    ) -> float:
         """Возвращает оборот за определенный период"""
         async with self.async_session_factory() as session:
             result = await session.execute(
@@ -1454,11 +1489,11 @@ class AdminData:
                 )
             )
             turnover = result.scalar_one_or_none()
-            return turnover if turnover else 0
+            return turnover if turnover else 0.0
 
     async def get_profit_by_period(
         self, start_date: datetime, end_date: datetime
-    ) -> int:
+    ) -> float:
         """Возвращает прибыль за определенный период"""
         async with self.async_session_factory() as session:
             result = await session.execute(
@@ -1468,7 +1503,7 @@ class AdminData:
                 )
             )
             profit = result.scalar_one_or_none()
-            return profit if profit else 0
+            return profit if profit else 0.0
 
     # ---
 
@@ -1496,6 +1531,158 @@ class AdminData:
             result = await session.execute(select(func.sum(Payment.payment_sum_rub)))
             profit = result.scalar_one_or_none()
             return profit if profit else 0
+
+    # ---
+
+    async def change_base_order_XP(self, new_XP: float):
+        """Обновляет базовый XP за заказ"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.base_order_XP = new_XP
+            else:
+                settings = GlobalSettings(base_order_XP=new_XP)
+                session.add(settings)
+
+            await session.commit()
+
+    async def change_distance_XP(self, new_XP: float):
+        """Обновляет базовый XP за расстояние"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.distance_XP = new_XP
+            else:
+                settings = GlobalSettings(distance_XP=new_XP)
+                session.add(settings)
+
+            await session.commit()
+
+    async def change_speed_XP(self, new_XP: float):
+        """Обновляет базовый XP за скорость"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.speed_XP = new_XP
+            else:
+                settings = GlobalSettings(speed_XP=new_XP)
+                session.add(settings)
+
+            await session.commit()
+
+    # ---
+
+    async def get_base_order_XP(self) -> float:
+        """Возвращает базовый XP за заказ"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.base_order_XP if settings else 0.0
+
+    async def get_distance_XP(self) -> float:
+        """Возвращает базовый XP за расстояние"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.distance_XP if settings else 0.0
+
+    async def get_speed_XP(self) -> float:
+        """Возвращает базовый XP за скорость"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+            return settings.speed_XP if settings else 0.0
+
+    # ---
+
+    async def get_courier_info_by_max_date_distance_covered(
+        self, date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который прошел наибольшее расстояние за указанный день,
+        на основе всех выполненных заказов.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id,
+                    func.sum(Order.distance_km).label("total_distance"),
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time) == date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.sum(Order.distance_km).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return None
+
+            courier_id, total_distance = row
+            return courier_id, total_distance
+
+    async def get_courier_info_by_max_date_orders_count(
+        self, date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который выполнил наибольшее количество заказов за указанный день.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id, func.count(Order.order_id).label("total_orders")
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time) == date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.count(Order.order_id).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return None
+
+            courier_id, total_orders = row
+            return courier_id, total_orders
+
+    async def get_courier_info_by_max_date_earnings(
+        self, date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который заработал больше всех за указанный день.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id, func.sum(Order.price_rub).label("total_earnings")
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time) == date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.sum(Order.price_rub).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return None
+
+            courier_id, total_earnings = row
+            return courier_id, total_earnings
 
 
 class PartnerData:
@@ -2301,23 +2488,11 @@ class OrderData:
                         fastest_order.execution_time_seconds,
                     )
                     if fastest_order
-                    else (
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
+                    else (None,) * 9
                 )
             except Exception as e:
                 log.error(f"Ошибка при получении самого быстрого заказа: {e}")
-                return None
+                return (None,) * 9
 
     async def get_fastest_order_by_period(
         self, date_1: datetime, date_2: datetime
@@ -2332,8 +2507,7 @@ class OrderData:
                         >= date_1,
                         func.date_trunc("day", Order.completed_at_moscow_time)
                         <= date_2,
-                        func.date_trunc("day", Order.order_status)
-                        == OrderStatus.COMPLETED,
+                        (Order.order_status) == OrderStatus.COMPLETED,
                     )
                     .order_by((Order.execution_time_seconds).asc())
                 )
@@ -2347,29 +2521,15 @@ class OrderData:
                         fastest_order.courier_phone,
                         fastest_order.order_city,
                         fastest_order.speed_kmh,
-                        fastest_order.created_at_moscow_time,
-                        fastest_order.completed_at_moscow_time,
                         fastest_order.distance_km,
                         fastest_order.execution_time_seconds,
                     )
                     if fastest_order
-                    else (
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
+                    else (None,) * 9
                 )
             except Exception as e:
                 log.error(f"Ошибка при получении самого быстрого заказа: {e}")
-                return None
+                return (None,) * 9
 
 
 customer_data = CustomerData(async_session_factory)

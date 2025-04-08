@@ -1158,7 +1158,8 @@ async def accept_order(
             f"Телефон: {customer_phone}\n\n"
             f"<i>*Принимайте оплату наличными или переводом!</i>\n\n"
             f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
-            f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>"
+            f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>\n\n"
+            f"<i>*После завершения заказ перейдите в Меню -> Мои заказы -> Активные и нажмите на кнопку '✅ Доставил'</i>\n\n"
         )
 
         await callback_query.answer("✅ Заказ принят!", show_alert=False)
@@ -1228,6 +1229,7 @@ async def complete_order(
         execution_time_minutes = int(execution_time_seconds % 3600 // 60)
 
         speed = order.distance_km / execution_time_hours_for_speed
+        distance = order.distance_km
 
         AVERAGE_SPEED_KMH = 8
         SPEED_MULTIPLIER = 10
@@ -1255,6 +1257,19 @@ async def complete_order(
             )
             return
 
+        base_order_XP = await admin_data.get_base_order_XP()
+        distance_XP = await admin_data.get_distance_XP()
+        speed_XP = await admin_data.get_speed_XP()
+
+        calculate_distance_XP = round((distance * distance_XP), 2)
+        calculate_speed_XP = round((speed * speed_XP), 2)
+
+        new_XP = round((base_order_XP + calculate_distance_XP + calculate_speed_XP), 2)
+
+        _ = await courier_data.update_courier_XP(tg_id=tg_id, new_XP=new_XP)
+
+        courier_id = await courier_data.get_courier_id(tg_id)
+
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             courier_username=callback_query.from_user.username,
@@ -1275,12 +1290,28 @@ async def complete_order(
             parse_mode="HTML",
         )
 
-        await callback_query.message.answer(
+        text = (
             f"<b>✅ Заказ №{current_order_id} доставлен</b>!\n\n"
             f"Вы заработали <b>{order.price_rub} руб</b>\n"
-            f"Время доставки <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
-            f"Скорость доставки <b>{speed:.2f} км/ч</b>\n\n"
-            f"Спасибо за вашу работу! 🚀",
+            f"Время доставки: <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
+            f"Скорость доставки: <b>{speed:.2f} км/ч</b>\n\n"
+            f" + {base_order_XP} очков опыта за заказ\n"
+            f" + {calculate_distance_XP} очков опыта за расстояние\n"
+            f" + {calculate_speed_XP} очков опыта за скорость\n"
+            f"Итого заработано: <b>{new_XP} очков опыта</b>\n\n"
+            f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n"
+            f"<i>В ближайшее время появятся новые возможности:</i>\n"
+            f"🔹 Приоритет к лучшим заказам\n"
+            f"🔹 Открытие лутбоксов с наградами\n"
+            f"🔹 Прокачка рейтинга и уровней\n"
+            f"🔹 Обмен очков на криптовалюту\n"
+            f"🔹 Доступ к уникальным заданиям\n"
+            f"🔹 Покупка реальных предметов во внутреннем магазине\n\n"
+            f"<b>Спасибо за вашу работу! 🚀</b>\n"
+        )
+
+        await callback_query.message.answer(
+            text=text,
             disable_notification=False,
             parse_mode="HTML",
         )
@@ -1556,6 +1587,8 @@ async def cmd_profile(
     else:
         subscription_status = "<b>Подписка:</b> Не активна\n\n"
 
+    courier_XP = await courier_data.get_courier_XP(tg_id)
+
     text = (
         f"👤 <b>Профиль курьера</b>\n\n"
         f"Посмотрите или измените данные о себе.\n\n"
@@ -1564,6 +1597,7 @@ async def cmd_profile(
         f"<b>Номер:</b> {courier_phone}\n"
         f"<b>Город:</b> {courier_city}\n\n"
         f"{subscription_status}"
+        f"Ваши очки опыта: <b>{courier_XP}</b>\n\n"
     )
 
     reply_kb = await kb.get_courier_kb("/profile")
@@ -2034,7 +2068,7 @@ async def payment_invoice(
 ):
     """Обрабатывает запрос на оплату подписки. /subs, pay_sub"""
 
-    chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
+    # chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
     moscow_time = await Time.get_moscow_time()
 
@@ -2069,10 +2103,7 @@ async def payment_invoice(
 
     else:
 
-        await _send_payment_invoice(
-            chat_id,
-            event,
-        )
+        await _use_XP(event)
 
 
 @payment_r.callback_query(
@@ -2083,21 +2114,96 @@ async def extend_subscription(
 ):
     """Обрабатывает запрос на продление подписки. extend_sub"""
 
-    chat_id = event.message.chat.id
+    await event.message.delete()
 
-    await _send_payment_invoice(
-        chat_id,
-        event,
+    await _use_XP(event)
+
+
+async def _use_XP(
+    event: CallbackQuery,
+):
+    """Использует очки опыта для оплаты подписки."""
+
+    text = (
+        f"🚀 <b>Оплатить подписку</b>\n\n"
+        f"Выберите способ оплаты:\n\n"
+        f"💵 Оплатить подписку\n"
+        f"✴️ Использовать очки опыта"
+    )
+
+    tg_id = event.from_user.id
+
+    courier_XP = await courier_data.get_courier_XP(tg_id)
+
+    if courier_XP is None:
+        courier_XP = 0
+
+    price_rub = await admin_data.get_subscription_price()
+    price_rub = price_rub // 100
+    new_price_rub = round((price_rub - courier_XP), 2)
+
+    log.info(
+        f"price_rub: {price_rub}, new_price_rub: {new_price_rub}, courier_XP: {courier_XP}"
+    )
+
+    keyboard = await kb.courier_XP_kb(
+        "use_XP",
+        rub=round(price_rub, 2),
+        current_xp=round(courier_XP, 2),
+        new_price=round(new_price_rub, 2),
+    )
+
+    await event.message.answer(
+        text=text,
+        reply_markup=keyboard,
+        disable_notification=True,
+        parse_mode="HTML",
     )
 
 
-async def _send_payment_invoice(
-    chat_id: int,
-    event: Message | CallbackQuery,
+@payment_r.callback_query(
+    F.data == "use_rub",
+)
+@payment_r.callback_query(
+    F.data == "use_XP",
+)
+async def send_payment_invoice(
+    event: CallbackQuery,
+    state: FSMContext,
 ):
     """Отправляет инвойс для оплаты подписки."""
 
     price_rub = await admin_data.get_subscription_price()
+
+    tg_id = event.from_user.id
+    chat_id = event.message.chat.id
+
+    use_XP = False
+
+    log.info(f"event.data: {event.data}")
+
+    if event.data == "use_XP":
+
+        use_XP = True
+
+        courier_XP = await courier_data.get_courier_XP(tg_id)
+        if courier_XP is None:
+            courier_XP = 0
+        price_rub = price_rub - (courier_XP * 100)
+        new_XP = -courier_XP
+        if price_rub < 0:
+            price_rub = 0
+
+        await state.update_data(
+            use_XP=use_XP,
+            new_XP=new_XP,
+            new_price=price_rub,
+        )
+        await rediska.save_fsm_state(
+            state,
+            courier_bot_id,
+            tg_id,
+        )
 
     prices = [
         LabeledPrice(
@@ -2106,6 +2212,9 @@ async def _send_payment_invoice(
         ),
     ]
 
+    log.info(f"price_rub: {price_rub}")
+    log.info(f"use_XP: {use_XP}")
+
     if not payment_provider:
         log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
         return
@@ -2113,7 +2222,7 @@ async def _send_payment_invoice(
     await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
-        description="Оформите подписку на сервис доставки...",
+        description="Оформите подписку Raketa",
         payload="Payment through a bot",
         provider_token=payment_provider,
         currency="RUB",
@@ -2129,17 +2238,32 @@ async def _send_payment_invoice(
         reply_markup=None,
     )
 
+    await event.message.delete()
+
 
 @payment_r.pre_checkout_query()
 async def pre_checkout_query(
     pre_checkout_query: PreCheckoutQuery,
+    state: FSMContext,
 ):
     """Обрабатывает запрос на предварительную проверку оплаты."""
+
+    price_rub = await admin_data.get_subscription_price()
+
+    data = await state.get_data()
+    use_XP = data.get("use_XP", False)
+
+    if use_XP:
+        new_price = data.get("new_price")
+        price_rub = new_price
+
+    log.info(f"price_rub: {price_rub}")
+    log.info(f"use_XP: {use_XP}")
 
     try:
         if (
             pre_checkout_query.currency == "RUB"
-            and pre_checkout_query.total_amount == 99000
+            and pre_checkout_query.total_amount == price_rub
         ):
             await pre_checkout_query.bot.answer_pre_checkout_query(
                 pre_checkout_query.id, ok=True
@@ -2164,28 +2288,39 @@ async def pre_checkout_query(
 )
 async def successful_payment(
     message: Message,
+    state: FSMContext,
 ):
     """Обрабатывает успешную оплату подписки."""
 
     tg_id = message.from_user.id
 
+    data = await state.get_data()
+    use_XP = data.get("use_XP", False)
+
     try:
 
         courier_id = await courier_data.get_courier_id(tg_id)
 
-        sum = message.successful_payment.total_amount // 100
+        sum = round((message.successful_payment.total_amount / 100), 2)
+
+        log.info(f"sum: {sum}")
 
         _ = await courier_data.set_payment(
             courier_id,
             sum,
         )
 
+        if use_XP:
+            new_XP = data.get("new_XP")
+            _ = await courier_data.update_courier_XP(tg_id, new_XP)
+
         is_updated = await courier_data.update_courier_subscription(
             tg_id=tg_id, days=30
         )
+
         if is_updated:
             ttl = await title.get_title_courier("success_payment")
-            text = f"Cпасибо за подписку!\nСумма: {message.successful_payment.total_amount // 100}{message.successful_payment.currency}"
+            text = f"Cпасибо за подписку!\nСумма: {sum} {message.successful_payment.currency}"
             reply_kb = await kb.get_courier_kb(
                 "success_payment",
             )

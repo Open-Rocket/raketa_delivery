@@ -56,13 +56,6 @@ class Base(AsyncAttrs, DeclarativeBase):
     repr_cols_num = 3
     repr_cols = tuple()
 
-    # def __repr__(self):
-    #     cols = []
-    #     for idx, col in enumerate(self.__table__.columns.keys()):
-    #         if col in self.repr_cols or idx < self.repr_cols_num:
-    #             cols.append(f"{col}={getattr(self, col)}")
-    #     return f"<{self.__class__.__name__}{','.join(cols)}>"
-
 
 class Role(enum.Enum):
     undefined = "undefined"
@@ -117,14 +110,20 @@ class GlobalSettings(Base):
     big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.3)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
 
-    reward_for_day_fastest_speed: Mapped[intData] = mapped_column(Integer, default=100)
-    reward_for_month_fastest_speed: Mapped[intData] = mapped_column(
-        Integer,
-        default=1000,
+    reward_for_day_fastest_speed: Mapped[floatData] = mapped_column(
+        Float, default=100.0
+    )
+    reward_for_month_fastest_speed: Mapped[floatData] = mapped_column(
+        Float,
+        default=1000.0,
     )
 
-    min_refund_amount: Mapped[intData] = mapped_column(Integer, default=1000)
-    max_refund_amount: Mapped[intData] = mapped_column(Integer, default=100000)
+    min_refund_amount: Mapped[floatData] = mapped_column(Float, default=1000.0)
+    max_refund_amount: Mapped[floatData] = mapped_column(Float, default=100000.0)
+
+    base_order_XP: Mapped[floatData] = mapped_column(Float, default=5.0)
+    distance_XP: Mapped[floatData] = mapped_column(Float, default=0.25)
+    speed_XP: Mapped[floatData] = mapped_column(Float, default=0.18)
 
 
 class Customer(Base):
@@ -152,7 +151,7 @@ class Customer(Base):
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
 
-    customer_discount: Mapped[intData]
+    customer_discount: Mapped[intData] = mapped_column(Integer, default=0)
 
     orders = relationship("Order", back_populates="customer")
     seed_key = relationship("SeedKey", back_populates="customers")
@@ -187,6 +186,11 @@ class Courier(Base):
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
 
+    courier_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
+
+    orders_completed: Mapped[intData] = mapped_column(Integer, default=0)
+    covered_distance_km: Mapped[floatData] = mapped_column(Float, default=0.0)
+
     courier_location_lat: Mapped[floatData]
     courier_location_lon: Mapped[floatData]
 
@@ -210,7 +214,7 @@ class Partner(Base):
     partner_tg_id: Mapped[intDataUnique]
     partner_registration_date: Mapped[datetimeData]
 
-    balance: Mapped[intData] = mapped_column(Integer, default=0)
+    balance: Mapped[floatData] = mapped_column(Float, default=0)
 
     seed_key = relationship("SeedKey", uselist=False, back_populates="partner")
 
@@ -230,7 +234,7 @@ class EarnRequest(Base):
     )
     partner_tg_id: Mapped[intDataUnique]
     request_date: Mapped[datetimeData]
-    amount: Mapped[intData]
+    amount: Mapped[floatData] = mapped_column(Float, nullable=True, default=0.0)
 
     refund_status: Mapped[RefundStatus] = mapped_column(
         Enum(RefundStatus),
@@ -311,7 +315,7 @@ class Order(Base):
 
     delivery_object: Mapped[stringData]
     distance_km: Mapped[floatData]
-    price_rub: Mapped[intData]
+    price_rub: Mapped[floatData]
     description: Mapped[textData]
     full_rout: Mapped[stringData]
 
@@ -345,7 +349,7 @@ class Payment(Base):
     payment_id: Mapped[intPK]
 
     payment_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    payment_sum_rub: Mapped[intData] = mapped_column(Integer, nullable=False)
+    payment_sum_rub: Mapped[floatData] = mapped_column(Float, nullable=False)
 
     payer_id: Mapped[int]
 

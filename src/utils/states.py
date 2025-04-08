@@ -75,6 +75,10 @@ class AdminState(StatesGroup):
     change_free_period = State()
     change_refund_percent = State()
 
+    change_base_order_XP = State()
+    change_distance_XP = State()
+    change_speed_XP = State()
+
     full_speed_report_by_date = State()
     full_speed_report_by_period = State()
     full_financial_report_by_date = State()

@@ -13,6 +13,7 @@ from src.config import log
 from src.utils import CourierState
 from src.config import courier_bot
 from aiogram.types import ReplyKeyboardRemove, ContentType
+from src.services import admin_data
 
 
 class CourierOuterMiddleware(BaseMiddleware):
@@ -46,6 +47,26 @@ class CourierOuterMiddleware(BaseMiddleware):
             await self.rediska.restore_fsm_state(fsm_context, bot_id, tg_id)
             state_data = await fsm_context.get_data()
 
+        service_status = await admin_data.get_service_status()
+
+        if not service_status:
+            if isinstance(event, Message):
+                await event.answer(
+                    text="🚫 <b>Сервис временно недоступен</b>",
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="HTML",
+                )
+            elif isinstance(event, CallbackQuery):
+                await event.answer(
+                    text="🚫 Сервис временно недоступен",
+                    show_alert=True,
+                )
+                log.info(
+                    f"🚫 Сервис временно недоступен для пользователя {event.from_user.id}"
+                )
+
+            return
+
         if isinstance(event, Message):
 
             result = await _check_state_and_handle_message(
@@ -65,7 +86,7 @@ class CourierOuterMiddleware(BaseMiddleware):
 async def _check_state_and_handle_message(
     fsm_context: FSMContext,
     state: str,
-    event: Message,
+    event: Message | CallbackQuery,
     handler: Callable,
     data: Dict,
 ):
