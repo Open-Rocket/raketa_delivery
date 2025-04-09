@@ -95,19 +95,19 @@ class GlobalSettings(Base):
     refund_percent: Mapped[intData] = mapped_column(Integer, default=30)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
 
-    distance_coefficient_less_5: Mapped[floatData] = mapped_column(Float, default=1.25)
+    distance_coefficient_less_5: Mapped[floatData] = mapped_column(Float, default=1.19)
     distance_coefficient_5_10: Mapped[floatData] = mapped_column(Float, default=1.1)
     distance_coefficient_10_20: Mapped[floatData] = mapped_column(Float, default=0.85)
     distance_coefficient_more_20: Mapped[floatData] = mapped_column(Float, default=0.75)
 
-    time_coefficient_00_06: Mapped[floatData] = mapped_column(Float, default=1.15)
+    time_coefficient_00_06: Mapped[floatData] = mapped_column(Float, default=1.13)
     time_coefficient_06_12: Mapped[floatData] = mapped_column(Float, default=1.0)
     time_coefficient_12_18: Mapped[floatData] = mapped_column(Float, default=1.1)
-    time_coefficient_18_21: Mapped[floatData] = mapped_column(Float, default=1.25)
+    time_coefficient_18_21: Mapped[floatData] = mapped_column(Float, default=1.19)
     time_coefficient_21_00: Mapped[floatData] = mapped_column(Float, default=1.1)
 
     city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
-    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.3)
+    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.2)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
 
     reward_for_day_fastest_speed: Mapped[floatData] = mapped_column(
@@ -118,12 +118,12 @@ class GlobalSettings(Base):
         default=1000.0,
     )
 
-    min_refund_amount: Mapped[floatData] = mapped_column(Float, default=1000.0)
+    min_refund_amount: Mapped[floatData] = mapped_column(Float, default=5000.0)
     max_refund_amount: Mapped[floatData] = mapped_column(Float, default=100000.0)
 
-    base_order_XP: Mapped[floatData] = mapped_column(Float, default=5.0)
-    distance_XP: Mapped[floatData] = mapped_column(Float, default=0.25)
-    speed_XP: Mapped[floatData] = mapped_column(Float, default=0.18)
+    base_order_XP: Mapped[floatData] = mapped_column(Float, default=1.0)
+    distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
+    speed_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
 
 
 class Customer(Base):
@@ -188,8 +188,10 @@ class Courier(Base):
 
     courier_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
 
+    max_speed_kmh: Mapped[floatData] = mapped_column(Float, default=0.0)
     orders_completed: Mapped[intData] = mapped_column(Integer, default=0)
     covered_distance_km: Mapped[floatData] = mapped_column(Float, default=0.0)
+    total_earned: Mapped[floatData] = mapped_column(Float, default=0.0)
 
     courier_location_lat: Mapped[floatData]
     courier_location_lon: Mapped[floatData]

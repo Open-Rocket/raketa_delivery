@@ -121,6 +121,12 @@ async def _check_state_and_handle_message(
         AdminState.change_base_order_XP.state,
         AdminState.change_distance_XP.state,
         AdminState.change_speed_XP.state,
+        AdminState.full_distance_report_by_date.state,
+        AdminState.full_distance_report_by_period.state,
+        AdminState.full_orders_report_by_date.state,
+        AdminState.full_orders_report_by_period.state,
+        AdminState.full_earned_report_by_date.state,
+        AdminState.full_earned_report_by_period.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await fsm_context.set_state(AdminState.default.state)

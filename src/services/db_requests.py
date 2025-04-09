@@ -384,6 +384,22 @@ class CourierData:
 
     # ---
 
+    async def get_courier_info_by_id(self, id: int) -> tuple:
+        """Возвращает имя, номер и город курьера из БД по его id"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_id == id)
+            )
+            if courier:
+                return (
+                    courier.courier_name or "...",
+                    courier.courier_phone or "...",
+                    courier.courier_city or "...",
+                )
+            return ("...",) * 3
+
+    # ---
+
     async def get_courier_info(self, tg_id: int) -> tuple:
         """Возвращает имя, номер и город курьера из БД"""
         async with self.async_session_factory() as session:
@@ -459,11 +475,7 @@ class CourierData:
                     ]
                 )
 
-                total_money_earned = sum(
-                    order.price_rub
-                    for order in orders
-                    if order.order_status == OrderStatus.COMPLETED
-                )
+                total_money_earned = courier.total_earned
                 total_execution_time = sum(
                     (
                         order.completed_at_moscow_time - order.started_at_moscow_time
@@ -471,11 +483,7 @@ class CourierData:
                     for order in orders
                     if order.order_status == OrderStatus.COMPLETED
                 )
-                total_distance = sum(
-                    order.distance_km
-                    for order in orders
-                    if order.order_status == OrderStatus.COMPLETED
-                )
+                total_distance = courier.covered_distance_km
                 average_execution_time = (
                     total_execution_time / completed_orders
                     if completed_orders > 0
@@ -492,6 +500,7 @@ class CourierData:
                     completed_orders,
                     average_execution_time,
                     average_speed,
+                    total_distance,
                     total_money_earned,
                 )
             return (0,) * 5
@@ -703,6 +712,29 @@ class CourierData:
             except Exception as e:
                 log.error(f"Ошибка при получении XP курьера: {e}")
                 return 0
+
+    async def update_courier_records(
+        self, tg_id, count: int, distance: float, earned: float
+    ):
+        """Обновляет рекорды курьера в БД"""
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return False
+
+                courier.orders_completed += count
+                courier.total_earned += earned
+                courier.covered_distance_km += distance
+
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении рекордов курьера: {e}")
+                return False
 
 
 class AdminData:
@@ -1601,6 +1633,47 @@ class AdminData:
 
     # ---
 
+    async def get_courier_info_by_max_distance_covered_ever(self) -> tuple | None:
+        """Возвращает курьера, который прошел наибольшее расстояние за все время"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier).order_by(Courier.covered_distance_km.desc()).limit(1)
+            )
+
+            courier = result.scalar_one_or_none()
+            if not courier:
+                return (None,) * 2
+
+            return courier.courier_id, courier.covered_distance_km
+
+    async def get_courier_info_by_max_orders_count_ever(self) -> tuple | None:
+        """Возвращает курьера, который выполнил наибольшее количество заказов за все время"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier).order_by(Courier.orders_completed.desc()).limit(1)
+            )
+
+            courier = result.scalar_one_or_none()
+            if not courier:
+                return (None,) * 2
+
+            return courier.courier_id, courier.orders_completed
+
+    async def get_courier_info_by_max_earned_ever(self) -> tuple | None:
+        """Возвращает курьера, который заработал больше всех за все время"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier).order_by(Courier.total_earned.desc()).limit(1)
+            )
+
+            courier = result.scalar_one_or_none()
+            if not courier:
+                return (None,) * 2
+
+            return courier.courier_id, courier.total_earned
+
+    # ---
+
     async def get_courier_info_by_max_date_distance_covered(
         self, date: datetime
     ) -> tuple | None:
@@ -1625,7 +1698,7 @@ class AdminData:
 
             row = result.first()
             if not row:
-                return None
+                return (None,) * 2
 
             courier_id, total_distance = row
             return courier_id, total_distance
@@ -1652,7 +1725,7 @@ class AdminData:
 
             row = result.first()
             if not row:
-                return None
+                return (None,) * 2
 
             courier_id, total_orders = row
             return courier_id, total_orders
@@ -1679,7 +1752,99 @@ class AdminData:
 
             row = result.first()
             if not row:
-                return None
+                return (None,) * 2
+
+            courier_id, total_earnings = row
+            return courier_id, total_earnings
+
+    # ---
+
+    async def get_courier_info_by_max_period_distance_covered(
+        self, start_data: datetime, end_date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который прошел наибольшее расстояние за указанный период,
+        на основе всех выполненных заказов.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id,
+                    func.sum(Order.distance_km).label("total_distance"),
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time)
+                    >= start_data,
+                    func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.sum(Order.distance_km).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return (None,) * 2
+
+            courier_id, total_distance = row
+            return courier_id, total_distance
+
+    async def get_courier_info_by_max_period_orders_count(
+        self, start_data: datetime, end_date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который выполнил наибольшее количество заказов за указанный период.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id, func.count(Order.order_id).label("total_orders")
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time)
+                    >= start_data,
+                    func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.count(Order.order_id).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return (None,) * 2
+
+            courier_id, total_orders = row
+            return courier_id, total_orders
+
+    async def get_courier_info_by_max_period_earnings(
+        self, start_data: datetime, end_date: datetime
+    ) -> tuple | None:
+        """
+        Возвращает курьера, который заработал больше всех за указанный период.
+        """
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(
+                    Order.courier_id,
+                    func.sum(Order.price_rub).label("total_earnings"),
+                )
+                .where(
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date_trunc("day", Order.completed_at_moscow_time)
+                    >= start_data,
+                    func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
+                )
+                .group_by(Order.courier_id)
+                .order_by(func.sum(Order.price_rub).desc())
+                .limit(1)
+            )
+
+            row = result.first()
+            if not row:
+                return (None,) * 2
 
             courier_id, total_earnings = row
             return courier_id, total_earnings
@@ -2458,8 +2623,8 @@ class OrderData:
 
             if order:
                 log.info(f"Скорость самого быстрого заказа: {order.speed_kmh}")
-                return order.speed_kmh
-            return None
+                return order.courier_id, order.speed_kmh
+            return (None,) * 2
 
     async def get_fastest_order_by_date(self, date: datetime) -> Optional[Order]:
         """Возвращает самый быстрый заказ за указанную дату"""

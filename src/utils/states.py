@@ -84,6 +84,15 @@ class AdminState(StatesGroup):
     full_financial_report_by_date = State()
     full_financial_report_by_period = State()
 
+    full_distance_report_by_date = State()
+    full_distance_report_by_period = State()
+
+    full_orders_report_by_date = State()
+    full_orders_report_by_period = State()
+
+    full_earned_report_by_date = State()
+    full_earned_report_by_period = State()
+
     change_min_refund_amount = State()
     change_max_refund_amount = State()
 

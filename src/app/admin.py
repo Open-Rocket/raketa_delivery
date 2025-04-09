@@ -393,7 +393,7 @@ async def cmd_global(
     profit = await admin_data.get_profit()
     turnover = await admin_data.get_turnover()
 
-    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
+    _, fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
     fastest_order_ever_speed = (
         fastest_order_ever_speed if fastest_order_ever_speed else "..."
     )
@@ -869,13 +869,17 @@ async def get_finance_full_report_by_date(message: Message, state: FSMContext):
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# ---
 # --- Рекорды
+#
+# ---
 # ---
 
 
 @admin_r.callback_query(
     F.data == "records",
+)
+@admin_r.callback_query(
+    F.data == "back_records",
 )
 async def data_records(callback_query: CallbackQuery, state: FSMContext):
     """Обработчик кнопки "Рекорды" для админа."""
@@ -889,11 +893,15 @@ async def data_records(callback_query: CallbackQuery, state: FSMContext):
     current_state = AdminState.default.state
 
     text = (
-        f"🏆 <b>Рекорды</b>\n\n"
-        f"Выберите тип рекордов:\n"
-        f" - <b>Скорость</b>\n"
-        f" - <b>Общая дистанция</b>\n"
-        f" - <b>Количество заказов</b>\n"
+        f"🏆 <b>Рекорды сервиса</b>\n\n"
+        f"Здесь ты можешь узнать, кто добился наибольших результатов среди всех курьеров. "
+        f"Показатели обновляются автоматически по завершению заказов.\n\n"
+        f"<b>Метрики:</b>\n\n"
+        f"🚀 <b>Скорость</b> — кто выполнил заказ быстрее всех. Считается по времени между взятием и завершением заказа.\n\n"
+        f"📏 <b>Пройденная дистанция</b> — кто прошёл больше всех километров за всё время. Учитываются все завершённые доставки.\n\n"
+        f"📦 <b>Количество заказов</b> — кто выполнил больше всего заказов. Только завершённые заказы.\n\n"
+        f"💰 <b>Заработал ₽</b> — кто получил больше всего денег от клиентов за доставку. Суммируется по всем завершённым заказам.\n\n"
+        f"Выберите метрику.\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("records")
@@ -928,14 +936,23 @@ async def data_records_speed(
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
 
-    fastest_order_ever_speed = await order_data.get_fastest_order_speed_ever()
+    courier_id, fastest_order_ever_speed = (
+        await order_data.get_fastest_order_speed_ever()
+    )
     fastest_order_ever_speed = (
         fastest_order_ever_speed if fastest_order_ever_speed else "..."
     )
 
+    name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+
     text = (
         f"💨 <b>Скорость</b>\n\n"
-        f"Самый быстрый заказ: <b>{fastest_order_ever_speed}</b> км/ч\n"
+        f"Курьер: <b>{name if name else '...'}</b>\n"
+        f"Номер курьера: {phone if phone else '...'}\n"
+        f"Город: <b>{city if city else '...'}</b>\n"
+        f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+        f" •\n"
+        f"Самый быстрый заказ: <b>{fastest_order_ever_speed}</b> км/ч\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("speed_records")
@@ -1172,16 +1189,28 @@ async def data_records_distance(
     """
 
     await callback_query.answer(
-        text="📏 Общая дистанция",
+        text="📏 Пройденная дистанция",
         show_alert=False,
     )
 
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
 
-    distance_records = await order_data.get_distance_records()
+    courier_id, total_distance = (
+        await admin_data.get_courier_info_by_max_distance_covered_ever()
+    )
 
-    text = f"📏 <b>Общая дистанция</b>\n\n" f"Дально: <b>{distance_records}</b> км\n"
+    name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+
+    text = (
+        f"📏 <b>Пройденная дистанция</b>\n\n"
+        f"Курьер: <b>{name}</b>\n"
+        f"Номер курьера: {phone}\n"
+        f"Город: <b>{city}</b>\n"
+        f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+        f" •\n"
+        f"Дальность: <b>{total_distance if total_distance else '...'}</b> км\n"
+    )
 
     reply_kb = await kb.get_admin_kb("distance_records")
 
@@ -1196,6 +1225,598 @@ async def data_records_distance(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
+@admin_r.callback_query(
+    F.data == "full_distance_report_by_date",
+)
+async def call_records_full_report_by_date(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_date, нужно ввести дату"""
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_distance_report_by_date.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите дату в формате <b>YYYY-MM-DD</b>.\n\n"
+        f"Пример: <code>{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.full_distance_report_by_date),
+)
+async def get_records_full_report_by_date(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за дату."""
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    date_str = message.text.strip()
+
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    courier_id, total_distance = (
+        await admin_data.get_courier_info_by_max_date_distance_covered(date=date)
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Дистанция: <b>{total_distance} км</b>\n"
+        )
+    else:
+        text = f"📅 Полный отчет за <b>{date_str}</b>:\n" f"Данных не найдено."
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_distance_report_by_period",
+)
+async def call_records_full_report_by_period(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_period, нужно ввести даты"""
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_distance_report_by_period.state
+
+    today = datetime.today().date()
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    month_ago = today - relativedelta(months=1)
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
+        f"Пример: <code>{month_ago}:{today_str}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.full_distance_report_by_period),
+)
+async def get_records_full_report_by_period(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за период."""
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    start_date_str, end_date_str = message.text.strip().split(":")
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    if start_date > end_date:
+        await message.answer(
+            text="❌ Начальная дата больше конечной. Попробуйте снова."
+        )
+        return
+
+    courier_id, total_distance = (
+        await admin_data.get_courier_info_by_max_period_distance_covered(
+            start_date=start_date,
+            end_date=end_date,
+        )
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Дистанция: <b>{total_distance} км</b>\n"
+        )
+    else:
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n"
+            f"Данных не найдено."
+        )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# Количество заказов
+
+
+@admin_r.callback_query(
+    F.data == "orders_records",
+)
+async def data_records_orders(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Количество заказов" для админа."""
+
+    await callback_query.answer(
+        text="📦 Количество заказов",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    courier_id, total_orders = (
+        await admin_data.get_courier_info_by_max_orders_count_ever()
+    )
+
+    name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+
+    text = (
+        f"📦 <b>Количество заказов</b>\n\n"
+        f"Курьер: <b>{name}</b>\n"
+        f"Номер курьера: {phone}\n"
+        f"Город: <b>{city}</b>\n"
+        f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+        f" •\n"
+        f"Заказов: <b>{total_orders if total_orders else '...'}</b>\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("orders_records")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_orders_report_by_date",
+)
+async def call_records_full_report_by_date(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_date, нужно ввести дату"""
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_orders_report_by_date.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите дату в формате <b>YYYY-MM-DD</b>.\n\n"
+        f"Пример: <code>{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_orders_report_by_date))
+async def get_records_full_report_by_date(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за дату."""
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    date_str = message.text.strip()
+
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    courier_id, total_orders = (
+        await admin_data.get_courier_info_by_max_date_orders_count(date=date)
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Заказов: <b>{total_orders} шт</b>\n"
+        )
+    else:
+        text = f"📅 Полный отчет за <b>{date_str}</b>:\n" f"Данных не найдено."
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_orders_report_by_period",
+)
+async def call_records_full_report_by_period(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_period, нужно ввести даты"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_orders_report_by_period.state
+
+    today = datetime.today().date()
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    month_ago = today - relativedelta(months=1)
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
+        f"Пример: <code>{month_ago}:{today_str}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_orders_report_by_period))
+async def get_records_full_report_by_period(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за период."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    start_date_str, end_date_str = message.text.strip().split(":")
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    if start_date > end_date:
+        await message.answer(
+            text="❌ Начальная дата больше конечной. Попробуйте снова."
+        )
+        return
+
+    courier_id, total_orders = (
+        await admin_data.get_courier_info_by_max_period_orders_count(
+            start_date=start_date,
+            end_date=end_date,
+        )
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Заказов: <b>{total_orders} шт</b>\n"
+        )
+    else:
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n"
+            f"Данных не найдено."
+        )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# Заработок
+
+
+@admin_r.callback_query(
+    F.data == "earn_courier_record",
+)
+async def data_records_earn(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки "Заработок" для админа."""
+
+    await callback_query.answer(
+        text="💵 Заработок",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    courier_id, total_earnings = await admin_data.get_courier_info_by_max_earned_ever()
+
+    name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+
+    text = (
+        f"💵 <b>Заработок</b>\n\n"
+        f"Курьер: <b>{name}</b>\n"
+        f"Номер курьера: {phone}\n"
+        f"Город: <b>{city}</b>\n"
+        f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+        f" •\n"
+        f"Заработок: <b>{total_earnings if total_earnings else '...'}</b> ₽\n"
+    )
+
+    reply_kb = await kb.get_admin_kb("earn_courier_record")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_earn_report_by_date",
+)
+async def call_records_full_report_by_date(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_date, нужно ввести дату"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_earned_report_by_date.state
+
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите дату в формате <b>YYYY-MM-DD</b>.\n\n"
+        f"Пример: <code>{today}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_earned_report_by_date))
+async def get_records_full_report_by_date(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за дату."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    date_str = message.text.strip()
+
+    try:
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    courier_id, total_earnings = await admin_data.get_courier_info_by_max_date_earnings(
+        date=date
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{date_str}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Заработок: <b>{total_earnings} ₽</b>\n"
+        )
+    else:
+        text = f"📅 Полный отчет за <b>{date_str}</b>:\n" f"Данных не найдено."
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "full_earn_report_by_period",
+)
+async def call_records_full_report_by_period(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки full_report_by_period, нужно ввести даты"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.full_earned_report_by_period.state
+
+    today = datetime.today().date()
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    month_ago = today - relativedelta(months=1)
+
+    text = (
+        f"📅 <b>Полный отчет по дате</b>\n\n"
+        f"Введите даты в формате <b>YYYY-MM-DD</b> через пробел.\n\n"
+        f"Пример: <code>{month_ago}:{today_str}</code>"
+    )
+
+    await callback_query.message.edit_text(
+        text=text,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(StateFilter(AdminState.full_earned_report_by_period))
+async def get_records_full_report_by_period(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик ввода для полного отчета по рекордам за период."""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    start_date_str, end_date_str = message.text.strip().split(":")
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        await message.answer(text="❌ Неверный формат даты. Попробуйте снова.")
+        return
+
+    if start_date > end_date:
+        await message.answer(
+            text="❌ Начальная дата больше конечной. Попробуйте снова."
+        )
+        return
+
+    courier_id, total_earnings = (
+        await admin_data.get_courier_info_by_max_period_earnings(
+            start_date=start_date,
+            end_date=end_date,
+        )
+    )
+
+    if courier_id:
+        name, phone, city = await courier_data.get_courier_info_by_id(id=courier_id)
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n\n"
+            f"Курьер: <b>{name}</b>\n"
+            f"Номер курьера: {phone}\n"
+            f"Город: <b>{city}</b>\n"
+            f"ID курьера: <b>{courier_id if courier_id else '...'}</b>\n"
+            f" •\n"
+            f"Заработок: <b>{total_earnings} ₽</b>\n"
+        )
+    else:
+        text = (
+            f"📅 Полный отчет за <b>{start_date}:{end_date}</b>:\n"
+            f"Данных не найдено."
+        )
+
+    await message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+# ---
+#
 # --- Тарифы
 
 

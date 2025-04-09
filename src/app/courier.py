@@ -1230,6 +1230,7 @@ async def complete_order(
 
         speed = order.distance_km / execution_time_hours_for_speed
         distance = order.distance_km
+        earned = order.price_rub
 
         AVERAGE_SPEED_KMH = 8
         SPEED_MULTIPLIER = 10
@@ -1266,10 +1267,6 @@ async def complete_order(
 
         new_XP = round((base_order_XP + calculate_distance_XP + calculate_speed_XP), 2)
 
-        _ = await courier_data.update_courier_XP(tg_id=tg_id, new_XP=new_XP)
-
-        courier_id = await courier_data.get_courier_id(tg_id)
-
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             courier_username=callback_query.from_user.username,
@@ -1278,6 +1275,23 @@ async def complete_order(
             execution_time_seconds=execution_time_seconds,
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
+
+        _ = await courier_data.update_courier_XP(
+            tg_id=tg_id,
+            new_XP=new_XP,
+        )
+
+        _ = await courier_data.update_courier_records(
+            tg_id=tg_id,
+            count=1,
+            distance=distance,
+            earned=earned,
+        )
+
+        await courier_data.change_order_active_count(
+            tg_id,
+            count=-1,
+        )
 
         notification_text = (
             f"Ваш заказ <b>№{current_order_id}</b> был доставлен курьером!\n"
@@ -1290,16 +1304,20 @@ async def complete_order(
             parse_mode="HTML",
         )
 
-        text = (
+        text_1 = (
             f"<b>✅ Заказ №{current_order_id} доставлен</b>!\n\n"
             f"Вы заработали <b>{order.price_rub} руб</b>\n"
             f"Время доставки: <b>{execution_time_hours} ч {execution_time_minutes} мин</b>\n"
             f"Скорость доставки: <b>{speed:.2f} км/ч</b>\n\n"
+            f"<b>Спасибо за вашу работу! 🚀</b>\n"
+        )
+
+        text_2 = (
             f" + {base_order_XP} очков опыта за заказ\n"
             f" + {calculate_distance_XP} очков опыта за расстояние\n"
             f" + {calculate_speed_XP} очков опыта за скорость\n"
             f"Итого заработано: <b>{new_XP} очков опыта</b>\n\n"
-            f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n"
+            f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n\n"
             f"<i>В ближайшее время появятся новые возможности:</i>\n"
             f"🔹 Приоритет к лучшим заказам\n"
             f"🔹 Открытие лутбоксов с наградами\n"
@@ -1307,16 +1325,20 @@ async def complete_order(
             f"🔹 Обмен очков на криптовалюту\n"
             f"🔹 Доступ к уникальным заданиям\n"
             f"🔹 Покупка реальных предметов во внутреннем магазине\n\n"
-            f"<b>Спасибо за вашу работу! 🚀</b>\n"
         )
 
         await callback_query.message.answer(
-            text=text,
+            text=text_1,
             disable_notification=False,
             parse_mode="HTML",
         )
 
-        await courier_data.change_order_active_count(tg_id, count=-1)
+        await callback_query.message.answer(
+            text=text_2,
+            disable_notification=False,
+            parse_mode="HTML",
+        )
+
         await state.set_state(current_state)
         await rediska.set_state(courier_bot_id, tg_id, current_state)
 
@@ -2031,16 +2053,18 @@ async def get_courier_statistic(
         completed_orders,
         average_execution_time,
         average_speed,
+        total_distance,
         total_money_earned,
     ) = await courier_data.get_courier_statistic(tg_id)
 
     text = (
         f"📊 <b>Ваша статистика</b>\n\n"
-        f"Всего заказов: {total_orders}\n"
-        f"Завершенные заказы: {completed_orders}\n"
-        f"Среднее время выполнения: {average_execution_time / 60:.2f} мин\n"
-        f"Средняя скорость: {average_speed:.2f} км/ч\n"
-        f"Общая сумма заработка: {total_money_earned} ₽\n"
+        f"Всего заказов: <b>{total_orders}</b>\n"
+        f"Завершенные заказы: <b>{completed_orders}</b>\n"
+        f"Среднее время выполнения: <b>{average_execution_time / 60:.2f} мин</b>\n"
+        f"Средняя скорость: <b>{average_speed:.2f} км/ч</b>\n"
+        f"Пройденное расстояние: <b>{total_distance:.2f} км</b>\n"
+        f"Сумма заработка: <b>{total_money_earned} ₽</b>\n"
     )
 
     reply_kb = await kb.get_courier_kb("go_back")
@@ -2068,7 +2092,6 @@ async def payment_invoice(
 ):
     """Обрабатывает запрос на оплату подписки. /subs, pay_sub"""
 
-    # chat_id = event.chat.id if isinstance(event, Message) else event.message.chat.id
     tg_id = event.from_user.id
     moscow_time = await Time.get_moscow_time()
 
@@ -2145,6 +2168,9 @@ async def _use_XP(
     log.info(
         f"price_rub: {price_rub}, new_price_rub: {new_price_rub}, courier_XP: {courier_XP}"
     )
+
+    if courier_XP >= price_rub:
+        courier_XP = price_rub
 
     keyboard = await kb.courier_XP_kb(
         "use_XP",

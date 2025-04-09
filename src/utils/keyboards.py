@@ -662,28 +662,6 @@ class Keyboard:
                     ],
                 ]
             ),
-            "admins": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="+ Зарегистрировать админа",
-                            callback_data="set_admin",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="❌ Удалить админа",
-                            callback_data="del_admin",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="↩️ Назад",
-                            callback_data="back_global_data",
-                        ),
-                    ],
-                ]
-            ),
             "/global": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -733,6 +711,29 @@ class Keyboard:
                             text="💬 Сообщения",
                             callback_data="messages",
                         )
+                    ],
+                ]
+            ),
+            # ---
+            "admins": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="+ Зарегистрировать админа",
+                            callback_data="set_admin",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="❌ Удалить админа",
+                            callback_data="del_admin",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
                     ],
                 ]
             ),
@@ -894,18 +895,31 @@ class Keyboard:
                     ],
                 ]
             ),
-            "send_message": InlineKeyboardMarkup(
+            # ---
+            "records": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Отправить сообщение",
-                            callback_data="send_message_to_users",
+                            text="Скорость",
+                            callback_data="speed_records",
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            text="Отправить рассылку",
-                            callback_data="send_broadcast_message",
+                            text="Дистанция",
+                            callback_data="distance_records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Заказов",
+                            callback_data="orders_records",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Заработал",
+                            callback_data="earn_courier_record",
                         )
                     ],
                     [
@@ -932,40 +946,79 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="↩️ Назад",
-                            callback_data="back_global_data",
-                        ),
-                    ],
-                ]
-            ),
-            "records": InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Скорость",
-                            callback_data="speed_records",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="Дистанция",
-                            callback_data="distance_records",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="Количество заказов",
-                            callback_data="orders_records",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="↩️ Назад",
+                            text="↩️ Рекорды",
                             callback_data="back_records",
                         ),
                     ],
                 ]
             ),
+            "distance_records": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D",
+                            callback_data="full_distance_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D : Y-M-D",
+                            callback_data="full_distance_report_by_period",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Рекорды",
+                            callback_data="back_records",
+                        ),
+                    ],
+                ]
+            ),
+            "orders_records": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D",
+                            callback_data="full_orders_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D : Y-M-D",
+                            callback_data="full_orders_report_by_period",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Рекорды",
+                            callback_data="back_records",
+                        ),
+                    ],
+                ]
+            ),
+            "earn_courier_record": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D",
+                            callback_data="full_earned_report_by_date",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Y-M-D : Y-M-D",
+                            callback_data="full_earned_report_by_period",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Рекорды",
+                            callback_data="back_records",
+                        ),
+                    ],
+                ]
+            ),
+            # ---
             "finance": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -995,6 +1048,28 @@ class Keyboard:
                             text="Обработать запрос №",
                             callback_data="process_request",
                         )
+                    ],
+                ]
+            ),
+            "send_message": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Отправить сообщение",
+                            callback_data="send_message_to_users",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Отправить рассылку",
+                            callback_data="send_broadcast_message",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
                     ],
                 ]
             ),
