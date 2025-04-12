@@ -16,6 +16,7 @@ from math import ceil
 from dateutil.relativedelta import relativedelta
 from aiogram import Dispatcher
 from aiogram.types import Update
+from aiogram.exceptions import TelegramBadRequest
 
 
 from src.services import (
@@ -53,11 +54,6 @@ from src.config import (
     admin_fallback,
     partner_r,
     partner_fallback,
-    orders_bot,
-    orders_bot_id,
-    orders_dp,
-    orders_r,
-    orders_fallback,
     payment_provider,
     log,
 )
@@ -71,11 +67,13 @@ from src.utils import (
     handler,
     kb,
     title,
+    send_notification_to_couriers,
 )
 from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "TelegramBadRequest",
     "Dispatcher",
     "Update",
     "relativedelta",
@@ -142,15 +140,11 @@ __all__ = [
     "partner_r",
     "partner_fallback",
     "partner_data",
-    "orders_bot",
-    "orders_bot_id",
-    "orders_dp",
-    "orders_r",
-    "orders_fallback",
     "PartnerState",
     "OrdersState",
     "seed_maker",
     "BufferedInputFile",
     "InputMediaDocument",
     "pdf_creator",
+    "send_notification_to_couriers",
 ]

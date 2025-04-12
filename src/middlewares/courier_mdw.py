@@ -13,7 +13,8 @@ from src.config import log
 from src.utils import CourierState
 from src.config import courier_bot
 from aiogram.types import ReplyKeyboardRemove, ContentType
-from src.services import admin_data
+from src.services import admin_data, courier_data
+from aiogram.exceptions import TelegramBadRequest
 
 
 class CourierOuterMiddleware(BaseMiddleware):
@@ -75,12 +76,15 @@ class CourierOuterMiddleware(BaseMiddleware):
                 event,
                 handler,
                 data,
+                tg_id,
             )
             return result
 
         elif isinstance(event, CallbackQuery):
-
-            return await handler(event, data)
+            try:
+                return await handler(event, data)
+            except TelegramBadRequest as e:
+                return
 
 
 async def _check_state_and_handle_message(
@@ -89,6 +93,7 @@ async def _check_state_and_handle_message(
     event: Message | CallbackQuery,
     handler: Callable,
     data: Dict,
+    tg_id: int,
 ):
     """Проверка состояния курьера и обработка сообщения"""
 
@@ -104,6 +109,9 @@ async def _check_state_and_handle_message(
         "/become_partner",
         "/chat",
         "/orders_bot",
+        "/promo",
+        "/notify",
+        "/support",
         "/restart",
     ]
 
@@ -163,6 +171,15 @@ async def _check_state_and_handle_message(
     ):
         if event.text in RESTRICTED_COMMANDS:
             await event.delete()
+            return
+
+    user_is_reg = await courier_data.get_courier_is_reg(tg_id=tg_id)
+
+    log.info(f"reg_status: {tg_id} {user_is_reg}")
+
+    if not user_is_reg:
+        if event.text in RESTRICTED_COMMANDS:
+            await event.answer(text="Вы не зарегистрировались!\n\n/start")
             return
 
     if state in (CourierState.reg_Phone.state,):

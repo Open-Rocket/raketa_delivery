@@ -6,6 +6,7 @@ from aiogram.types import (
     CopyTextButton,
 )
 from typing import Optional
+from src.services import admin_data
 
 
 class Keyboard:
@@ -15,6 +16,8 @@ class Keyboard:
         key: str,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для клиента"""
+
+        support_link = await admin_data.get_support_link()
 
         kb = {
             "/start": InlineKeyboardMarkup(
@@ -64,6 +67,16 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="Перейти в канал",
                             url="https://t.me/raketadeliverychannel",
+                        )
+                    ]
+                ]
+            ),
+            "/support": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Перейти в чат",
+                            url=support_link,
                         )
                     ]
                 ]
@@ -650,14 +663,14 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="📦 Выбрать заказ",
-                            callback_data="choose_order",
+                            text="🔄 Обновить",
+                            callback_data="refresh_orders",
                         )
                     ],
                     [
                         InlineKeyboardButton(
-                            text="🔄 Обновить данные",
-                            callback_data="refresh_orders",
+                            text="📦 Выбрать заказ",
+                            callback_data="choose_order",
                         )
                     ],
                 ]
@@ -710,6 +723,12 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="💬 Сообщения",
                             callback_data="messages",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="🔔 Уведомления",
+                            callback_data="notifications",
                         )
                     ],
                 ]
@@ -851,6 +870,12 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="XP за скорость",
                             callback_data="change_speed_XP",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Радиус поиска",
+                            callback_data="change_radius_km",
                         )
                     ],
                     [
@@ -1051,6 +1076,28 @@ class Keyboard:
                     ],
                 ]
             ),
+            "notifications": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Изменить интервал",
+                            callback_data="change_interval",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Изменить ссылку поддержки",
+                            callback_data="change_support_link",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
             "send_message": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -1100,6 +1147,7 @@ class Keyboard:
         key: str,
         status_service: bool = False,
         status_partner: bool = True,
+        status_notify: bool = True,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
@@ -1122,6 +1170,16 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="↩️ Назад",
                             callback_data="back_global_data",
+                        ),
+                    ],
+                ]
+            ),
+            "notify": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Включить уведомления 🔔' if status_notify else  'Выключить уведомления 🔕'}",
+                            callback_data=f"{'turn_on_notify' if status_notify else   'turn_off_notify'}",
                         ),
                     ],
                 ]
@@ -1251,6 +1309,25 @@ class Keyboard:
                         InlineKeyboardButton(
                             text="🔄 Обновить данные",
                             callback_data="refresh_refs",
+                        )
+                    ]
+                ]
+            ),
+        }
+
+        return kb[key]
+
+    @staticmethod
+    async def get_task_kb(key: str) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для курьера"""
+
+        kb = {
+            "go_work": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"Перейти к заказам!",
+                            callback_data="lets_go",
                         )
                     ]
                 ]

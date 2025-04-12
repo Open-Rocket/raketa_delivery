@@ -10,7 +10,7 @@ from .db_requests import (
 )
 from .fuzzy import cities, cities_2, find_closest_city
 from .seed import seed_maker
-from .earn_requests import pdf_creator
+from .pdf_creator import pdf_creator
 
 
 __all__ = [

@@ -15,6 +15,7 @@ from src.utils import AdminState
 from src.config import admin_bot, SUPER_ADMIN_TG_ID
 from aiogram.types import ReplyKeyboardRemove, ContentType
 from src.services import admin_data
+from aiogram.exceptions import TelegramBadRequest
 
 
 class AdminOuterMiddleware(BaseMiddleware):
@@ -63,8 +64,10 @@ class AdminOuterMiddleware(BaseMiddleware):
             return result
 
         elif isinstance(event, CallbackQuery):
-
-            return await handler(event, data)
+            try:
+                return await handler(event, data)
+            except TelegramBadRequest as e:
+                return
 
 
 async def _check_state_and_handle_message(
@@ -127,6 +130,10 @@ async def _check_state_and_handle_message(
         AdminState.full_orders_report_by_period.state,
         AdminState.full_earned_report_by_date.state,
         AdminState.full_earned_report_by_period.state,
+        AdminState.change_interval.state,
+        AdminState.change_support_link.state,
+        AdminState.change_radius_km.state,
+        AdminState.choose_order.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await fsm_context.set_state(AdminState.default.state)

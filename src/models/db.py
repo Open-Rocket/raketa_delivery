@@ -7,11 +7,15 @@ from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy import LargeBinary
 
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from sqlalchemy.ext.asyncio import (
     AsyncAttrs,
     async_sessionmaker,
     create_async_engine,
 )
+
 
 from sqlalchemy.orm import (
     Mapped,
@@ -39,6 +43,10 @@ load_dotenv()
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
 engine = create_async_engine(url=db_settings.DB_URL_asyncpg, echo=False)
 async_session_factory = async_sessionmaker(engine)
+
+
+sync_engine = create_engine(url=db_settings.DB_URL_psycopg2, echo=False)
+sync_session_factory = sessionmaker(sync_engine)
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
@@ -87,7 +95,7 @@ class GlobalSettings(Base):
     service_is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     partner_program_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    free_period_days: Mapped[intData] = mapped_column(Integer, default=10)
+    free_period_days: Mapped[intData] = mapped_column(Integer, default=30)
     order_price_per_km: Mapped[intData] = mapped_column(Integer, default=38)
     order_max_price: Mapped[intData] = mapped_column(Integer, default=100)
     subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
@@ -100,6 +108,12 @@ class GlobalSettings(Base):
     distance_coefficient_10_20: Mapped[floatData] = mapped_column(Float, default=0.85)
     distance_coefficient_more_20: Mapped[floatData] = mapped_column(Float, default=0.75)
 
+    distance_radius: Mapped[intData] = mapped_column(Integer, default=5)
+
+    support_link: Mapped[stringData] = mapped_column(
+        String, default="https://t.me/Ruslan_Ch66"
+    )
+
     time_coefficient_00_06: Mapped[floatData] = mapped_column(Float, default=1.13)
     time_coefficient_06_12: Mapped[floatData] = mapped_column(Float, default=1.0)
     time_coefficient_12_18: Mapped[floatData] = mapped_column(Float, default=1.1)
@@ -107,8 +121,13 @@ class GlobalSettings(Base):
     time_coefficient_21_00: Mapped[floatData] = mapped_column(Float, default=1.1)
 
     city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
-    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.2)
+    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.12)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
+
+    new_orders_notification_interval: Mapped[intData] = mapped_column(
+        Integer,
+        default=3600,  # sec
+    )
 
     reward_for_day_fastest_speed: Mapped[floatData] = mapped_column(
         Float, default=100.0
@@ -121,9 +140,9 @@ class GlobalSettings(Base):
     min_refund_amount: Mapped[floatData] = mapped_column(Float, default=5000.0)
     max_refund_amount: Mapped[floatData] = mapped_column(Float, default=100000.0)
 
-    base_order_XP: Mapped[floatData] = mapped_column(Float, default=1.0)
+    base_order_XP: Mapped[floatData] = mapped_column(Float, default=0.5)
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
-    speed_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
+    speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
 
 
 class Customer(Base):
@@ -147,6 +166,8 @@ class Customer(Base):
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_city: Mapped[stringData]
+
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     customer_accept_terms_of_use: Mapped[stringData]
     customer_registration_date: Mapped[datetimeData]
@@ -186,6 +207,8 @@ class Courier(Base):
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
 
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
+
     courier_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
 
     max_speed_kmh: Mapped[floatData] = mapped_column(Float, default=0.0)
@@ -201,6 +224,8 @@ class Courier(Base):
 
     orders_active_now: Mapped[intData]
 
+    notify_status: Mapped[bool] = mapped_column(Boolean, default=True)
+
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
     partner = relationship("Partner", back_populates="couriers")
@@ -215,6 +240,8 @@ class Partner(Base):
 
     partner_tg_id: Mapped[intDataUnique]
     partner_registration_date: Mapped[datetimeData]
+
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     balance: Mapped[floatData] = mapped_column(Float, default=0)
 
@@ -360,6 +387,7 @@ class Payment(Base):
 
 __all__ = [
     "async_session_factory",
+    "sync_session_factory",
     "Customer",
     "Courier",
     "Admin",

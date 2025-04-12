@@ -14,8 +14,6 @@ from .routers import (
     admin_fallback,
     partner_r,
     partner_fallback,
-    orders_r,
-    orders_fallback,
 )
 from .bots import (
     SUPER_ADMIN_TG_ID,
@@ -35,10 +33,6 @@ from .bots import (
     partner_bot_id,
     partner_dp,
     fsm_partner_storage,
-    orders_bot,
-    orders_bot_id,
-    orders_dp,
-    fsm_orders_storage,
 )
 
 
@@ -78,10 +72,4 @@ __all__ = [
     "admin_fallback",
     "partner_r",
     "partner_fallback",
-    "orders_bot",
-    "orders_bot_id",
-    "orders_dp",
-    "fsm_orders_storage",
-    "orders_r",
-    "orders_fallback",
 ]

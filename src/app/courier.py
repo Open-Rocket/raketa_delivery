@@ -1,5 +1,6 @@
 from ._deps import (
     CommandStart,
+    TelegramBadRequest,
     FSMContext,
     ContentType,
     ReplyKeyboardRemove,
@@ -30,11 +31,12 @@ from ._deps import (
     rediska,
     cities,
     payment_provider,
+    customer_bot,
     log,
     F,
     find_closest_city,
+    send_notification_to_couriers,
     ceil,
-    customer_bot,
 )
 
 
@@ -319,7 +321,10 @@ async def courier_accept_tou(
             )
 
         else:
-            subscription_status = "<b>Подписка:</b> Не активна\n\n"
+            subscription_status = (
+                f"<b>Подписка:</b> Не активна\n\n"
+                f"<i>Введите PROMOKOD для активации бесплатного периода</i> /promo\n\n"
+            )
 
         text = (
             f"Вы успешно зарегистрировались! 🎉\n\n"
@@ -375,6 +380,84 @@ async def courier_accept_tou(
 
 
 # ---
+# ---
+
+
+@courier_r.message(F.text == "/notify")
+async def cmd_notify(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /notify"""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    notify_status = await courier_data.get_courier_notify_status(tg_id=tg_id)
+
+    log.info(f"notify status: {notify_status}")
+
+    text = (
+        f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
+    )
+
+    reply_kb = await kb.get_turn_status_kb(
+        "notify",
+        status_notify=not notify_status,
+    )
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+
+@courier_r.callback_query(F.data == "turn_on_notify")
+@courier_r.callback_query(F.data == "turn_off_notify")
+async def data_turn_on_notify(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик 'turn_on_notify' и 'turn_off_notify' для курьера."""
+
+    tg_id = callback_query.from_user.id
+    notify_status = await courier_data.get_courier_notify_status(tg_id=tg_id)
+
+    log.info(f"notify status: {notify_status}")
+
+    notify_status = not notify_status
+    await courier_data.set_courier_notify_status(
+        tg_id=tg_id,
+        status=notify_status,
+    )
+
+    text = (
+        f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
+    )
+
+    await callback_query.answer(
+        "✅ Уведомления обновлены",
+        show_alert=False,
+    )
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(CourierState.default.state)
+    await rediska.set_state(courier_bot_id, tg_id, CourierState.default.state)
+
+
 # ---
 
 
@@ -525,7 +608,8 @@ async def cmd_run(
     """Обрабатывает запрос на начало работы курьера. /run, lets_go"""
 
     if isinstance(event, CallbackQuery):
-        await event.message.delete()  # Попытка удалить сообщение
+
+        await event.message.delete()
         await event.answer("🚀 Начать работу", show_alert=False)
 
     current_state = CourierState.default.state
@@ -705,26 +789,16 @@ async def get_location(
     tg_id = event.from_user.id
     courier_tg_id = event.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
+    radius_km = await admin_data.get_distance_radius()
 
     if isinstance(event, CallbackQuery):
 
         if event.data == "refresh_orders" or event.data == "back_location":
-
             my_lat, my_lon = await courier_data.get_courier_last_location(courier_tg_id)
-            radius_km = 5
-
-            nearby_orders = await order_data.get_nearby_orders(
-                my_lat, my_lon, radius_km
-            )
-            city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
     else:
         my_lat = event.location.latitude
         my_lon = event.location.longitude
-        radius_km = 5
-
-        nearby_orders = await order_data.get_nearby_orders(my_lat, my_lon, radius_km)
-        city_orders = await order_data.get_pending_orders_in_city(courier_city)
 
         _ = await courier_data.update_courier_location(
             tg_id,
@@ -732,10 +806,18 @@ async def get_location(
             my_lon,
         )
 
+    nearby_orders = await order_data.get_nearby_orders(my_lat, my_lon, radius_km)
+    city_orders = await order_data.get_pending_orders_in_city(courier_city)
+
+    total_sum_nearby = sum(order["price_rub"] for order in nearby_orders.values())
+    total_sum_city = sum(order["price_rub"] for order in city_orders.values())
+
     text = (
         f"<b>📋 Заказы</b>\n\n"
-        f"Всего заказов в городе <b>{courier_city}</b>: <b>{len(city_orders)}</b>\n"
+        f"Заказов в городе <b>{courier_city}</b>: <b>{len(city_orders)}</b>\n"
         f"Заказов рядом с вами: <b>{len(nearby_orders)}</b>\n\n"
+        f"{courier_city}: <b>{total_sum_city}₽</b>\n"
+        f"Рядом: <b>{total_sum_nearby}₽</b>\n\n"
         f"🔍 Хотите посмотреть заказы рядом?"
     )
 
@@ -1313,18 +1395,18 @@ async def complete_order(
         )
 
         text_2 = (
-            f" + {base_order_XP} очков опыта за заказ\n"
-            f" + {calculate_distance_XP} очков опыта за расстояние\n"
-            f" + {calculate_speed_XP} очков опыта за скорость\n"
+            f"+ {base_order_XP} очков опыта за заказ\n"
+            f"+ {calculate_distance_XP} очков опыта за расстояние\n"
+            f"+ {calculate_speed_XP} очков опыта за скорость\n"
             f"Итого заработано: <b>{new_XP} очков опыта</b>\n\n"
             f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n\n"
-            f"<i>В ближайшее время появятся новые возможности:</i>\n"
-            f"🔹 Приоритет к лучшим заказам\n"
-            f"🔹 Открытие лутбоксов с наградами\n"
-            f"🔹 Прокачка рейтинга и уровней\n"
-            f"🔹 Обмен очков на криптовалюту\n"
-            f"🔹 Доступ к уникальным заданиям\n"
-            f"🔹 Покупка реальных предметов во внутреннем магазине\n\n"
+            # f"<i>В ближайшее время появятся новые возможности:</i>\n"
+            # f"🔹 Приоритет к лучшим заказам\n"
+            # f"🔹 Открытие лутбоксов с наградами\n"
+            # f"🔹 Прокачка рейтинга и уровней\n"
+            # f"🔹 Обмен очков на криптовалюту\n"
+            # f"🔹 Доступ к уникальным заданиям\n"
+            # f"🔹 Покупка реальных предметов во внутреннем магазине\n\n"
         )
 
         await callback_query.message.answer(
@@ -1652,9 +1734,12 @@ async def set_name(
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
     await callback_query.message.answer(
         text,
+        reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    await callback_query.message.delete()
 
 
 @courier_r.callback_query(
@@ -1683,6 +1768,8 @@ async def set_phone(
         parse_mode="HTML",
     )
 
+    await callback_query.message.delete()
+
 
 @courier_r.callback_query(
     F.data == "set_my_city",
@@ -1704,9 +1791,12 @@ async def set_city(
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
     await callback_query.message.answer(
         text=text,
+        reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    await callback_query.message.delete()
 
 
 # ---
@@ -1731,8 +1821,8 @@ async def change_name(
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
-    _ = await courier_data.update_courier_name(tg_id, name)
-    _ = await rediska.set_name(courier_bot_id, tg_id, name)
+    _ = await courier_data.update_courier_name(tg_id, new_name)
+    _ = await rediska.set_name(courier_bot_id, tg_id, new_name)
 
     text = (
         f"Имя было изменено на {new_name} 🎉\n\n"
@@ -1774,6 +1864,7 @@ async def change_phone(
 
     await message.answer(
         text,
+        reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
     )
@@ -1847,9 +1938,11 @@ async def cmd_info(
 
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
-        f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
+        f"Здесь вы можете ознакомиться с основной информацией о сервисе, задать вопрос или предложить свою идею!\n\n"
         f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
-        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
+        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>\n"
+        f" •\n"
+        f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
     )
 
     await message.answer(
@@ -2010,7 +2103,7 @@ async def cmd_channel(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
     text = (
-        f"📺 <b>Официальный канал Raketa Delivery</b>\n\n"
+        f"📣 <b>Официальный канал Raketa Delivery</b>\n\n"
         f"🔹 <b>Актуальные новости</b> сервиса и важные объявления\n"
         f"🔹 <b>Полезные советы</b> для курьеров и партнеров\n"
         f"🔹 <b>Информация</b> о новых функциях и возможностях\n\n"
@@ -2025,6 +2118,41 @@ async def cmd_channel(
         disable_notification=True,
         parse_mode="HTML",
     )
+
+
+# ---
+
+
+@courier_r.message(
+    F.text == "/support",
+)
+async def cmd_support(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /support."""
+
+    current_state = CourierState.default.state
+    tg_id = message.from_user.id
+
+    text = (
+        f"👨‍💼 <b>Поддержка</b>\n\n"
+        f"Если у вас возникли вопросы или проблемы, "
+        f"вы можете обратиться в нашу службу поддержки.\n\n"
+        f"<i>*Мы всегда готовы помочь вам!</i>"
+    )
+
+    reply_kb = await kb.get_customer_kb("/support")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
 # ---
@@ -2101,6 +2229,7 @@ async def payment_invoice(
 
     if isinstance(event, CallbackQuery):
         await event.answer("💵 Оформить подписку", show_alert=False)
+        await event.message.delete()
 
     _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
 
@@ -2143,7 +2272,7 @@ async def extend_subscription(
 
 
 async def _use_XP(
-    event: CallbackQuery,
+    event: Message | CallbackQuery,
 ):
     """Использует очки опыта для оплаты подписки."""
 
@@ -2179,12 +2308,21 @@ async def _use_XP(
         new_price=round(new_price_rub, 2),
     )
 
-    await event.message.answer(
-        text=text,
-        reply_markup=keyboard,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
+    if isinstance(event, Message):
+        await event.answer(
+            text=text,
+            reply_markup=keyboard,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    elif isinstance(event, CallbackQuery):
+        await event.message.answer(
+            text=text,
+            reply_markup=keyboard,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
 
 
 @payment_r.callback_query(
@@ -2240,6 +2378,16 @@ async def send_payment_invoice(
 
     log.info(f"price_rub: {price_rub}")
     log.info(f"use_XP: {use_XP}")
+
+    await state.update_data(
+        use_XP=use_XP,
+        new_price=price_rub,
+    )
+    await rediska.save_fsm_state(
+        state,
+        courier_bot_id,
+        tg_id,
+    )
 
     if not payment_provider:
         log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")

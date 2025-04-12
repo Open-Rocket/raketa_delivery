@@ -14,6 +14,8 @@ from src.utils import PartnerState
 from src.config import admin_bot, partner_bot
 from aiogram.types import ReplyKeyboardRemove, ContentType
 from src.services import partner_data, admin_data
+from src.utils import kb
+from aiogram.exceptions import TelegramBadRequest
 
 
 class AgentOuterMiddleware(BaseMiddleware):
@@ -49,6 +51,7 @@ class AgentOuterMiddleware(BaseMiddleware):
             state_data = await fsm_context.get_data()
 
         service_status = await admin_data.get_service_status()
+        partner_program_status = await admin_data.get_partner_program_status()
 
         if not service_status:
             if isinstance(event, Message):
@@ -68,6 +71,24 @@ class AgentOuterMiddleware(BaseMiddleware):
 
             return
 
+        if not partner_program_status:
+            if isinstance(event, Message):
+                await event.answer(
+                    text="🚫 <b>Партнерская программа временно недоступна</b>",
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode="HTML",
+                )
+            elif isinstance(event, CallbackQuery):
+                await event.answer(
+                    text="🚫 Партнерская программа временно недоступна",
+                    show_alert=True,
+                )
+                log.info(
+                    f"🚫 Партнерская программа временно недоступна для пользователя {event.from_user.id}"
+                )
+
+            return
+
         if isinstance(event, Message):
 
             result = await _check_state_and_handle_message(
@@ -82,8 +103,10 @@ class AgentOuterMiddleware(BaseMiddleware):
             return result
 
         elif isinstance(event, CallbackQuery):
-
-            return await handler(event, data)
+            try:
+                return await handler(event, data)
+            except TelegramBadRequest as e:
+                return
 
 
 async def _check_state_and_handle_message(
@@ -96,6 +119,20 @@ async def _check_state_and_handle_message(
     data: Dict,
 ):
     """Проверка состояния агента и обработка сообщения"""
+
+    seed_key = await partner_data.get_my_seed_key(tg_id)
+
+    if not seed_key:
+        text = "Вам нужно сгенерировать ваш персональный SEED-ключ, чтобы начать работу с сервисом.\n\n"
+
+        reply_kb = await kb.get_partner_kb("generate_seed")
+
+        await event.answer(
+            text=text,
+            reply_markup=reply_kb,
+            parse_mode="HTML",
+        )
+        return
 
     return await handler(event, data)
 

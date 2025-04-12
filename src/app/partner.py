@@ -106,6 +106,15 @@ async def partner_generate_seed(
     tg_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
 
+    partner_id = await partner_data.get_partner_id_by_tg_id(tg_id)
+
+    if partner_id:
+        await callback_query.answer(
+            text="Вы уже зарегистрированы в системе, вам не нужно повторно генерировать ключ.",
+            show_alert=True,
+        )
+        return
+
     all_seed_keys = await partner_data.get_all_seed_keys()
 
     await callback_query.answer("🔑 Генерация ключа...", show_alert=False)
@@ -137,7 +146,7 @@ async def partner_generate_seed(
                 f"🔑 <b>Ваш ключ:</b> <code>{seed_key}</code>  👈 <i>Нажмите</i>\n\n"
                 f"- Этот ключ служит промокодом для пользователей. Используя его они получают скидки и могут участвовать в акциях сервиса.\n\n"
                 f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
-                f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете {refund_percent}% с подписки курьеров каждый месяц.\n\n"
+                f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете <b>{refund_percent}%</b> с подписки курьеров каждый месяц.\n\n"
                 f"▼ <b>Выберите действие в • ≡ Меню •</b>"
             )
 
@@ -148,6 +157,8 @@ async def partner_generate_seed(
                     disable_notification=True,
                     parse_mode="HTML",
                 )
+
+                await callback_query.message.delete()
 
                 await state.set_state(current_state)
                 await rediska.set_state(partner_bot_id, tg_id, current_state)
@@ -273,7 +284,7 @@ async def cmd_key(
 
     text = (
         f"Приглашайте курьеров и клиентов, используя этот ключ. "
-        f"За каждого привлеченного курьера вы будете получать {refund_percent}% от его подписки каждый месяц.\n\n"
+        f"За каждого привлеченного курьера вы будете получать <b>{refund_percent}%</b> от его подписки каждый месяц.\n\n"
         f"<b>🔑 Ваш ключ:</b> <code>{seed_key}</code>  👈 <i>Нажмите</i>"
     )
 
@@ -374,6 +385,41 @@ async def cmd_balance(
     await state.update_data(message_text_balance=text, message_kb_balance=new_kb_json)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+
+
+# ---
+
+
+@partner_r.message(
+    F.text == "/support",
+)
+async def cmd_support(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /support."""
+
+    current_state = PartnerState.default.state
+    tg_id = message.from_user.id
+
+    text = (
+        f"👨‍💼 <b>Поддержка</b>\n\n"
+        f"Если у вас возникли вопросы или проблемы, "
+        f"вы можете обратиться в нашу службу поддержки.\n\n"
+        f"<i>*Мы всегда готовы помочь вам!</i>"
+    )
+
+    reply_kb = await kb.get_customer_kb("/support")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
 # ---
@@ -763,7 +809,7 @@ async def data_earn(
 
         user = callback_query.from_user
 
-        username = user.username  # может быть None
+        username = user.username
         user_link = (
             f"<a href='tg://user?id={tg_id}'>{username if username else tg_id}</a>"
         )
@@ -784,3 +830,12 @@ async def data_earn(
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
+
+
+@partner_r.message()
+async def handle_unrecognized_message(
+    message: Message,
+):
+    """Обрабатывает нераспознанные сообщения."""
+
+    await message.delete()

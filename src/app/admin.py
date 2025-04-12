@@ -10,6 +10,7 @@ from ._deps import (
     json,
     relativedelta,
     BufferedInputFile,
+    TelegramBadRequest,
     pdf_creator,
     ContentType,
     filters,
@@ -317,6 +318,68 @@ async def cmd_orders(
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
+@admin_r.callback_query(
+    F.data == "choose_order",
+)
+async def call_choose_order(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на choose_order"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.choose_order.state
+
+    await callback_query.message.answer(
+        text=f"Введите номер заказа:",
+        disable_notification=True,
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.choose_order),
+)
+async def get_entered_order(
+    message: Message,
+    state: FSMContext,
+):
+    """Возвразщает данные по заказу"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.choose_order.state
+
+    order_id_str = message.text.strip()
+
+    try:
+        order_id = int(order_id_str)
+    except Exception as e:
+        log.error(f"Error {e}")
+        await message.answer(
+            text=f"Введите корректно номер заказа:",
+            disable_notification=True,
+        )
+
+    order_data_info = await order_data.get_order_dict_by_id(order_id=order_id)
+
+    pdf_path = await pdf_creator.create_order_data_pdf(data=order_data_info)
+
+    with open(pdf_path, "rb") as f:
+        file_data = f.read()
+
+    await message.answer_document(
+        document=BufferedInputFile(file_data, filename=pdf_path.name),
+        caption="Данные по заказу",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
 # ---
 # ---
 # ---
@@ -407,6 +470,10 @@ async def cmd_global(
     distance_XP = await admin_data.get_distance_XP()
     speed_XP = await admin_data.get_speed_XP()
 
+    interval = await admin_data.get_new_orders_notification_interval()
+    support_link = await admin_data.get_support_link()
+    radius_km = await admin_data.get_distance_radius()
+
     global_state_data = {
         "common_price": common_price,
         "max_price": max_price,
@@ -440,6 +507,9 @@ async def cmd_global(
         "base_order_XP": base_order_XP,
         "distance_XP": distance_XP,
         "speed_XP": speed_XP,
+        "interval": interval,
+        "support_link": support_link,
+        "radius_km": radius_km,
     }
 
     text = (
@@ -478,7 +548,9 @@ async def cmd_global(
         f" ▸ XP за скорость: <b>{speed_XP}</b>\n"
         f" •\n"
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
-        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
+        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n"
+        f" •\n"
+        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n\n"
         f"🎉 <b>Акции</b>\n"
         f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
@@ -487,8 +559,11 @@ async def cmd_global(
         f" ▸ Партнерский процент: <b>{refund_percent}%</b>\n\n"
         f"💬 <b>Сообщения</b>\n"
         f" ▸ Запросы на выплату: <b>{len(all_earn_waiting_requests)}</b>\n"
-        f" ▸ Минимальная выплата <b>{min_refund_amount}₽</b>\n"
-        f" ▸ Максимальная выплата <b>{max_refund_amount}₽</b>\n\n"
+        f" ▸ Минимальная выплата: <b>{min_refund_amount}₽</b>\n"
+        f" ▸ Максимальная выплата: <b>{max_refund_amount}₽</b>\n\n"
+        f"🔔 <b>уведомления</b>\n"
+        f" ▸ Новые заказы: <b>{interval} сек</b>\n\n"
+        f" ▸ Поддержка: <b>{support_link}</b>\n\n"
         f"<b>Выберите действие:</b>\n"
     )
 
@@ -505,6 +580,7 @@ async def cmd_global(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
@@ -519,6 +595,7 @@ async def cmd_global(
             await event.message.edit_text(
                 text=text,
                 reply_markup=reply_kb,
+                disable_web_page_preview=True,
                 parse_mode="HTML",
             )
 
@@ -528,12 +605,13 @@ async def cmd_global(
                 show_alert=False,
             )
 
-            if saved_text != text or saved_kb != new_kb_json:
-                await event.message.edit_text(
-                    text=text,
-                    reply_markup=reply_kb,
-                    parse_mode="HTML",
-                )
+        if saved_text != text or saved_kb != new_kb_json:
+            await event.message.edit_text(
+                text=text,
+                reply_markup=reply_kb,
+                disable_web_page_preview=True,
+                parse_mode="HTML",
+            )
 
     await state.set_state(current_state)
     await state.update_data(
@@ -551,19 +629,60 @@ async def cmd_global(
 @admin_r.callback_query(
     F.data == "service_data",
 )
+@admin_r.callback_query(
+    F.data == "turn_on_service",
+)
+@admin_r.callback_query(
+    F.data == "turn_off_service",
+)
+@admin_r.callback_query(
+    F.data == "turn_on_partner",
+)
+@admin_r.callback_query(
+    F.data == "turn_off_partner",
+)
 async def data_service_data(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
     """Обработчик кнопки "Сервисные данные" для админа."""
 
-    await callback_query.answer(
-        text="⚙️ Сервис",
-        show_alert=False,
-    )
-
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
+
+    if callback_query.data == "service_data":
+        await callback_query.answer(
+            text="⚙️ Сервис",
+            show_alert=False,
+        )
+
+    elif callback_query.data == "turn_on_service":
+        await admin_data.change_service_status(status=True)
+        await callback_query.answer(
+            text="Service ON✅",
+            show_alert=False,
+        )
+
+    elif callback_query.data == "turn_off_service":
+        await admin_data.change_service_status(status=False)
+        await callback_query.answer(
+            text="Service OFF❌",
+            show_alert=False,
+        )
+
+    elif callback_query.data == "turn_on_partner":
+        await admin_data.change_partner_program(status=True)
+        await callback_query.answer(
+            text="Partner program ON✅",
+            show_alert=False,
+        )
+
+    elif callback_query.data == "turn_off_partner":
+        await admin_data.change_partner_program(status=False)
+        await callback_query.answer(
+            text="Partner program OFF❌",
+            show_alert=False,
+        )
 
     service_status = await admin_data.get_service_status()
     partner_program_status = await admin_data.get_partner_program_status()
@@ -614,79 +733,6 @@ async def data_service_data(
         parse_mode="HTML",
     )
 
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-@admin_r.callback_query(
-    F.data == "turn_on_service",
-)
-@admin_r.callback_query(
-    F.data == "turn_off_service",
-)
-async def call_status_service(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик кнопки "Включить/Выключить сервис" для админа."""
-
-    tg_id = callback_query.from_user.id
-    current_state = AdminState.default.state
-
-    service_status = await admin_data.get_service_status()
-
-    if callback_query.data == "turn_on_service":
-        await admin_data.change_service_status(status=True)
-        await callback_query.message.answer(
-            text=f"✅ Сервис включен! \n\n",
-        )
-
-    elif callback_query.data == "turn_off_service":
-        await admin_data.change_service_status(status=False)
-
-        await callback_query.message.answer(
-            text=f"❌ Сервис выключен!",
-        )
-
-    service_status = await admin_data.get_service_status()
-    log.info(f"service_status_2: {service_status}")
-
-    await callback_query.message.delete()
-
-    await state.set_state(current_state)
-    await rediska.set_state(admin_bot_id, tg_id, current_state)
-
-
-@admin_r.callback_query(
-    F.data == "turn_on_partner",
-)
-@admin_r.callback_query(
-    F.data == "turn_off_partner",
-)
-async def change_status_partner(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик кнопки "Включить/Выключить партнерки" для админа."""
-
-    tg_id = callback_query.from_user.id
-    current_state = AdminState.default.state
-
-    partner_program_status = await admin_data.get_partner_program_status()
-
-    if callback_query.data == "turn_on_partner":
-        await admin_data.change_partner_program(status=True)
-        await callback_query.message.answer(
-            text=f"✅ Партнерская программа включена! \n\n",
-        )
-    elif callback_query.data == "turn_off_partner":
-        await admin_data.change_partner_program(status=False)
-        await callback_query.message.answer(
-            text=f"❌ Партнерская программа выключена!",
-        )
-    partner_program_status = await admin_data.get_partner_program_status()
-    log.info(f"partner_program_status: {partner_program_status}")
-    await callback_query.message.delete()
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
@@ -1856,6 +1902,7 @@ async def data_prices_and_tariffs(
     base_order_XP = global_state_data.get("base_order_XP")
     distance_XP = global_state_data.get("distance_XP")
     speed_XP = global_state_data.get("speed_XP")
+    radius_km = global_state_data.get("radius_km")
 
     text = (
         f"<b>💰 Тарифы</b>\n\n"
@@ -1879,7 +1926,9 @@ async def data_prices_and_tariffs(
         f" ▸ XP за скорость: <b>{speed_XP}</b>\n"
         f" •\n"
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
-        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n\n"
+        f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n"
+        f" •\n"
+        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("prices_and_tariffs")
@@ -1916,6 +1965,7 @@ async def data_prices_and_tariffs(
             "change_base_order_XP",
             "change_distance_XP",
             "change_speed_XP",
+            "change_radius_km",
         ]
     )
 )
@@ -1983,6 +2033,9 @@ async def call_change_price(
         case "change_speed_XP":
             current_state = AdminState.change_speed_XP.state
             text = "Введите новый XP за скорость:"
+        case "change_radius_km":
+            current_state = AdminState.change_radius_km.state
+            text = "Введите новый радиус поиска:"
 
         case _:
             await callback_query.answer(
@@ -1991,8 +2044,6 @@ async def call_change_price(
             return
 
     await callback_query.message.delete()
-
-    log.info(f"current_state:, {current_state}")
 
     tg_id = callback_query.from_user.id
     await callback_query.message.answer(
@@ -2024,6 +2075,7 @@ async def call_change_price(
         AdminState.change_base_order_XP,
         AdminState.change_distance_XP,
         AdminState.change_speed_XP,
+        AdminState.change_radius_km,
     )
 )
 async def change_prices_filer(
@@ -2124,6 +2176,10 @@ async def change_prices_filer(
             await admin_data.change_speed_XP(new_value)
             text = f"✅ Новый XP за скорость: {new_value}"
 
+        case AdminState.change_radius_km.state:
+            await admin_data.change_distance_radius(new_value)
+            text = f"✅ Новый радиус поиска: {new_value}"
+
         case _:
             await message.answer(
                 text="❌ Ошибка! Неизвестная команда.",
@@ -2136,6 +2192,8 @@ async def change_prices_filer(
     await message.answer(
         text=text,
         disable_notification=True,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
     )
 
     await state.set_state(current_state)
@@ -2520,8 +2578,6 @@ async def data_messages(callback_query: CallbackQuery, state: FSMContext):
 
     all_earn_waiting_requests = await partner_data.get_all_waiting_earn_requests()
 
-    log.info(f"all_earn_requests: {all_earn_waiting_requests}")
-
     pdf_path = await pdf_creator.create_earn_requests_pdf(all_earn_waiting_requests)
 
     with open(pdf_path, "rb") as f:
@@ -2686,3 +2742,158 @@ async def confirm_request(
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# --- Уведомления
+
+
+@admin_r.callback_query(
+    F.data == "notifications",
+)
+async def data_notifications(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки 'Уведомления'"""
+    await callback_query.answer(text="🔔 Уведомления", show_alert=False)
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    data = await state.get_data()
+    global_state_data: dict = data.get("global_state_data", {})
+    interval = global_state_data.get("interval")
+    support_link = global_state_data.get("support_link")
+
+    text = (
+        f"🔔 <b>Уведомления</b>\n\n"
+        f"Новые заказы: <b>{interval} сек</b>\n"
+        f"Поддержка: <b>{support_link}</b>"
+    )
+
+    reply_kb = await kb.get_admin_kb("notifications")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "change_interval",
+)
+async def change_interval(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки 'Изменить интервал'"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.change_interval.state
+
+    await callback_query.message.answer(
+        text="Задайте интервал в секундах:",
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "change_support_link",
+)
+async def change_support_link(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик кнопки 'Изменить ссылку поддержки'"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.change_support_link.state
+
+    await callback_query.message.answer(
+        text="Задайте новую ссылку:",
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.change_interval),
+)
+async def confirm_interval(
+    message: Message,
+    state: FSMContext,
+):
+    """Принимает изменения изменения интервала"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+    new_interval = message.text.strip()
+
+    try:
+        new_interval = int(new_interval)
+        if new_interval > 10:
+            await admin_data.change_new_orders_notification_interval(
+                interval_seconds=new_interval
+            )
+            await message.answer(
+                text=f"Новый интервал уведомлений: {new_interval} сек",
+                parse_mode="HTML",
+            )
+
+            await state.set_state(current_state)
+            await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+        else:
+            await message.answer("Введите число побольше:")
+    except ValueError:
+        await message.answer("Пожалуйста, введите корректное число.")
+
+
+@admin_r.message(
+    StateFilter(AdminState.change_support_link),
+)
+async def confirm_link(
+    message: Message,
+    state: FSMContext,
+):
+    """Принимает изменения изменения интервала"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.change_support_link.state
+    new_link = message.text.strip()
+
+    await admin_data.change_support_link(link=new_link)
+
+    await message.answer(
+        text=f"Новая ссылка поддержки: {new_link}",
+        disable_notification=True,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+# ---
+# ---
+
+
+@admin_r.message()
+async def handle_unrecognized_message(
+    message: Message,
+):
+    """Обрабатывает нераспознанные сообщения."""
+
+    await message.delete()

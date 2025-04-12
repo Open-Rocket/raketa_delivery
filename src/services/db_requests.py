@@ -2,6 +2,7 @@ import zlib
 import asyncio
 from src.models import (
     async_session_factory,
+    sync_session_factory,
     Customer,
     Courier,
     Admin,
@@ -124,6 +125,17 @@ class CustomerData:
                 )
             return ("...", "...", "...")
 
+    async def get_customer_is_reg(self, tg_id: int) -> bool:
+        """Возвращает статус регистрации курьера"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+
+            if customer:
+                return True
+            return False
+
     # ---
 
     async def is_set_key(self, tg_id: int) -> bool:
@@ -207,6 +219,7 @@ class CourierData:
 
     def __init__(self, async_session_factory: Callable[..., AsyncSession]):
         self.async_session_factory = async_session_factory
+        self.sync_session_factory = sync_session_factory
 
     # ---
 
@@ -273,6 +286,77 @@ class CourierData:
                 await session.rollback()
                 log.error(f"Ошибка при увеличении счетчика активных заказов: {e}")
                 return False
+
+    # ---
+
+    async def get_count_and_sum_orders_in_my_city(
+        self, tg_id: int
+    ) -> tuple[int, float]:
+        """Возвращает количество заказов и их общую сумму в городе курьера"""
+
+        async with self.async_session_factory() as session:
+            try:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                if not courier:
+                    return 0, 0.0
+
+                orders_result = await session.execute(
+                    select(Order).where(
+                        (Order.order_city == courier.courier_city),
+                        (Order.order_status == OrderStatus.PENDING),
+                    )
+                )
+                orders = orders_result.scalars().all()
+
+                count = len(orders)
+                total_sum = sum(order.price_rub for order in orders if order.price_rub)
+
+                return count, total_sum
+
+            except Exception as e:
+                log.error(f"Ошибка при получении количества и суммы заказов: {e}")
+                return 0, 0.0
+
+    async def get_all_couriers_tg_ids(self) -> list:
+        """Возвращает список tg_id всех курьеров"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Courier.courier_tg_id))
+            return query.scalars().all()
+
+    # ---
+
+    async def set_courier_notify_status(self, tg_id: int, status: bool) -> bool:
+        """Устанавливает статус уведомлений курьера в БД"""
+
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    return False
+
+                courier.notify_status = status
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении статуса уведомлений: {e}")
+                return False
+
+    async def get_courier_notify_status(self, tg_id: int) -> bool:
+        """Возвращает статус уведомлений курьера"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if courier:
+                return courier.notify_status
+            return False
 
     # ---
 
@@ -423,6 +507,17 @@ class CourierData:
             if courier:
                 return courier.courier_city or "..."
             return "..."
+
+    async def get_courier_is_reg(self, tg_id: int) -> bool:
+        """Возвращает статус регистрации курьера"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+
+            if courier:
+                return True
+            return False
 
     async def get_courier_full_info(self, tg_id: int) -> tuple:
         """Возвращает полную информацию о курьере, включая дату окончания подписки"""
@@ -810,6 +905,38 @@ class AdminData:
 
     # ---
 
+    async def change_new_orders_notification_interval(self, interval_seconds: int):
+        """Устанавливает интервал отправки уведомлений о новых заказах курьерам"""
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.new_orders_notification_interval = interval_seconds
+
+            else:
+                settings = GlobalSettings(
+                    new_orders_notification_interval=interval_seconds
+                )
+                session.add(session)
+
+            await session.commit()
+
+    async def get_new_orders_notification_interval(self) -> int:
+        """Возвращает интервал отправки уведомлений о новых заказах курьерам"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings = result.scalar_one_or_none()
+
+            if not settings:
+                return 3600
+
+            return settings.new_orders_notification_interval
+
+    # ---
+
     async def change_partner_program(self, status: bool):
         """Изменяет статут партнерской программы, включает и приостанавливает ее"""
         async with self.async_session_factory() as session:
@@ -1035,11 +1162,71 @@ class AdminData:
             result = await session.execute(select(GlobalSettings))
             settings: GlobalSettings = result.scalar_one_or_none()
 
-            if settings is not None:
+            if settings:
                 return settings.free_period_days
+
             return 10
 
     # ---
+
+    async def change_distance_radius(self, distance: int):
+        """Изменяет радиус поиска заказов"""
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            try:
+                distance = int(distance)
+            except Exception as e:
+                log.error(f"Error {e}")
+
+            if settings:
+                settings.distance_radius = distance
+            else:
+                settings = GlobalSettings(distance_radius=distance)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_distance_radius(self) -> int:
+        """Возвращает величину радиуса поиска заказов"""
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                return settings.distance_radius
+            return 5
+
+    # ---
+
+    async def change_support_link(self, link: str):
+        """Меняет ссылку поддержки"""
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                settings.support_link = link
+            else:
+                settings = GlobalSettings(support_link=link)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_support_link(self) -> int:
+        """Возвращает ссылку на поддержку"""
+
+        async with self.async_session_factory() as session:
+            result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = result.scalar_one_or_none()
+
+            if settings:
+                return settings.support_link
+            return "https://t.me/Ruslan_Ch66"
 
     # ---
 
@@ -1896,6 +2083,19 @@ class PartnerData:
 
     # ---
 
+    async def get_partner_id_by_tg_id(self, tg_id: int) -> Optional[int]:
+        """Возвращает ID партнера по его Telegram ID"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Partner).where(Partner.partner_tg_id == tg_id)
+            )
+
+            partner = query.scalar_one_or_none()
+
+            return partner.partner_id if partner else None
+
+    # ---
+
     async def get_my_seed_key(self, tg_id: int) -> Optional[str]:
         """Возвращает seed ключ партнера"""
         async with self.async_session_factory() as session:
@@ -2528,6 +2728,7 @@ class OrderData:
                             "starting_point": [start_lat, start_lon],
                             "status": order.order_status.value,
                             "distance_km": order.distance_km,
+                            "price_rub": order.price_rub,
                         }
                 except (ValueError, TypeError) as e:
                     log.error(
@@ -2542,7 +2743,7 @@ class OrderData:
 
             return available_orders
 
-    async def get_pending_orders_in_city(self, city: str) -> list:
+    async def get_pending_orders_in_city(self, city: str) -> dict:
         """Возвращает все ожидающие заказы в указанном городе"""
         async with self.async_session_factory() as session:
             query = await session.execute(
@@ -2565,6 +2766,7 @@ class OrderData:
                     "starting_point": order.starting_point,
                     "status": order.order_status.value,
                     "distance_km": order.distance_km,
+                    "price_rub": order.price_rub,
                 }
 
             return city_orders_dict
@@ -2695,6 +2897,53 @@ class OrderData:
             except Exception as e:
                 log.error(f"Ошибка при получении самого быстрого заказа: {e}")
                 return (None,) * 9
+
+    # ---
+
+    async def get_order_dict_by_id(self, order_id: int) -> dict | None:
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Order).where(Order.order_id == order_id)
+            )
+            order: Order = result.scalar_one_or_none()
+
+            if not order:
+                return None
+
+            return {
+                "order_id": order.order_id,
+                "order_city": order.order_city,
+                "order_status": (
+                    order.order_status.value if order.order_status else None
+                ),
+                "customer_id": order.customer_id,
+                "customer_name": order.customer_name,
+                "customer_phone": order.customer_phone,
+                "courier_id": order.courier_id,
+                "courier_name": order.courier_name,
+                "courier_phone": order.courier_phone,
+                "created_at_moscow_time": (
+                    str(order.created_at_moscow_time)
+                    if order.created_at_moscow_time
+                    else None
+                ),
+                "started_at_moscow_time": (
+                    str(order.started_at_moscow_time)
+                    if order.started_at_moscow_time
+                    else None
+                ),
+                "completed_at_moscow_time": (
+                    str(order.completed_at_moscow_time)
+                    if order.completed_at_moscow_time
+                    else None
+                ),
+                "distance_km": order.distance_km,
+                "execution_time_seconds": order.execution_time_seconds,
+                "speed_kmh": order.speed_kmh,
+                "delivery_object": order.delivery_object,
+                "price_rub": order.price_rub,
+                "description": order.description,
+            }
 
 
 customer_data = CustomerData(async_session_factory)

@@ -79,6 +79,8 @@ class AdminState(StatesGroup):
     change_distance_XP = State()
     change_speed_XP = State()
 
+    choose_order = State()
+
     full_speed_report_by_date = State()
     full_speed_report_by_period = State()
     full_financial_report_by_date = State()
@@ -100,6 +102,10 @@ class AdminState(StatesGroup):
 
     set_new_admin = State()
     del_admin = State()
+
+    change_interval = State()
+    change_support_link = State()
+    change_radius_km = State()
 
     reg_adminPhone = State()
 

@@ -14,8 +14,6 @@ from ._deps import (
     zlib,
     handler,
     customer_bot,
-    orders_bot,
-    orders_bot_id,
     customer_bot_id,
     customer_r,
     customer_fallback,
@@ -711,16 +709,10 @@ async def cmd_order(
 
     if is_read_info:
 
-        _, _, customer_city = await customer_data.get_customer_info(tg_id=tg_id)
         current_state = CustomerState.ai_voice_order.state
         text = (
             f"<i>*Вы можете отправить как голосовое сообщение, так и текстовое — "
             f"заказ будет оформлен в считанные секунды.</i>\n\n"
-            f"<b>Пример:</b>\n"
-            f"<code>Город - {customer_city}\nЗабрать заказ - адрес.\nДоставить - адрес.\n"
-            f"Нужно доставить - предмет.\nПолучатель - Имя.\nТелефон - номер.</code>\n\n"
-            f"👆 <i>Нажмите чтобы скопировать</i>\n\n"
-            f"<i>Можете использовать текст выше в качестве шаблона или описать заказ так как вам удобно. *ИИ готов принять заказ</i>\n\n"
             f"ゞ <b>Опишите ваш заказ ...</b>"
         )
         await message.answer(
@@ -767,9 +759,16 @@ async def data_ai(
     current_state = CustomerState.ai_voice_order.state
     tg_id = callback_query.from_user.id
 
+    _, _, customer_city = await customer_data.get_customer_info(tg_id=tg_id)
+
     text = (
         f"<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
         f"заказ будет оформлен в считанные секунды.</i>\n\n"
+        f"<b>Пример:</b>\n"
+        f"<code>Город - {customer_city}\nЗабрать заказ - адрес.\nДоставить - адрес.\n"
+        f"Нужно доставить - предмет.\nПолучатель - Имя.\nТелефон - номер.</code>\n\n"
+        f"👆 <i>Нажмите чтобы скопировать</i>\n\n"
+        f"<i>Можете использовать текст выше в качестве шаблона или описать заказ так как вам удобно. *ИИ готов принять заказ</i>\n\n"
         f"ゞ <b>Опишите ваш заказ ...</b>"
     )
 
@@ -957,9 +956,11 @@ async def cmd_info(
 
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
-        f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
+        f"Здесь вы можете ознакомиться с основной информацией о сервисе, задать вопрос или предложить свою идею!\n\n"
         f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
-        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
+        f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>\n"
+        f" •\n"
+        f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
     )
 
     await message.answer(
@@ -1105,6 +1106,41 @@ async def cmd_become_partner(
         disable_notification=True,
         parse_mode="HTML",
     )
+
+
+# ---
+
+
+@customer_r.message(
+    F.text == "/support",
+)
+async def cmd_support(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /support."""
+
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+
+    text = (
+        f"👨‍💼 <b>Поддержка</b>\n\n"
+        f"Если у вас возникли вопросы или проблемы, "
+        f"вы можете обратиться в нашу службу поддержки.\n\n"
+        f"<i>*Мы всегда готовы помочь вам!</i>"
+    )
+
+    reply_kb = await kb.get_customer_kb("/support")
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 # ---
@@ -1456,6 +1492,7 @@ async def set_name(
     text = f"Изменить данные профиля.\n\n" f"<b>Ваше имя:</b>"
     await callback_query.message.answer(
         text=text,
+        reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
     )
@@ -1511,6 +1548,7 @@ async def set_city(
     text = f"Изменить данные профиля.\n\n" f"<b>Ваш город:</b>"
     await callback_query.message.answer(
         text=text,
+        reply_markup=ReplyKeyboardRemove(),
         disable_notification=True,
         parse_mode="HTML",
     )

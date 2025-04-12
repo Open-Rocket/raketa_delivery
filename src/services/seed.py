@@ -4,7 +4,7 @@ import secrets
 from io import BytesIO
 from reportlab.lib.pagesizes import mm
 from reportlab.pdfgen import canvas
-from src.utils import title
+from src.utils.titles import title
 from reportlab.lib.pagesizes import letter
 from PIL import Image, ImageDraw, ImageFont
 
