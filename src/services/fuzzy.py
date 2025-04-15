@@ -79,8 +79,10 @@ class Cities:
                 except Exception as e:
                     log.error(f"Ошибка при загрузке из кэша: {e}")
                     await cls._load_cities_from_json()
+
             else:
                 await cls._load_cities_from_json()
+
         return cls._cities
 
     @classmethod

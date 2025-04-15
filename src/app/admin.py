@@ -1302,7 +1302,7 @@ async def call_records_full_report_by_date(
 @admin_r.message(
     StateFilter(AdminState.full_distance_report_by_date),
 )
-async def get_records_full_report_by_date(
+async def get_records_distance_full_report_by_date(
     message: Message,
     state: FSMContext,
 ):
@@ -1349,7 +1349,7 @@ async def get_records_full_report_by_date(
 @admin_r.callback_query(
     F.data == "full_distance_report_by_period",
 )
-async def call_records_full_report_by_period(
+async def call_records_distance_full_report_by_period(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -1379,7 +1379,7 @@ async def call_records_full_report_by_period(
 @admin_r.message(
     StateFilter(AdminState.full_distance_report_by_period),
 )
-async def get_records_full_report_by_period(
+async def get_records_distance_full_report_by_period(
     message: Message,
     state: FSMContext,
 ):

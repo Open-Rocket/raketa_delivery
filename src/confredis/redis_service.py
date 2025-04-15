@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State
 from aiogram.types import Message
 from src.config import log
+from datetime import date
 
 
 class RedisKey:
@@ -297,6 +298,56 @@ class RedisService:
             return int(partner_tg_id) if partner_tg_id else None
         except Exception as e:
             log.error(f"Ошибка чтения tg_id партнера из Redis: {e}")
+            return None
+
+    # ---
+
+    async def set_last_speed_bonus_award_date(self, award_date: date) -> bool:
+        try:
+            await self.redis.set(
+                "global_info:last_speed_bonus_award_date", award_date.isoformat()
+            )
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи last_speed_bonus_award_date в Redis: {e}")
+            return False
+
+    async def set_last_distance_bonus_award_date(self, award_date: date) -> bool:
+        try:
+            await self.redis.set(
+                "global_info:last_distance_bonus_award_date", award_date.isoformat()
+            )
+            return True
+        except Exception as e:
+            log.error(f"Ошибка записи last_distance_bonus_award_date в Redis: {e}")
+            return False
+
+    async def get_last_speed_bonus_award_date(self) -> date | None:
+        try:
+            raw_value = await self.redis.get("global_info:last_speed_bonus_award_date")
+            if not raw_value:
+                return None
+            date_str = (
+                raw_value.decode("utf-8") if isinstance(raw_value, bytes) else raw_value
+            )
+            return date.fromisoformat(date_str)
+        except Exception as e:
+            log.error(f"Ошибка чтения last_speed_bonus_award_date из Redis: {e}")
+            return None
+
+    async def get_last_distance_bonus_award_date(self) -> date | None:
+        try:
+            raw_value = await self.redis.get(
+                "global_info:last_distance_bonus_award_date"
+            )
+            if not raw_value:
+                return None
+            date_str = (
+                raw_value.decode("utf-8") if isinstance(raw_value, bytes) else raw_value
+            )
+            return date.fromisoformat(date_str)
+        except Exception as e:
+            log.error(f"Ошибка чтения last_distance_bonus_award_date из Redis: {e}")
             return None
 
 

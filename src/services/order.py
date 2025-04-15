@@ -1,4 +1,5 @@
 import io
+import asyncio
 from datetime import datetime
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -132,26 +133,26 @@ class MessageRecognizer:
         return message.text
 
     async def _process_audio_data(self, audio_data: bytes) -> str | bool:
-        """Распознаёт речь из аудиофайла."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._sync_recognize_audio, audio_data)
 
+    def _sync_recognize_audio(self, audio_data: bytes) -> str | bool:
         r = sr.Recognizer()
 
-        # Конвертация ogg -> wav
-        audio_segment = AudioSegment.from_file(audio_data, format="ogg")
-        audio_wav = io.BytesIO()
-        audio_segment.export(audio_wav, format="wav")
-        audio_wav.seek(0)
+        try:
+            # ogg -> wav
+            audio_segment = AudioSegment.from_file(audio_data, format="ogg")
+            audio_wav = io.BytesIO()
+            audio_segment.export(audio_wav, format="wav")
+            audio_wav.seek(0)
 
-        with sr.AudioFile(audio_wav) as source:
-            audio = r.record(source)
-            try:
+            with sr.AudioFile(audio_wav) as source:
+                audio = r.record(source)
                 return r.recognize_google(audio, language="ru-RU")
-            except (
-                sr.UnknownValueError,
-                sr.RequestError,
-            ) as e:
-                log.error(f"_process_audio_data ERROR: {e}")
-                return False
+
+        except (sr.UnknownValueError, sr.RequestError) as e:
+            log.error(f"_sync_recognize_audio ERROR: {e}")
+            return False
 
 
 formatter = OrderFormatter()

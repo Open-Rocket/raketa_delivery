@@ -260,6 +260,14 @@ class CourierData:
             )
             return courier.courier_id if courier else 0
 
+    async def get_courier_tg_id(self, id: int) -> int:
+        """Возвращает tg_id курьера по id"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_id == id)
+            )
+            return courier.courier_tg_id if courier else None
+
     # ---
 
     async def change_order_active_count(self, tg_id: int, count: int) -> bool:
