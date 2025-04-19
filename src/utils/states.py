@@ -109,6 +109,10 @@ class AdminState(StatesGroup):
 
     reg_adminPhone = State()
 
+    choose_user_by_ID = State()
+    choose_courier_by_ID = State()
+    choose_partner_by_SEED = State()
+
 
 class PartnerState(StatesGroup):
 

@@ -160,6 +160,9 @@ async def reg_admin_phone(
 @admin_r.callback_query(
     F.data == "refresh_users",
 )
+@admin_r.callback_query(
+    F.data == "back_to_users",
+)
 async def cmd_users(
     event: Message | CallbackQuery,
     state: FSMContext,
@@ -210,12 +213,25 @@ async def cmd_users(
 
     elif isinstance(event, CallbackQuery):
 
-        await event.answer(
-            text="🔄 Обновление пользователей...",
-            show_alert=False,
-        )
+        if event.data == "refresh_users":
+            await event.answer(
+                text="🔄 Обновление пользователей...",
+                show_alert=False,
+            )
 
-        if saved_text != text or saved_kb != new_kb_json:
+            if saved_text != text or saved_kb != new_kb_json:
+
+                await event.message.edit_text(
+                    text=text,
+                    reply_markup=reply_kb,
+                    parse_mode="HTML",
+                )
+
+        if event.data == "back_to_users":
+            await event.answer(
+                text="↩️ Назад",
+                show_alert=False,
+            )
 
             await event.message.edit_text(
                 text=text,
@@ -227,6 +243,448 @@ async def cmd_users(
     await state.update_data(message_text_users=text, message_kb_users=new_kb_json)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+
+
+@admin_r.callback_query(
+    F.data == "choose_user",
+)
+async def data_user(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку Клиенты"""
+
+    await callback_query.answer(
+        text="👫 Клиенты",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    text = (
+        f"<b>👫 Клиенты</b>\n\n"
+        f"Вы можете выбрать конкретного клиента по его id в базе или сделать рассылку всем клиентам сервиса"
+    )
+
+    reply_kb = await kb.get_admin_kb("choose_user")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "choose_courier",
+)
+async def data_courier(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку Курьера"""
+
+    await callback_query.answer(
+        text="🥷 Курьеры",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    text = (
+        f"<b>🥷 Курьеры</b>\n\n"
+        f"Вы можете выбрать конкретного курьера по его id в базе или сделать рассылку всем курьерам сервиса"
+    )
+
+    reply_kb = await kb.get_admin_kb("choose_courier")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "choose_partner",
+)
+async def data_courier(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку Курьера"""
+
+    await callback_query.answer(
+        text="🤝 Партнеры",
+        show_alert=False,
+    )
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+
+    text = (
+        f"<b>🤝 Партнеры</b>\n\n"
+        f"Вы можете выбрать конкретного партнера по его SEED или сделать рассылку всем партнерам сервиса"
+    )
+
+    reply_kb = await kb.get_admin_kb("choose_partner")
+
+    await callback_query.message.edit_text(
+        text=text,
+        reply_markup=reply_kb,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "choose_user_by_ID",
+)
+async def call_choose_user_by_ID(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку выбрать пользователя по его ID"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.choose_user_by_ID.state
+
+    await callback_query.message.answer(
+        text="Введите ID клиента:",
+        disable_notification=True,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "choose_courier_by_ID",
+)
+async def call_choose_courier_by_ID(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку выбрать курьера по его ID"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.choose_courier_by_ID.state
+
+    await callback_query.message.answer(
+        text="Введите ID курьера:",
+        disable_notification=True,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "choose_partner_by_SEED",
+)
+async def call_choose_partner_by_SEED(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку выбрать партнера по его SEED"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.choose_partner_by_SEED.state
+
+    await callback_query.message.answer(
+        text="Введите SEED партнера:",
+        disable_notification=True,
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.choose_user_by_ID),
+)
+async def get_user_by_ID(
+    message: Message,
+    state: FSMContext,
+):
+    """Возвращает клиента по его ID"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    user_ID_str = message.text.strip()
+
+    try:
+        user_ID = int(user_ID_str)
+    except Exception as e:
+        log.error(f"Exception {e}")
+        await message.answer(
+            text="Введите целое число",
+            disable_notification=True,
+        )
+
+    customer_tg_id, name, phone, city, block_status = (
+        await admin_data.get_customer_full_info_by_ID(id=user_ID)
+    )
+
+    if name != None:
+
+        customer_link = f"<a href='tg://user?id={customer_tg_id}'>Профиль</a>"
+
+        text = (
+            f"<b>👫 Клиент</b>\n\n"
+            f"Имя: {name}\n"
+            f"Телефон: {phone}\n"
+            f"Link: {customer_link}\n"
+            f"Город: {city}\n\n"
+            f"Статус: {'Заблокирован 🔒' if block_status else 'Активный 🍀'}"
+        )
+
+        reply_kb = await kb.get_user_manipulate_kb(
+            type_of_user="customer",
+            is_blocked=block_status,
+        )
+
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        await message.answer(
+            text="Данных нет",
+            disable_notification=True,
+        )
+
+    await state.set_state(current_state)
+    await state.update_data(customer_id=user_ID)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.choose_courier_by_ID),
+)
+async def get_courier_by_ID(
+    message: Message,
+    state: FSMContext,
+):
+    """Возвращает курьера по его ID"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    courier_ID_str = message.text.strip()
+
+    try:
+        courier_ID = int(courier_ID_str)
+    except Exception as e:
+        log.error(f"Exception {e}")
+        await message.answer(
+            text="Введите целое число",
+            disable_notification=True,
+        )
+
+    courier_tg_id, name, phone, city, courier_XP, block_status = (
+        await admin_data.get_courier_full_info_by_ID(id=courier_ID)
+    )
+
+    if name != None:
+
+        courier_link = f"<a href='tg://user?id={courier_tg_id}'>Профиль</a>"
+
+        text = (
+            f"<b>🥷 Курьер</b>\n\n"
+            f"Имя: {name}\n"
+            f"Телефон: {phone}\n"
+            f"Link: {courier_link}\n"
+            f"Город: {city}\n"
+            f"XP: {courier_XP}\n\n"
+            f"Статус: {'Заблокирован 🔒' if block_status else 'Активный 🍀'}"
+        )
+
+        reply_kb = await kb.get_user_manipulate_kb(
+            type_of_user="courier",
+            is_blocked=block_status,
+        )
+
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        await message.answer(
+            text="Данных нет",
+            disable_notification=True,
+        )
+
+    await state.set_state(current_state)
+    await state.update_data(courier_id=courier_ID)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(AdminState.choose_partner_by_SEED),
+)
+async def get_partner_by_SEED(
+    message: Message,
+    state: FSMContext,
+):
+    """Возвращает партнера по его SEED"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+
+    partner_SEED = message.text.strip()
+
+    partner_tg_id, balance, block_status = (
+        await admin_data.get_partner_full_info_by_SEED(seed=partner_SEED)
+    )
+
+    if partner_tg_id != None:
+
+        partner_link = f"<a href='tg://user?id={partner_tg_id}'>Профиль</a>"
+
+        text = (
+            f"<b>🤝 Партнеры</b>\n\n"
+            f"Баланс: {balance if balance else 0}\n"
+            f"Link: {partner_link}\n"
+            f"Статус: {'Заблокирован 🔒' if block_status else 'Активный 🍀'}"
+        )
+
+        reply_kb = await kb.get_user_manipulate_kb(
+            type_of_user="partner",
+            is_blocked=block_status,
+        )
+
+        await message.answer(
+            text=text,
+            reply_markup=reply_kb,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+    else:
+        await message.answer(
+            text="Данных нет",
+            disable_notification=True,
+        )
+
+    await state.set_state(current_state)
+    await state.update_data(partner_seed=partner_SEED)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.callback_query(
+    F.data == "block_customer",
+)
+@admin_r.callback_query(
+    F.data == "unblock_customer",
+)
+@admin_r.callback_query(
+    F.data == "block_courier",
+)
+@admin_r.callback_query(
+    F.data == "unblock_courier",
+)
+@admin_r.callback_query(
+    F.data == "block_partner",
+)
+@admin_r.callback_query(
+    F.data == "unblock_partner",
+)
+async def call_block_unblock_customer(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на блок/разблок клиента"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.default.state
+    data = await state.get_data()
+    customer_id = data.get("customer_id")
+    courier_id = data.get("courier_id")
+    partner_seed = data.get("partner_seed")
+
+    match callback_query.data:
+        case "block_customer":
+            await admin_data.change_customer_block_status(
+                id=customer_id,
+                block_status=True,
+            )
+            await callback_query.message.answer(
+                text=f"Клиент с ID {customer_id} был заблокирован 🔒",
+                disable_notification=True,
+            )
+
+        case "unblock_customer":
+            await admin_data.change_customer_block_status(
+                id=customer_id,
+                block_status=False,
+            )
+            await callback_query.message.answer(
+                text=f"Клиент с ID {customer_id} был разблокирован 🔓",
+                disable_notification=True,
+            )
+
+        case "block_courier":
+            await admin_data.change_courier_block_status(
+                id=courier_id,
+                block_status=True,
+            )
+            await callback_query.message.answer(
+                text=f"Курьер с ID {customer_id} был заблокирован 🔒",
+                disable_notification=True,
+            )
+
+        case "unblock_courier":
+            await admin_data.change_courier_block_status(
+                id=courier_id,
+                block_status=False,
+            )
+            await callback_query.message.answer(
+                text=f"Курьер с SEED {partner_seed} был разблокирован 🔓",
+                disable_notification=True,
+            )
+
+        case "block_partner":
+            await admin_data.change_partner_block_status(
+                seed=partner_seed,
+                block_status=True,
+            )
+            await callback_query.message.answer(
+                text=f"Партнер с SEED {partner_seed} был заблокирован 🔓",
+                disable_notification=True,
+            )
+
+        case "unblock_partner":
+            await admin_data.change_partner_block_status(
+                id=partner_seed,
+                block_status=False,
+            )
+            await callback_query.message.answer(
+                text=f"Партнер с ID {customer_id} был разблокирован 🔓",
+                disable_notification=True,
+            )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
 # --- Заказы
@@ -2762,7 +3220,8 @@ async def data_notifications(
 
     data = await state.get_data()
     global_state_data: dict = data.get("global_state_data", {})
-    interval = global_state_data.get("interval")
+    # interval = global_state_data.get("interval")
+    interval = await admin_data.get_new_orders_notification_interval()
     support_link = global_state_data.get("support_link")
 
     text = (

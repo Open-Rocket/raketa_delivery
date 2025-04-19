@@ -1,8 +1,8 @@
 from .clock import Time
 from .db import db_settings
 from .logger import log
-from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY
-from .geocoder import YANDEX_API_KEY
+from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY, GEMINI_API_KEY
+from .geocoder import YANDEX_API_KEY, YANDEX_API_KEY_2
 from .payment import payment_provider
 from .routers import (
     customer_r,
@@ -43,8 +43,10 @@ __all__ = [
     "Time",
     "PROXY",
     "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
     "AI_ASSISTANT_ID",
     "YANDEX_API_KEY",
+    "YANDEX_API_KEY_2",
     "payment",
     "customer_r",
     "courier_r",

@@ -134,6 +134,9 @@ async def _check_state_and_handle_message(
         AdminState.change_support_link.state,
         AdminState.change_radius_km.state,
         AdminState.choose_order.state,
+        AdminState.choose_user_by_ID.state,
+        AdminState.choose_courier_by_ID.state,
+        AdminState.choose_partner_by_SEED.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await fsm_context.set_state(AdminState.default.state)

@@ -126,7 +126,7 @@ class GlobalSettings(Base):
 
     new_orders_notification_interval: Mapped[intData] = mapped_column(
         Integer,
-        default=3600,  # sec
+        default=14400,  # sec
     )
 
     reward_for_day_fastest_speed: Mapped[floatData] = mapped_column(

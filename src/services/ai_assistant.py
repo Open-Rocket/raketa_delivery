@@ -4,7 +4,7 @@ from openai import AsyncOpenAI, APIError, RateLimitError, APIConnectionError
 from src.config import PROXY, OPENAI_API_KEY, AI_ASSISTANT_ID, log
 
 
-class AssistantAi:
+class AssistantOpenAi:
     def __init__(self):
         self.proxy = PROXY
         self.api_key = OPENAI_API_KEY
@@ -20,11 +20,13 @@ class AssistantAi:
     async def _get_gpt_text(
         self,
         request: str,
-        model="gpt-4-turbo",
+        model="gpt-4.1",
     ):
         """Отправляет инструкции для агента ИИ, в случае возникновения ошибок обрабатывает их."""
 
         try:
+
+            # raise Exception("🧨 Тестовая ошибка внутри _get_gpt_text OpenAi")
 
             completion = await self.client.chat.completions.create(
                 messages=[
@@ -41,27 +43,12 @@ class AssistantAi:
 
             return response_text
 
-        except RateLimitError as e:
-            log.error(f"Превышен лимит запросов к OpenAI API: {str(e)}", exc_info=True)
-            return None
-
-        except APIConnectionError as e:
-            log.error(f"Ошибка соединения с OpenAI API: {str(e)}", exc_info=True)
-            return None
-
-        except APIError as e:
-            log.error(f"Ошибка API OpenAI: {str(e)}", exc_info=True)
-            return None
-
         except Exception as e:
             log.error(
-                f"Неизвестная ошибка при получении ответа от GPT: exception={str(e)}, type={type(e).__name__}",
+                f"Exception {e}",
                 exc_info=True,
             )
             return None
-
-        finally:
-            log.debug(f"Завершение выполнения _get_gpt_text")
 
     async def process_order(
         self,
@@ -101,11 +88,11 @@ class AssistantAi:
 
             response_str = await self._get_gpt_text(messages_json)
 
-            if not response_str:
+            if not response_str or response_str[0] == None:
                 log.error(" Получен пустой ответ от GPT.")
                 return (None, None, None, None)
 
-            if response_str.lower() == "n":
+            if response_str == "N":
                 log.error("Ваш запрос не прошел модерацию!")
                 return ("N", "N", "N", "N")
 
@@ -116,10 +103,6 @@ class AssistantAi:
             delivery_object = response.get("delivery_object", "-")
             description = response.get("description", "")
 
-            # log.info(
-            #     f"Извлеченные данные: city={city}, addresses={addresses}, delivery_object={delivery_object}, description={description}",
-            # )
-
             return city, addresses, delivery_object, description
 
         except Exception as e:
@@ -127,7 +110,7 @@ class AssistantAi:
             return (None, None, None, None)
 
 
-assistant = AssistantAi()
+assistant = AssistantOpenAi()
 
 
 __all__ = ["assistant"]

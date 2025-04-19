@@ -17,6 +17,7 @@ from src.models import (
     Subscription,
 )
 from sqlalchemy import select, delete, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.functions import min
 from datetime import datetime, timedelta
 from sqlalchemy.engine import Result
@@ -111,6 +112,8 @@ class CustomerData:
 
     # ---
 
+    # ---
+
     async def get_customer_info(self, tg_id: int) -> tuple:
         """Возвращает имя, номер и город клиента из БД"""
         async with self.async_session_factory() as session:
@@ -135,6 +138,18 @@ class CustomerData:
             if customer:
                 return True
             return False
+
+    # ---
+    async def get_customer_city(self, tg_id: int) -> str:
+        """Возвращает город пользователя"""
+        async with self.async_session_factory() as session:
+            res = await session.execute(
+                select(Customer.customer_city).where(Customer.customer_tg_id == tg_id)
+            )
+
+            city = res.scalar_one_or_none()
+
+            return city
 
     # ---
 
@@ -213,6 +228,14 @@ class CustomerData:
             )
             customer_discount = customer.customer_discount
             return customer_discount if customer_discount else 0
+
+    # ---
+
+    async def get_all_customers_tg_ids(self) -> list:
+        """Возвращает список tg_id всех пользователей"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Customer.customer_tg_id))
+            return query.scalars().all()
 
 
 class CourierData:
@@ -332,6 +355,16 @@ class CourierData:
         async with self.async_session_factory() as session:
             query = await session.execute(select(Courier.courier_tg_id))
             return query.scalars().all()
+
+    # ---
+
+    async def get_couriers_in_city(self, city) -> list:
+        """Возвращает список всех курьеров в указанном городе"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier.courier_id).where(Courier.courier_city == city)
+            )
+            return result.scalars().all()
 
     # ---
 
@@ -2044,6 +2077,117 @@ class AdminData:
             courier_id, total_earnings = row
             return courier_id, total_earnings
 
+    # ---
+
+    async def get_customer_full_info_by_ID(
+        self,
+        id: int,
+    ) -> tuple:
+        """Возвращает всю информацию о клиенте по его ID"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_id == id)
+            )
+
+            if customer:
+                return (
+                    customer.customer_tg_id or None,
+                    customer.customer_name or None,
+                    customer.customer_phone or None,
+                    customer.customer_city or None,
+                    customer.is_blocked or None,
+                )
+            return (None,) * 5
+
+    async def get_courier_full_info_by_ID(
+        self,
+        id: int,
+    ) -> tuple:
+        """Возвращает всю информацию о клиенте по его ID"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_id == id)
+            )
+
+            if courier:
+                return (
+                    courier.courier_tg_id or None,
+                    courier.courier_name or None,
+                    courier.courier_phone or None,
+                    courier.courier_city or None,
+                    courier.courier_XP or None,
+                    courier.is_blocked or None,
+                )
+            return (None,) * 6
+
+    async def get_partner_full_info_by_SEED(
+        self,
+        seed: str,
+    ) -> tuple:
+        """Возвращает всю информацию о клиенте по его ID"""
+        async with self.async_session_factory() as session:
+            res = await session.execute(
+                select(Partner)
+                .join(SeedKey)
+                .options(selectinload(Partner.seed_key))
+                .where(SeedKey.seed_key == seed)
+            )
+
+            partner = res.scalar_one_or_none()
+
+            if partner:
+                return (
+                    partner.partner_tg_id or None,
+                    partner.balance or None,
+                    partner.is_blocked or None,
+                )
+            return (None,) * 3
+
+    # ---
+
+    async def change_customer_block_status(
+        self,
+        id: int,
+        block_status: bool,
+    ):
+        """Изменяет статус блокировки клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_id == id)
+            )
+            customer.is_blocked = block_status
+            await session.commit()
+
+    async def change_courier_block_status(
+        self,
+        id: int,
+        block_status: bool,
+    ):
+        """Изменяет статус блокировки курьера"""
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_id == id)
+            )
+            courier.is_blocked = block_status
+            await session.commit()
+
+    async def change_partner_block_status(
+        self,
+        seed: int,
+        block_status: bool,
+    ):
+        """Изменяет статус блокировки курьера"""
+        async with self.async_session_factory() as session:
+            res = await session.execute(
+                select(Partner)
+                .join(SeedKey)
+                .options(selectinload(Partner.seed_key))
+                .where(SeedKey.seed_key == seed)
+            )
+            partner = res.scalar_one_or_none()
+            partner.is_blocked = block_status
+            await session.commit()
+
 
 class PartnerData:
 
@@ -2952,6 +3096,23 @@ class OrderData:
                 "price_rub": order.price_rub,
                 "description": order.description,
             }
+
+    # ---
+
+    async def get_count_and_sum_orders_in_city(self, city) -> tuple:
+        """Возвращает количество заказов и их общую сумму в каждом городе"""
+        async with self.async_session_factory() as session:
+            res = await session.execute(
+                select(
+                    func.count(Order.order_id),
+                    func.coalesce(func.sum(Order.price_rub), 0),
+                ).where(
+                    Order.order_city == city,
+                    Order.order_status == OrderStatus.PENDING,
+                )
+            )
+            count_orders, total_price = res.one()
+            return count_orders, total_price
 
 
 customer_data = CustomerData(async_session_factory)

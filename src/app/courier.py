@@ -693,19 +693,23 @@ async def cmd_run(
             )
     else:
         reply_kb = await kb.get_courier_kb("pay_sub")
-        text = "‼️ Ваша подписка не активна, пожалуйста, оплатите подписку."
-
+        text = (
+            "‼️ Ваша подписка не активна, пожалуйста, оплатите подписку.\n\n"
+            "<i>*Введите PROMOKOD если еще не использовали пробный период</i> /promo"
+        )
         if isinstance(event, CallbackQuery):
             await event.message.answer(
                 text=text,
                 reply_markup=reply_kb,
                 show_alert=True,
+                parse_mode="HTML",
             )
         else:
             await event.answer(
                 text=text,
                 reply_markup=reply_kb,
                 disable_notification=True,
+                parse_mode="HTML",
             )
 
     await state.set_state(current_state)

@@ -2,7 +2,7 @@ import urllib3
 import requests
 from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
-from src.config import YANDEX_API_KEY
+from src.config import YANDEX_API_KEY, YANDEX_API_KEY_2
 from src.services.fuzzy import cities
 from src.config import log
 from src.confredis import rediska
@@ -16,8 +16,7 @@ class RouteMaster:
 
     YANDEX_API_KEYS = [
         YANDEX_API_KEY,
-        YANDEX_API_KEY,
-        YANDEX_API_KEY,
+        YANDEX_API_KEY_2,
     ]
 
     @staticmethod
@@ -56,24 +55,31 @@ class RouteMaster:
         log.info(f"yandex_api_counter: {counter}")
 
         try:
+
+            # if api_key == YANDEX_API_KEY:
+            #     raise requests.RequestException("Искусственная ошибка для теста")
+
             response = requests.get(base_url, params=params)
-            response.raise_for_status()  # Поднимет исключение, если статус не 2xx
-            # raise requests.RequestException("Error")
+            response.raise_for_status()
+
+            json_data = response.json()
+            feature_members = json_data["response"]["GeoObjectCollection"][
+                "featureMember"
+            ]
+
+            if not feature_members:
+                log.warning(f"Нет результатов геокодирования для адреса: {address}")
+                return (None, None)
+
+            pos = feature_members[0]["GeoObject"]["Point"]["pos"]
+            longitude, latitude = pos.split()
+            return latitude, longitude
+
         except requests.RequestException as e:
             log.error(
                 f"Error while getting coordinates from Yandex with key {api_key}: {e}"
             )
             return (None, None)
-
-        if response.status_code == 200:
-            json_data = response.json()
-            pos = json_data["response"]["GeoObjectCollection"]["featureMember"][0][
-                "GeoObject"
-            ]["Point"]["pos"]
-            longitude, latitude = pos.split()
-            return latitude, longitude
-
-        return (None, None)
 
     @staticmethod
     async def calculate_total_distance(

@@ -1,33 +1,69 @@
 import asyncio
 from datetime import timedelta
-from src.config import courier_bot, log, Time
-from src.services.db_requests import courier_data, admin_data, order_data
+from src.config import courier_bot, customer_bot, log, Time
+from src.services.db_requests import courier_data, admin_data, order_data, customer_data
 from src.utils import kb
 from src.confredis import rediska
+from collections import defaultdict
 
 
 async def new_orders_notification():
+
     all_couriers_tg_ids = await courier_data.get_all_couriers_tg_ids()
-    reply_kb = await kb.get_task_kb("go_work")
 
-    for courier_tg_id in all_couriers_tg_ids:
+    # Словарь для группировки по городам: {город: [tg_id1, tg_id2, ...]}
+    city_couriers_map = defaultdict(list)
+
+    # Отдельно отслеживаем тех, кому надо отправлять уведомление
+    for tg_id in all_couriers_tg_ids:
+        notify_status = await courier_data.get_courier_notify_status(tg_id=tg_id)
+        if notify_status:
+            city = await courier_data.get_courier_city(tg_id=tg_id)
+            if city:
+                city_couriers_map[city].append(tg_id)
+
+    # Теперь один запрос на каждый город
+    for city, tg_ids in city_couriers_map.items():
         count_orders, total_price_rub = (
-            await courier_data.get_count_and_sum_orders_in_my_city(tg_id=courier_tg_id)
-        )
-        notify_status = await courier_data.get_courier_notify_status(
-            tg_id=courier_tg_id
+            await order_data.get_count_and_sum_orders_in_city(city)
         )
 
-        if count_orders > 0 and notify_status:
+        if count_orders > 0:
             text = (
-                f"В вашем городе сейчас {count_orders} заказов на {total_price_rub}₽."
+                f"В городе {city} сейчас заказов: <b>{count_orders}</b>\n"
+                f"Сумма заказов: <b>{total_price_rub}₽</b>\n"
+                f"Начать работу /run"
             )
-            await courier_bot.send_message(
-                chat_id=courier_tg_id,
-                text=text,
-                reply_markup=reply_kb,
-                parse_mode="HTML",
-            )
+            for tg_id in tg_ids:
+                await courier_bot.send_message(
+                    chat_id=tg_id,
+                    text=text,
+                    parse_mode="HTML",
+                )
+
+
+async def city_couriers_notification():
+
+    all_customers_tg_ids = await customer_data.get_all_customers_tg_ids()
+    city_customers_map = defaultdict(list)
+
+    # Сначала собираем всех клиентов по городам
+    for tg_id in all_customers_tg_ids:
+        customer_city = await customer_data.get_customer_city(tg_id=tg_id)
+        if customer_city:
+            city_customers_map[customer_city].append(tg_id)
+
+    # Затем обрабатываем каждый город один раз
+    for city, tg_ids in city_customers_map.items():
+        couriers_city_len = len(await courier_data.get_couriers_in_city(city=city))
+        if couriers_city_len > 0:
+            text = f"Курьеров в городе {city} сейчас: <b>{couriers_city_len}</b>\nМожете сделать заказ /order"
+            for tg_id in tg_ids:
+                await customer_bot.send_message(
+                    chat_id=tg_id,
+                    text=text,
+                    parse_mode="HTML",
+                )
 
 
 async def XP_points_notification():
@@ -39,7 +75,7 @@ async def XP_points_notification():
     last_speed_bonus_award_date = await rediska.get_last_speed_bonus_award_date()
     last_distance_bonus_award_date = await rediska.get_last_distance_bonus_award_date()
 
-    if now.hour == 6 and 9 < now.minute < 15 and last_speed_bonus_award_date != today:
+    if now.hour == 0 and 5 < now.minute < 7 and last_speed_bonus_award_date != today:
 
         (
             order_id,
@@ -78,11 +114,7 @@ async def XP_points_notification():
                 log.error(f"Exception speed bonus day {e}")
             last_speed_bonus_award_date = today
 
-    if (
-        now.hour == 6
-        and 9 < now.minute < 15
-        and last_distance_bonus_award_date != today
-    ):
+    if now.hour == 0 and 5 < now.minute < 7 and last_distance_bonus_award_date != today:
         courier_id, distance = (
             await admin_data.get_courier_info_by_max_date_distance_covered(date=today)
         )
@@ -112,7 +144,7 @@ async def XP_points_notification():
                 last_distance_bonus_award_date = today
 
 
-# 🔁 Запуск двух независимых циклов
+# 🔁 Запуск независимых циклов
 
 
 async def notification_loop():
@@ -120,6 +152,7 @@ async def notification_loop():
         try:
             interval = await admin_data.get_new_orders_notification_interval()
             await new_orders_notification()
+            await city_couriers_notification()
             await asyncio.sleep(interval)
         except Exception as e:
             log.error(f"[notification_loop] Ошибка: {e}")

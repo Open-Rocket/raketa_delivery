@@ -26,6 +26,7 @@ from src.services import (
     admin_data,
     partner_data,
     assistant,
+    gemini_assistant,
     formatter,
     route,
     recognizer,

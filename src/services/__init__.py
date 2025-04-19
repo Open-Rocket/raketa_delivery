@@ -1,4 +1,5 @@
 from .ai_assistant import assistant
+from .gemini_assistant_ai import gemini_assistant
 from .routing import route
 from .order import formatter, recognizer
 from .db_requests import (
@@ -15,6 +16,7 @@ from .pdf_creator import pdf_creator
 
 __all__ = [
     "assistant",
+    "gemini_assistant",
     "route",
     "formatter",
     "recognizer",

@@ -142,12 +142,12 @@ async def _check_state_and_handle_message(
 
             return
 
-    if state == CustomerState.assistant_run.state:
-        if event.text in ("/restart", "/start"):
-            await restart_bot()
-            return
-        await event.delete()
-        return
+    # if state == CustomerState.assistant_run.state:
+    #     if event.text in ("/restart", "/start"):
+    #         await restart_bot()
+    #         return
+    #     await event.delete()
+    #     return
 
     if state in (CustomerState.reg_Phone.state,):
         if event.text in [

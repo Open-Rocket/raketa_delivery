@@ -1138,6 +1138,67 @@ class Keyboard:
                 one_time_keyboard=True,
                 input_field_placeholder="✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎✳︎",
             ),
+            # ---
+            "choose_user": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Выбрать по ID",
+                            callback_data="choose_user_by_ID",
+                        ),
+                        InlineKeyboardButton(
+                            text="Рассылка",
+                            callback_data="mailing_users",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_to_users",
+                        ),
+                    ],
+                ]
+            ),
+            "choose_courier": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Выбрать по ID",
+                            callback_data="choose_courier_by_ID",
+                        ),
+                        InlineKeyboardButton(
+                            text="Рассылка",
+                            callback_data="mailing_couriers",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_to_users",
+                        ),
+                    ],
+                ]
+            ),
+            "choose_partner": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Выбрать по SEED",
+                            callback_data="choose_partner_by_SEED",
+                        ),
+                        InlineKeyboardButton(
+                            text="Рассылка",
+                            callback_data="mailing_partners",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="↩️ Назад",
+                            callback_data="back_to_users",
+                        ),
+                    ],
+                ]
+            ),
         }
 
         return kb[key]
@@ -1189,7 +1250,9 @@ class Keyboard:
         return kb[key]
 
     @staticmethod
-    async def get_partner_kb(key: str) -> InlineKeyboardMarkup:
+    async def get_partner_kb(
+        key: str,
+    ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
         kb = {
@@ -1318,7 +1381,9 @@ class Keyboard:
         return kb[key]
 
     @staticmethod
-    async def get_task_kb(key: str) -> InlineKeyboardMarkup:
+    async def get_task_kb(
+        key: str,
+    ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для курьера"""
 
         kb = {
@@ -1335,6 +1400,54 @@ class Keyboard:
         }
 
         return kb[key]
+
+    @staticmethod
+    async def get_user_manipulate_kb(
+        type_of_user: str,
+        is_blocked: bool = False,
+    ) -> InlineKeyboardMarkup:
+        """Возвращает клавиатуру для взаимодействия с пользователем"""
+
+        kb = {
+            "customer": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Разблокировать 🔓' if is_blocked else 'Заблокировать 🔒'}",
+                            callback_data=f"{'unblock_customer' if is_blocked else 'block_customer'}",
+                        ),
+                    ],
+                ]
+            ),
+            "courier": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Разблокировать 🔓' if is_blocked else 'Заблокировать 🔒'}",
+                            callback_data=f"{'unblock_courier' if is_blocked else 'block_courier'}",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Начислить XP ❇️",
+                            callback_data="add_XP",
+                        ),
+                    ],
+                ]
+            ),
+            "partner": InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Разблокировать 🔓' if is_blocked else 'Заблокировать 🔒'}",
+                            callback_data=f"{'unblock_partner' if is_blocked else 'block_partner'}",
+                        ),
+                    ],
+                ]
+            ),
+        }
+
+        return kb[type_of_user]
 
 
 kb: Keyboard = Keyboard()

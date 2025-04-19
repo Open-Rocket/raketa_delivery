@@ -76,7 +76,7 @@ class PDFcreator:
         return output_path
 
     async def create_order_data_pdf(self, data: dict) -> Path:
-        """Создает PDF-файл с данными о заказе с переносом длинных строк."""
+        """Создает PDF-файл с данными о заказе с переносом длинных строк с учётом ширины."""
         output_path = self.output_dir / "order_data.pdf"
 
         pdf = canvas.Canvas(str(output_path), pagesize=letter)
@@ -84,6 +84,7 @@ class PDFcreator:
 
         pdf.setFont("DejaVuSans", 20)
         x, y = 50, 800
+        right_margin = 550  # правая граница текста (A4 шириной 612 pt)
 
         current_date = datetime.now().strftime("%Y-%m-%d %H:%M")
         pdf.drawString(x, y, "Order Information")
@@ -94,23 +95,38 @@ class PDFcreator:
         y -= 40
 
         pdf.setFont("DejaVuSans", 12)
-        max_width = (
-            90  # Максимальная длина строки в символах — подбирается опытным путём
-        )
+        font_name = "DejaVuSans"
+        font_size = 12
 
         for key, value in data.items():
             formatted_key = key.replace("_", " ").capitalize()
             line = f"{formatted_key}: {value}"
 
-            # Переносим строку, если она слишком длинная
-            wrapped_lines = wrap(line, width=max_width)
+            # Правильный перенос строк с учётом ширины
+            words = line.split()
+            current_line = ""
 
-            for wrapped_line in wrapped_lines:
-                pdf.drawString(x, y, wrapped_line)
+            for word in words:
+                test_line = f"{current_line} {word}".strip()
+                line_width = pdf.stringWidth(test_line, font_name, font_size)
+
+                if line_width < (right_margin - x):
+                    current_line = test_line
+                else:
+                    pdf.drawString(x, y, current_line)
+                    y -= 18
+                    current_line = word
+                    if y < 50:
+                        pdf.showPage()
+                        pdf.setFont(font_name, font_size)
+                        y = 800
+
+            if current_line:
+                pdf.drawString(x, y, current_line)
                 y -= 18
                 if y < 50:
                     pdf.showPage()
-                    pdf.setFont("DejaVuSans", 12)
+                    pdf.setFont(font_name, font_size)
                     y = 800
 
         pdf.save()
