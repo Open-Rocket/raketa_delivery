@@ -237,6 +237,48 @@ class CustomerData:
             query = await session.execute(select(Customer.customer_tg_id))
             return query.scalars().all()
 
+    async def get_all_customers_tg_ids_notify_status_true(self) -> list:
+        """Возвращает список tg_id всех пользователей"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Customer.customer_tg_id).where(Customer.notify_status == True)
+            )
+            return query.scalars().all()
+
+    # ---
+
+    async def set_customer_notify_status(self, tg_id: int, status: bool) -> bool:
+        """Устанавливает статус уведомлений клиента в БД"""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Customer).where(Customer.customer_tg_id == tg_id)
+                )
+                customer = result.scalar_one_or_none()
+
+                if not customer:
+                    return False
+
+                customer.notify_status = status
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении статуса уведомлений: {e}")
+                return False
+
+    async def get_customer_notify_status(self, tg_id: int) -> bool:
+        """Возвращает статус уведомлений клиента"""
+        async with self.async_session_factory() as session:
+            customer = await session.scalar(
+                select(Customer).where(Customer.customer_tg_id == tg_id)
+            )
+            if customer:
+                return customer.notify_status
+            return False
+
+    # ---
+
 
 class CourierData:
 
@@ -354,6 +396,14 @@ class CourierData:
         """Возвращает список tg_id всех курьеров"""
         async with self.async_session_factory() as session:
             query = await session.execute(select(Courier.courier_tg_id))
+            return query.scalars().all()
+
+    async def get_all_couriers_tg_ids_notify_status_true(self) -> list:
+        """Возвращает список tg_id всех курьеров"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Courier.courier_tg_id).where(Courier.notify_status == True)
+            )
             return query.scalars().all()
 
     # ---
@@ -733,8 +783,7 @@ class CourierData:
 
             log.info(f"seed_key_obj: {seed_key_obj}")
 
-            if not seed_key_obj.seed_key:
-                log.info(f"seed_key_obj.seed_key: {seed_key_obj.seed_key}")
+            if not seed_key_obj or not seed_key_obj.seed_key:
                 return False
 
             courier = await session.scalar(
@@ -872,6 +921,19 @@ class CourierData:
                 log.error(f"Ошибка при обновлении рекордов курьера: {e}")
                 return False
 
+    # ---
+
+    async def get_courier_seed_key_by_tg_id(self, tg_id: int) -> str | None:
+        """Возвращает seed_key, привязанный к курьеру по его Telegram ID"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(SeedKey.seed_key)
+                .join(Courier, SeedKey.seed_key_id == Courier.seed_key_id)
+                .where(Courier.courier_tg_id == tg_id)
+            )
+            seed_key = result.scalar_one_or_none()
+            return seed_key
+
 
 class AdminData:
 
@@ -972,7 +1034,7 @@ class AdminData:
             settings = result.scalar_one_or_none()
 
             if not settings:
-                return 3600
+                return 14400
 
             return settings.new_orders_notification_interval
 
@@ -1113,26 +1175,6 @@ class AdminData:
 
     # ---
 
-    async def change_discount_percent_courier(self, percent: int):
-        """Обновляет процент скидки курьеру"""
-        async with self.async_session_factory() as session:
-
-            if percent > 75:
-                percent = 75
-            elif percent < 0:
-                percent = 0
-
-            result = await session.execute(select(GlobalSettings))
-            settings: GlobalSettings = result.scalar_one_or_none()
-
-            if settings:
-                settings.discount_percent_courier = percent
-            else:
-                settings = GlobalSettings(discount_percent_courier=percent)
-                session.add(settings)
-
-            await session.commit()
-
     async def change_first_order_discount(self, percent: int):
         """Обновляет процент скидки на первый заказ"""
         async with self.async_session_factory() as session:
@@ -1152,17 +1194,6 @@ class AdminData:
                 session.add(settings)
 
             await session.commit()
-
-    async def get_discount_percent_courier(self) -> int:
-        """Возвращает процент скидки для курьера."""
-        async with self.async_session_factory() as session:
-            result = await session.execute(select(GlobalSettings))
-            settings: GlobalSettings = result.scalar_one_or_none()
-
-            if settings is not None:
-                return settings.discount_percent_courier
-
-            return 15
 
     async def get_first_order_discount(self) -> float:
         """Возвращает процент скидки на первый заказ"""
@@ -1988,7 +2019,7 @@ class AdminData:
     # ---
 
     async def get_courier_info_by_max_period_distance_covered(
-        self, start_data: datetime, end_date: datetime
+        self, start_date: datetime, end_date: datetime
     ) -> tuple | None:
         """
         Возвращает курьера, который прошел наибольшее расстояние за указанный период,
@@ -2003,7 +2034,7 @@ class AdminData:
                 .where(
                     Order.order_status == OrderStatus.COMPLETED,
                     func.date_trunc("day", Order.completed_at_moscow_time)
-                    >= start_data,
+                    >= start_date,
                     func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
                 )
                 .group_by(Order.courier_id)
@@ -2019,7 +2050,7 @@ class AdminData:
             return courier_id, total_distance
 
     async def get_courier_info_by_max_period_orders_count(
-        self, start_data: datetime, end_date: datetime
+        self, start_date: datetime, end_date: datetime
     ) -> tuple | None:
         """
         Возвращает курьера, который выполнил наибольшее количество заказов за указанный период.
@@ -2032,7 +2063,7 @@ class AdminData:
                 .where(
                     Order.order_status == OrderStatus.COMPLETED,
                     func.date_trunc("day", Order.completed_at_moscow_time)
-                    >= start_data,
+                    >= start_date,
                     func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
                 )
                 .group_by(Order.courier_id)
@@ -2048,7 +2079,7 @@ class AdminData:
             return courier_id, total_orders
 
     async def get_courier_info_by_max_period_earnings(
-        self, start_data: datetime, end_date: datetime
+        self, start_date: datetime, end_date: datetime
     ) -> tuple | None:
         """
         Возвращает курьера, который заработал больше всех за указанный период.
@@ -2062,7 +2093,7 @@ class AdminData:
                 .where(
                     Order.order_status == OrderStatus.COMPLETED,
                     func.date_trunc("day", Order.completed_at_moscow_time)
-                    >= start_data,
+                    >= start_date,
                     func.date_trunc("day", Order.completed_at_moscow_time) <= end_date,
                 )
                 .group_by(Order.courier_id)
@@ -2187,6 +2218,78 @@ class AdminData:
             partner = res.scalar_one_or_none()
             partner.is_blocked = block_status
             await session.commit()
+
+    # ---
+
+    async def get_customer_block_status(self, tg_id: int) -> bool:
+        """Возвращает статус блокировки клиента"""
+        async with self.async_session_factory() as session:
+            status = await session.scalar(
+                select(Customer.is_blocked).where(Customer.customer_tg_id == tg_id)
+            )
+            return bool(status)
+
+    async def get_courier_block_status(self, tg_id: int) -> bool:
+        """Возвращает статус блокировки курьера"""
+        async with self.async_session_factory() as session:
+            status = await session.scalar(
+                select(Courier.is_blocked).where(Courier.courier_tg_id == tg_id)
+            )
+            return bool(status)
+
+    async def get_partner_block_status(self, tg_id: int) -> bool:
+        """Возвращает статус блокировки партнера"""
+        async with self.async_session_factory() as session:
+            status = await session.scalar(
+                select(Partner.is_blocked).where(Partner.partner_tg_id == tg_id)
+            )
+            return bool(status)
+
+    # ---
+
+    async def change_courier_max_active_orders_count(self, new_count: int) -> int:
+        """Возвращает количество активных заказов у курьера"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(GlobalSettings))
+            settings = query.scalar_one_or_none()
+            if settings:
+                settings.max_orders_count = new_count
+            else:
+                settings = GlobalSettings(max_orders_count=new_count)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_courier_max_active_orders_count(self) -> int:
+        """Получает текущее значение максимального количества активных заказов у курьера"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(GlobalSettings))
+            settings = query.scalar_one_or_none()
+            if settings:
+                return settings.max_orders_count
+            return 3
+
+    # ---
+
+    async def update_taxi_orders_count(self, value: int):
+        """Увеличивает счетчик заказов на такси"""
+        async with self.async_session_factory() as session:
+            res: Result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = res.scalar_one_or_none()
+            if settings:
+                settings.taxi_orders_count += value
+            else:
+                settings = GlobalSettings(taxi_orders_count=value)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_taxi_orders_count(self) -> int:
+        """Возвращает текущий счётчик заказов на такси"""
+        async with self.async_session_factory() as session:
+            res: Result = await session.execute(select(GlobalSettings))
+            settings: GlobalSettings = res.scalar_one_or_none()
+            return settings.taxi_orders_count if settings else 0
 
 
 class PartnerData:
@@ -2557,6 +2660,27 @@ class PartnerData:
         async with self.async_session_factory() as session:
             settings = await session.scalar(select(GlobalSettings))
             return settings.max_refund_amount if settings else 0
+
+    # ---
+
+    async def get_all_partners_tg_ids(self) -> list:
+        """Возвращает список tg_id всех партнеров"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(Partner.partner_tg_id))
+            return query.scalars().all()
+
+    # ---
+
+    async def get_seed_key_by_partner_tg_id(self, tg_id: int) -> str | None:
+        """Возвращает seed_key по Telegram ID партнёра"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(SeedKey.seed_key)
+                .join(Partner)
+                .where(Partner.partner_tg_id == tg_id)
+            )
+            seed_key = result.scalar_one_or_none()
+            return seed_key
 
 
 class OrderData:

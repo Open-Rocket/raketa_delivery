@@ -880,6 +880,12 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
+                            text="Макс выполняемых заказов",
+                            callback_data="change_max_orders_count",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
                             text="↩️ Назад",
                             callback_data="back_global_data",
                         ),
@@ -888,12 +894,6 @@ class Keyboard:
             ),
             "discounts_and_promotions": InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Скидка на подписку курьеру",
-                            callback_data="change_subscription_discount",
-                        )
-                    ],
                     [
                         InlineKeyboardButton(
                             text="Скидка на первый заказ",

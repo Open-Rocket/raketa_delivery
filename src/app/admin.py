@@ -10,20 +10,12 @@ from ._deps import (
     json,
     relativedelta,
     BufferedInputFile,
-    TelegramBadRequest,
-    pdf_creator,
-    ContentType,
     filters,
-    OrderStatus,
-    PreCheckoutQuery,
-    LabeledPrice,
-    zlib,
-    Time,
     Dispatcher,
     Update,
-    find_closest_city,
     SUPER_ADMIN_TG_ID,
     F,
+    pdf_creator,
     admin_data,
     kb,
     order_data,
@@ -31,22 +23,14 @@ from ._deps import (
     log,
     admin_r,
     admin_bot,
+    customer_bot,
+    admin_fallback,
+    courier_bot,
     partner_bot,
     admin_bot_id,
     partner_data,
-    admin_fallback,
-    courier_bot_id,
-    handler,
-    courier_r,
-    courier_fallback,
     courier_data,
-    payment_r,
-    title,
-    courier_bot_id,
-    cities,
-    payment_provider,
-    courier_bot,
-    customer_bot,
+    customer_data,
 )
 
 
@@ -245,6 +229,9 @@ async def cmd_users(
     await rediska.save_fsm_state(state, admin_bot_id, tg_id)
 
 
+# ---
+
+
 @admin_r.callback_query(
     F.data == "choose_user",
 )
@@ -316,7 +303,7 @@ async def data_courier(
 @admin_r.callback_query(
     F.data == "choose_partner",
 )
-async def data_courier(
+async def data_partner(
     callback_query: CallbackQuery,
     state: FSMContext,
 ):
@@ -345,6 +332,9 @@ async def data_courier(
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
 
 
 @admin_r.callback_query(
@@ -408,6 +398,116 @@ async def call_choose_partner_by_SEED(
 
     await state.set_state(current_state)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+
+
+@admin_r.callback_query(
+    F.data.in_(
+        [
+            "mailing_users",
+            "mailing_couriers",
+            "mailing_partners",
+        ],
+    )
+)
+async def call_mailing(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку рассылки для клиентов"""
+
+    tg_id = callback_query.from_user.id
+
+    match callback_query.data:
+        case "mailing_users":
+            current_state = AdminState.mailing_users.state
+            text = (
+                f"<b>Рассылка для клиентов</b>\n\n"
+                f"Напишите сообщение, которое собираетесь переслать всем клиентам сервиса:"
+            )
+        case "mailing_couriers":
+            current_state = AdminState.mailing_couriers.state
+            text = (
+                f"<b>Рассылка для курьеров</b>\n\n"
+                f"Напишите сообщение, которое собираетесь переслать всем курьерам сервиса:"
+            )
+        case "mailing_partners":
+            current_state = AdminState.mailing_partners.state
+            text = (
+                f"<b>Рассылка для партнеров</b>\n\n"
+                f"Напишите сообщение, которое собираетесь переслать всем партнерам сервиса:"
+            )
+
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+@admin_r.message(
+    StateFilter(
+        AdminState.mailing_users,
+        AdminState.mailing_couriers,
+        AdminState.mailing_partners,
+    ),
+)
+async def send_mailing(
+    message: Message,
+    state: FSMContext,
+):
+    """Обрабатывает рассылку сообщения для клиентов"""
+
+    tg_id = message.from_user.id
+    msg_text_mailing = message.text.strip()
+    current_state = await state.get_state()
+
+    match current_state:
+        case AdminState.mailing_users.state:
+            all_customers_tg_ids = (
+                await customer_data.get_all_customers_tg_ids_notify_status_true()
+            )
+            for tg_id in all_customers_tg_ids:
+                await customer_bot.send_message(
+                    chat_id=tg_id,
+                    text=msg_text_mailing,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
+        case AdminState.mailing_couriers.state:
+            all_couriers_tg_ids = (
+                await courier_data.get_all_couriers_tg_ids_notify_status_true()
+            )
+            for tg_id in all_couriers_tg_ids:
+                await courier_bot.send_message(
+                    chat_id=tg_id,
+                    text=msg_text_mailing,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
+        case AdminState.mailing_partners.state:
+            all_couriers_tg_ids = await partner_data.get_all_partners_tg_ids()
+            for tg_id in all_couriers_tg_ids:
+                await partner_bot.send_message(
+                    chat_id=tg_id,
+                    text=msg_text_mailing,
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
+
+    current_state = AdminState.default.state
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
 
 
 @admin_r.message(
@@ -533,7 +633,7 @@ async def get_courier_by_ID(
         )
 
     await state.set_state(current_state)
-    await state.update_data(courier_id=courier_ID)
+    await state.update_data(courier_id=courier_ID, courier_tg_id=courier_tg_id)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
@@ -587,6 +687,96 @@ async def get_partner_by_SEED(
     await state.set_state(current_state)
     await state.update_data(partner_seed=partner_SEED)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+
+
+@admin_r.callback_query(
+    F.data == "add_XP",
+)
+async def data_add_XP(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает нажатие на кнопку начисления XP"""
+
+    tg_id = callback_query.from_user.id
+    current_state = AdminState.add_XP.state
+    data = await state.get_data()
+    courier_id = data.get("courier_id")
+
+    text = f"Сколько баллов XP начислить курьеру с ID {courier_id}:"
+
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
+
+
+@admin_r.message(
+    StateFilter(AdminState.add_XP.state),
+)
+async def send_XP_to_courier(
+    message: Message,
+    state: FSMContext,
+):
+    """Начисляет XP курьеру"""
+
+    tg_id = message.from_user.id
+    current_state = AdminState.default.state
+    data = await state.get_data()
+    courier_id = data.get("courier_id")
+    courier_tg_id = data.get("courier_tg_id")
+
+    msg_XP = message.text.strip()
+
+    try:
+        new_XP = int(msg_XP)
+    except Exception as e:
+        log.error(f"Error {e}")
+        await message.answer(
+            text="Введите число",
+            disable_notification=True,
+        )
+
+    is_update = await courier_data.update_courier_XP(
+        tg_id=courier_tg_id,
+        new_XP=new_XP,
+    )
+
+    if is_update:
+        await courier_bot.send_message(
+            chat_id=courier_tg_id,
+            text=f"Вам было начислено <b>{new_XP}</b> очков! ✴️",
+            parse_mode="HTML",
+        )
+
+        await message.answer(
+            text=f"Курьеру c ID {courier_id} было начислено {new_XP} очков!",
+            disable_notification=True,
+        )
+
+    else:
+
+        await message.answer(
+            text=f"Очки не были начислены, повторите действие!",
+            disable_notification=True,
+        )
+
+    await state.set_state(current_state)
+    await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+
+# ---
 
 
 @admin_r.callback_query(
@@ -673,13 +863,19 @@ async def call_block_unblock_customer(
 
         case "unblock_partner":
             await admin_data.change_partner_block_status(
-                id=partner_seed,
+                seed=partner_seed,
                 block_status=False,
             )
             await callback_query.message.answer(
                 text=f"Партнер с ID {customer_id} был разблокирован 🔓",
                 disable_notification=True,
             )
+
+        case _:
+            await callback_query.message.answer(
+                text="❌ Ошибка! Неизвестная команда.",
+            )
+            return
 
     await callback_query.message.delete()
 
@@ -806,16 +1002,17 @@ async def get_entered_order(
     message: Message,
     state: FSMContext,
 ):
-    """Возвразщает данные по заказу"""
+    """Возвращает данные по заказу"""
 
     tg_id = message.from_user.id
-    current_state = AdminState.choose_order.state
+    current_state = AdminState.default.state
 
     order_id_str = message.text.strip()
 
     try:
         order_id = int(order_id_str)
     except Exception as e:
+        current_state = AdminState.choose_order.state
         log.error(f"Error {e}")
         await message.answer(
             text=f"Введите корректно номер заказа:",
@@ -823,6 +1020,14 @@ async def get_entered_order(
         )
 
     order_data_info = await order_data.get_order_dict_by_id(order_id=order_id)
+
+    if order_data_info == None:
+        await message.answer(text="Данных нет")
+
+        await state.set_state(current_state)
+        await rediska.set_state(admin_bot_id, tg_id, current_state)
+
+        return
 
     pdf_path = await pdf_creator.create_order_data_pdf(data=order_data_info)
 
@@ -860,8 +1065,11 @@ async def cmd_global(
 
     tg_id = event.from_user.id
     current_state = AdminState.default.state
+    all_admins = await admin_data.get_all_admins()
 
-    if tg_id != SUPER_ADMIN_TG_ID:
+    if tg_id != SUPER_ADMIN_TG_ID and tg_id not in [
+        admin.admin_tg_id for admin in all_admins
+    ]:
         await event.answer(
             text="❌ У вас нет доступа к этой команде.",
         )
@@ -871,7 +1079,6 @@ async def cmd_global(
     partner_program_status = await admin_data.get_partner_program_status()
     common_price, max_price = await admin_data.get_order_prices()
     subs_price = await admin_data.get_subscription_price() // 100
-    discount_percent_courier = await admin_data.get_discount_percent_courier()
     discount_percent_first_order = await admin_data.get_first_order_discount()
     free_period_days = await admin_data.get_free_period_days()
     customers, couriers, partners = await admin_data.get_all_users()
@@ -932,11 +1139,14 @@ async def cmd_global(
     support_link = await admin_data.get_support_link()
     radius_km = await admin_data.get_distance_radius()
 
+    max_orders_count = await admin_data.get_courier_max_active_orders_count()
+
+    taxi_orders_count = await admin_data.get_taxi_orders_count()
+
     global_state_data = {
         "common_price": common_price,
         "max_price": max_price,
         "subs_price": subs_price,
-        "discount_percent_courier": discount_percent_courier,
         "discount_percent_first_order": discount_percent_first_order,
         "free_period_days": free_period_days,
         "coefficient_less_5km": coefficient_less_5km,
@@ -968,6 +1178,8 @@ async def cmd_global(
         "interval": interval,
         "support_link": support_link,
         "radius_km": radius_km,
+        "max_orders_count": max_orders_count,
+        "taxi_orders_count": taxi_orders_count,
     }
 
     text = (
@@ -1008,9 +1220,9 @@ async def cmd_global(
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
         f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n"
         f" •\n"
-        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n\n"
+        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n"
+        f" ▸ Макс количество заказов за раз: <b>{max_orders_count}</b>\n\n"
         f"🎉 <b>Акции</b>\n"
-        f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
         f" ▸ Бесплатный период: <b>{free_period_days} дней</b>\n"
         f" •\n"
@@ -1020,8 +1232,9 @@ async def cmd_global(
         f" ▸ Минимальная выплата: <b>{min_refund_amount}₽</b>\n"
         f" ▸ Максимальная выплата: <b>{max_refund_amount}₽</b>\n\n"
         f"🔔 <b>уведомления</b>\n"
-        f" ▸ Новые заказы: <b>{interval} сек</b>\n\n"
+        f" ▸ Новые заказы: <b>{interval} сек</b>\n"
         f" ▸ Поддержка: <b>{support_link}</b>\n\n"
+        f" ▸ Заказов Taxi: <b>{taxi_orders_count}</b>\n\n"
         f"<b>Выберите действие:</b>\n"
     )
 
@@ -1108,39 +1321,42 @@ async def data_service_data(
     tg_id = callback_query.from_user.id
     current_state = AdminState.default.state
 
-    if callback_query.data == "service_data":
-        await callback_query.answer(
-            text="⚙️ Сервис",
-            show_alert=False,
-        )
+    match callback_query.data:
+        case "service_data":
+            await callback_query.answer(
+                text="⚙️ Сервис",
+                show_alert=False,
+            )
+        case "turn_on_service":
+            await admin_data.change_service_status(status=True)
+            await callback_query.answer(
+                text="Service ON✅",
+                show_alert=False,
+            )
 
-    elif callback_query.data == "turn_on_service":
-        await admin_data.change_service_status(status=True)
-        await callback_query.answer(
-            text="Service ON✅",
-            show_alert=False,
-        )
+        case "turn_off_service":
+            await admin_data.change_service_status(status=False)
+            await callback_query.answer(
+                text="Service OFF❌",
+                show_alert=False,
+            )
 
-    elif callback_query.data == "turn_off_service":
-        await admin_data.change_service_status(status=False)
-        await callback_query.answer(
-            text="Service OFF❌",
-            show_alert=False,
-        )
+        case "turn_on_partner":
+            await admin_data.change_partner_program(status=True)
+            await callback_query.answer(
+                text="Partner program ON✅",
+                show_alert=False,
+            )
 
-    elif callback_query.data == "turn_on_partner":
-        await admin_data.change_partner_program(status=True)
-        await callback_query.answer(
-            text="Partner program ON✅",
-            show_alert=False,
-        )
+        case "turn_off_partner":
+            await admin_data.change_partner_program(status=False)
+            await callback_query.answer(
+                text="Partner program OFF❌",
+                show_alert=False,
+            )
 
-    elif callback_query.data == "turn_off_partner":
-        await admin_data.change_partner_program(status=False)
-        await callback_query.answer(
-            text="Partner program OFF❌",
-            show_alert=False,
-        )
+        case _:
+            await callback_query.answer("Неизвестное действие", show_alert=True)
 
     service_status = await admin_data.get_service_status()
     partner_program_status = await admin_data.get_partner_program_status()
@@ -1201,7 +1417,10 @@ async def data_service_data(
 @admin_r.callback_query(
     F.data == "finance",
 )
-async def data_finance(callback_query: CallbackQuery, state: FSMContext):
+async def data_finance(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
     """Обработчик кнопки "Финансы" для админа."""
 
     await callback_query.answer(
@@ -1296,8 +1515,13 @@ async def call_finance_full_report_by_period(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_financial_report_by_period))
-async def get_finance_full_report_by_period(message: Message, state: FSMContext):
+@admin_r.message(
+    StateFilter(AdminState.full_financial_report_by_period),
+)
+async def get_finance_full_report_by_period(
+    message: Message,
+    state: FSMContext,
+):
     """Обработчик ввода для полного отчета по финансам за период."""
 
     tg_id = message.from_user.id
@@ -1338,8 +1562,13 @@ async def get_finance_full_report_by_period(message: Message, state: FSMContext)
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_financial_report_by_date))
-async def get_finance_full_report_by_date(message: Message, state: FSMContext):
+@admin_r.message(
+    StateFilter(AdminState.full_financial_report_by_date),
+)
+async def get_finance_full_report_by_date(
+    message: Message,
+    state: FSMContext,
+):
     """Обработчик ввода для полного отчета по финансам за дату."""
 
     tg_id = message.from_user.id
@@ -1385,7 +1614,10 @@ async def get_finance_full_report_by_date(message: Message, state: FSMContext):
 @admin_r.callback_query(
     F.data == "back_records",
 )
-async def data_records(callback_query: CallbackQuery, state: FSMContext):
+async def data_records(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
     """Обработчик кнопки "Рекорды" для админа."""
 
     await callback_query.answer(
@@ -1532,8 +1764,13 @@ async def call_records_full_report_by_period(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_speed_report_by_date))
-async def get_records_full_report_by_date(message: Message, state: FSMContext):
+@admin_r.message(
+    StateFilter(AdminState.full_speed_report_by_date),
+)
+async def get_records_full_report_by_date(
+    message: Message,
+    state: FSMContext,
+):
     """Обработчик ввода для полного отчета по рекордам за дату."""
 
     tg_id = message.from_user.id
@@ -1601,8 +1838,13 @@ async def get_records_full_report_by_date(message: Message, state: FSMContext):
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_speed_report_by_period))
-async def get_records_full_report_by_period(message: Message, state: FSMContext):
+@admin_r.message(
+    StateFilter(AdminState.full_speed_report_by_period),
+)
+async def get_records_full_report_by_period(
+    message: Message,
+    state: FSMContext,
+):
     """Обработчик ввода для полного отчета по рекордам за период."""
 
     tg_id = message.from_user.id
@@ -1971,7 +2213,9 @@ async def call_records_full_report_by_date(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_orders_report_by_date))
+@admin_r.message(
+    StateFilter(AdminState.full_orders_report_by_date),
+)
 async def get_records_full_report_by_date(
     message: Message,
     state: FSMContext,
@@ -2047,7 +2291,9 @@ async def call_records_full_report_by_period(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_orders_report_by_period))
+@admin_r.message(
+    StateFilter(AdminState.full_orders_report_by_period),
+)
 async def get_records_full_report_by_period(
     message: Message,
     state: FSMContext,
@@ -2154,7 +2400,7 @@ async def data_records_earn(
 
 
 @admin_r.callback_query(
-    F.data == "full_earn_report_by_date",
+    F.data == "full_earned_report_by_date",
 )
 async def call_records_full_report_by_date(
     callback_query: CallbackQuery,
@@ -2182,7 +2428,9 @@ async def call_records_full_report_by_date(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_earned_report_by_date))
+@admin_r.message(
+    StateFilter(AdminState.full_earned_report_by_date),
+)
 async def get_records_full_report_by_date(
     message: Message,
     state: FSMContext,
@@ -2229,7 +2477,7 @@ async def get_records_full_report_by_date(
 
 
 @admin_r.callback_query(
-    F.data == "full_earn_report_by_period",
+    F.data == "full_earned_report_by_period",
 )
 async def call_records_full_report_by_period(
     callback_query: CallbackQuery,
@@ -2259,7 +2507,9 @@ async def call_records_full_report_by_period(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-@admin_r.message(StateFilter(AdminState.full_earned_report_by_period))
+@admin_r.message(
+    StateFilter(AdminState.full_earned_report_by_period),
+)
 async def get_records_full_report_by_period(
     message: Message,
     state: FSMContext,
@@ -2361,6 +2611,8 @@ async def data_prices_and_tariffs(
     distance_XP = global_state_data.get("distance_XP")
     speed_XP = global_state_data.get("speed_XP")
     radius_km = global_state_data.get("radius_km")
+    max_orders_count = global_state_data.get("max_orders_count")
+    taxi_orders_count = global_state_data.get("taxi_orders_count")
 
     text = (
         f"<b>💰 Тарифы</b>\n\n"
@@ -2386,7 +2638,9 @@ async def data_prices_and_tariffs(
         f" ▸ Коэфф. в больших городах: <b>{coefficient_big_cities}</b>\n"
         f" ▸ Коэфф. в остальных городах: <b>{coefficient_other_cities}</b>\n"
         f" •\n"
-        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n\n"
+        f" ▸ Радиус поиска: <b>{radius_km} km</b>\n"
+        f" ▸ Макс количество заказов за раз: <b>{max_orders_count}</b>\n\n"
+        f" ▸ Заказов Taxi: <b>{taxi_orders_count}</b>\n\n"
     )
 
     reply_kb = await kb.get_admin_kb("prices_and_tariffs")
@@ -2424,6 +2678,7 @@ async def data_prices_and_tariffs(
             "change_distance_XP",
             "change_speed_XP",
             "change_radius_km",
+            "change_max_orders_count",
         ]
     )
 )
@@ -2494,6 +2749,9 @@ async def call_change_price(
         case "change_radius_km":
             current_state = AdminState.change_radius_km.state
             text = "Введите новый радиус поиска:"
+        case "change_max_orders_count":
+            current_state = AdminState.change_max_orders_count.state
+            text = "Введите максимальное количество выполняемых заказов:"
 
         case _:
             await callback_query.answer(
@@ -2534,6 +2792,7 @@ async def call_change_price(
         AdminState.change_distance_XP,
         AdminState.change_speed_XP,
         AdminState.change_radius_km,
+        AdminState.change_max_orders_count,
     )
 )
 async def change_prices_filer(
@@ -2638,6 +2897,10 @@ async def change_prices_filer(
             await admin_data.change_distance_radius(new_value)
             text = f"✅ Новый радиус поиска: {new_value}"
 
+        case AdminState.change_max_orders_count.state:
+            await admin_data.change_courier_max_active_orders_count(new_value)
+            text = f"✅ Максимальное число выполняемых заказов: {int(new_value)}"
+
         case _:
             await message.answer(
                 text="❌ Ошибка! Неизвестная команда.",
@@ -2680,14 +2943,12 @@ async def data_discounts_and_promotions(
 
     data = await state.get_data()
     global_state_data: dict = data.get("global_state_data")
-    discount_percent_courier = global_state_data.get("discount_percent_courier")
     discount_percent_first_order = global_state_data.get("discount_percent_first_order")
     free_period_days = global_state_data.get("free_period_days")
     refund_percent = global_state_data.get("refund_percent")
 
     text = (
         f"<b>🎉 Акции</b>\n\n"
-        f" ▸ Скидка на подписку курьеру: <b>{discount_percent_courier}%</b>\n"
         f" ▸ Скидка на первый заказ: <b>{discount_percent_first_order}%</b>\n"
         f" ▸ Бесплатный период: <b>{free_period_days} дней</b>\n"
         f" •\n"
@@ -3026,8 +3287,13 @@ async def call_del_admin(
 # --- Сообщения
 
 
-@admin_r.callback_query(F.data == "messages")
-async def data_messages(callback_query: CallbackQuery, state: FSMContext):
+@admin_r.callback_query(
+    F.data == "messages",
+)
+async def data_messages(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
     """Обработчик кнопки 'Сообщения' для админа с PDF-файлом запросов."""
     await callback_query.answer(text="💬 Сообщения", show_alert=False)
 

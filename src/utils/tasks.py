@@ -9,18 +9,18 @@ from collections import defaultdict
 
 async def new_orders_notification():
 
-    all_couriers_tg_ids = await courier_data.get_all_couriers_tg_ids()
+    all_couriers_tg_ids = (
+        await courier_data.get_all_couriers_tg_ids_notify_status_true()
+    )
 
     # Словарь для группировки по городам: {город: [tg_id1, tg_id2, ...]}
     city_couriers_map = defaultdict(list)
 
     # Отдельно отслеживаем тех, кому надо отправлять уведомление
     for tg_id in all_couriers_tg_ids:
-        notify_status = await courier_data.get_courier_notify_status(tg_id=tg_id)
-        if notify_status:
-            city = await courier_data.get_courier_city(tg_id=tg_id)
-            if city:
-                city_couriers_map[city].append(tg_id)
+        city = await courier_data.get_courier_city(tg_id=tg_id)
+        if city:
+            city_couriers_map[city].append(tg_id)
 
     # Теперь один запрос на каждый город
     for city, tg_ids in city_couriers_map.items():
@@ -44,7 +44,9 @@ async def new_orders_notification():
 
 async def city_couriers_notification():
 
-    all_customers_tg_ids = await customer_data.get_all_customers_tg_ids()
+    all_customers_tg_ids = (
+        await customer_data.get_all_customers_tg_ids_notify_status_true()
+    )
     city_customers_map = defaultdict(list)
 
     # Сначала собираем всех клиентов по городам

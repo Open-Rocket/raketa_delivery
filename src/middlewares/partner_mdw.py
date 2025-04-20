@@ -52,21 +52,27 @@ class AgentOuterMiddleware(BaseMiddleware):
 
         service_status = await admin_data.get_service_status()
         partner_program_status = await admin_data.get_partner_program_status()
+        is_block = await admin_data.get_partner_block_status(tg_id=tg_id)
+
+        if is_block:
+            await event.answer(
+                text="🚫 <b>Вы были заблокированы!</b>",
+                reply_markup=ReplyKeyboardRemove(),
+                parse_mode="HTML",
+            )
+            return
 
         if not service_status:
             if isinstance(event, Message):
                 await event.answer(
-                    text="🚫 <b>Сервис временно недоступен</b>",
+                    text="<b>🛠️ Сервис временно недоступен!\n\nВедутся технические работы.</b>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode="HTML",
                 )
             elif isinstance(event, CallbackQuery):
                 await event.answer(
-                    text="🚫 Сервис временно недоступен",
+                    text="<b>🛠️ Сервис временно недоступен!\n\nВедутся технические работы.</b>",
                     show_alert=True,
-                )
-                log.info(
-                    f"🚫 Сервис временно недоступен для пользователя {event.from_user.id}"
                 )
 
             return

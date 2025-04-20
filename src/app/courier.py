@@ -27,6 +27,7 @@ from ._deps import (
     courier_bot_id,
     order_data,
     partner_data,
+    partner_bot,
     admin_data,
     rediska,
     cities,
@@ -383,7 +384,9 @@ async def courier_accept_tou(
 # ---
 
 
-@courier_r.message(F.text == "/notify")
+@courier_r.message(
+    F.text == "/notify",
+)
 async def cmd_notify(
     message: Message,
     state: FSMContext,
@@ -399,7 +402,7 @@ async def cmd_notify(
 
     text = (
         f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
-        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях.</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
     )
 
     reply_kb = await kb.get_turn_status_kb(
@@ -418,8 +421,12 @@ async def cmd_notify(
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
-@courier_r.callback_query(F.data == "turn_on_notify")
-@courier_r.callback_query(F.data == "turn_off_notify")
+@courier_r.callback_query(
+    F.data == "turn_on_notify",
+)
+@courier_r.callback_query(
+    F.data == "turn_off_notify",
+)
 async def data_turn_on_notify(
     callback_query: CallbackQuery,
     state: FSMContext,
@@ -439,7 +446,7 @@ async def data_turn_on_notify(
 
     text = (
         f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
-        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления о новых заказах и акциях.</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию о новых заказах и акциях.</i>'}\n\n"
     )
 
     await callback_query.answer(
@@ -535,6 +542,8 @@ async def data_set_PROMO(
         parse_mode="HTML",
     )
 
+    await callback_query.message.delete()
+
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
@@ -565,6 +574,19 @@ async def data_PROMO(
         _ = await courier_data.update_courier_subscription(tg_id, days=free_period)
 
         _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
+
+        (
+            partner_tg_id,
+            balance,
+            is_blocked,
+        ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
+
+        await partner_bot.send_message(
+            chat_id=partner_tg_id,
+            text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
 
         if end_date and end_date >= moscow_time:
             remaining_days = (end_date - moscow_time).days
@@ -621,6 +643,16 @@ async def cmd_run(
 
     log.info(f"end_date: {end_date}")
 
+    is_block = await admin_data.get_courier_block_status(tg_id=tg_id)
+
+    if is_block:
+        await event.answer(
+            text="🚫 <b>Вы были заблокированы и не можете больше принимать новые заказы!</b>",
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode="HTML",
+        )
+        return
+
     if end_date and end_date >= moscow_time:
         if is_read_info:
             if isinstance(event, CallbackQuery):
@@ -630,10 +662,11 @@ async def cmd_run(
             current_active_orders_count = (
                 await courier_data.get_courier_active_orders_count(tg_id)
             )
+            max_orders_count = await admin_data.get_courier_max_active_orders_count()
 
             reply_kb = await kb.get_courier_kb("/run")
 
-            if current_active_orders_count < 3:
+            if current_active_orders_count < max_orders_count:
                 text = (
                     f"Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
                     f"<i>*Доступно только с мобильных устройств</i>\n\n"
@@ -733,10 +766,11 @@ async def data_lets_go_first(
     current_active_orders_count = await courier_data.get_courier_active_orders_count(
         tg_id
     )
+    max_orders_count = await admin_data.get_courier_max_active_orders_count()
 
     reply_kb = await kb.get_courier_kb("/run")
 
-    if current_active_orders_count < 3:
+    if current_active_orders_count < max_orders_count:
 
         text = (
             "Пожалуйста, отправьте вашу текущую локацию, чтобы мы могли назначить вам ближайшие заказы.\n\n"
@@ -2498,7 +2532,7 @@ async def successful_payment(
 
         if is_updated:
             ttl = await title.get_title_courier("success_payment")
-            text = f"Cпасибо за подписку!\nСумма: {sum} {message.successful_payment.currency}"
+            text = f"Спасибо за подписку!\nСумма: {sum} {message.successful_payment.currency}"
             reply_kb = await kb.get_courier_kb(
                 "success_payment",
             )
@@ -2506,6 +2540,24 @@ async def successful_payment(
                 photo=ttl,
                 caption=text,
                 reply_markup=reply_kb,
+            )
+
+            seed_key = await courier_data.get_courier_seed_key_by_tg_id(tg_id=tg_id)
+
+            (
+                partner_tg_id,
+                balance,
+                is_blocked,
+            ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
+
+            refund_percent = await admin_data.get_refund_percent()
+
+            added_balance = (sum // 100) * refund_percent
+
+            await partner_bot.send_message(
+                chat_id=partner_tg_id,
+                text=f"Ваш реферал произвел оплату, +{added_balance}₽ к вашему балансу!\nБаланс: {balance}₽",
+                disable_notification=True,
             )
 
             log.info(f"Subscription updated successfully for courier {tg_id}.")

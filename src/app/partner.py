@@ -45,12 +45,13 @@ async def cmd_start(
     """Обрабатывает команду /start для партнера."""
 
     tg_id = message.from_user.id
-    is_reg = await rediska.is_reg(partner_bot_id, tg_id)
+    # is_reg = await rediska.is_reg(partner_bot_id, tg_id)
+    seed_key = await partner_data.get_seed_key_by_partner_tg_id(tg_id=tg_id)
     new_message = None
 
     refund_percent = await admin_data.get_refund_percent()
 
-    if is_reg:
+    if seed_key:
         current_state = PartnerState.default.state
         await message.answer(
             text="▼ <b>Выберите действие в Меню ...</b>",
@@ -60,19 +61,9 @@ async def cmd_start(
 
     else:
         current_state = PartnerState.reg_state.state
-        photo_title = await title.get_title_partner("/start")
-        text = (
-            f"🚀 <b>Добро пожаловать в Raketa Delivery | Партнеры</b>\n\n"
-            f"🔹 <b>Наши условия:</b>\n"
-            f"Вы привлекаете как клиентов, так и курьеров, и получаете <b>{refund_percent}% с подписки каждого курьера</b>, которого привлекли.\n\n"
-            f"🔸 Привлекая клиентов, вы помогаете увеличивать сеть сервиса, что делает его более востребованным и выгодным.\n\n"
-            f"🔸 Работайте в удобное время, привлекай новых пользователей и получайте пассивный доход!\n\n"
-            f"💰 <b>Присоединяйтесь и начинайте зарабатывать уже сейчас!</b>\n\n"
-            f"<i>Нужно сгенерировать ваш уникальный SEED-ключ!</i>"
-        )
+        text = "Вам нужно сгенерировать ваш персональный SEED-ключ, чтобы начать работу с сервисом.\n\n"
         reply_kb = await kb.get_partner_kb("generate_seed")
         new_message = await message.answer_photo(
-            photo=photo_title,
             caption=text,
             reply_markup=reply_kb,
             disable_notification=True,
@@ -818,7 +809,7 @@ async def data_earn(
 
     else:
         text = (
-            f"🚫 <b>Минимальная сумма вывода:</b> {min_refund_amount}₽\n\n"
+            f"🚫 <b>Минимальная сумма вывода: {min_refund_amount}₽</b>\n\n"
             f"Ваш текущий баланс: <b>{balance}₽</b>\n\n"
             f"Приглашайте больше клиентов и курьеров, чтобы увеличить свой доход!\n\n"
         )

@@ -99,7 +99,6 @@ class GlobalSettings(Base):
     order_price_per_km: Mapped[intData] = mapped_column(Integer, default=38)
     order_max_price: Mapped[intData] = mapped_column(Integer, default=100)
     subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
-    discount_percent_courier: Mapped[intData] = mapped_column(Integer, default=15)
     refund_percent: Mapped[intData] = mapped_column(Integer, default=30)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
 
@@ -140,6 +139,10 @@ class GlobalSettings(Base):
     min_refund_amount: Mapped[floatData] = mapped_column(Float, default=5000.0)
     max_refund_amount: Mapped[floatData] = mapped_column(Float, default=100000.0)
 
+    max_orders_count: Mapped[intData] = mapped_column(Integer, default=3)
+
+    taxi_orders_count: Mapped[intData] = mapped_column(Integer, default=0)
+
     base_order_XP: Mapped[floatData] = mapped_column(Float, default=0.5)
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
@@ -173,6 +176,8 @@ class Customer(Base):
     customer_registration_date: Mapped[datetimeData]
 
     customer_discount: Mapped[intData] = mapped_column(Integer, default=0)
+
+    notify_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
     orders = relationship("Order", back_populates="customer")
     seed_key = relationship("SeedKey", back_populates="customers")

@@ -137,6 +137,11 @@ async def _check_state_and_handle_message(
         AdminState.choose_user_by_ID.state,
         AdminState.choose_courier_by_ID.state,
         AdminState.choose_partner_by_SEED.state,
+        AdminState.mailing_users.state,
+        AdminState.mailing_couriers.state,
+        AdminState.mailing_partners.state,
+        AdminState.add_XP.state,
+        AdminState.change_max_orders_count.state,
     ):
         if event.text in RESTRICTED_COMMANDS:
             await fsm_context.set_state(AdminState.default.state)

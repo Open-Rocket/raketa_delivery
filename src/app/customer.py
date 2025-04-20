@@ -14,6 +14,7 @@ from ._deps import (
     zlib,
     handler,
     customer_bot,
+    partner_bot,
     customer_bot_id,
     customer_r,
     customer_fallback,
@@ -326,6 +327,7 @@ async def customer_accept_tou(
             f"Имя: {customer_name}\n"
             f"Номер: {customer_phone}\n"
             f"Город: {customer_city}\n\n"
+            f"<i>Введите PROMOKOD для активации скидки на первый заказ</i> /promo\n\n"
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
         new_message = await callback_query.message.answer(
@@ -727,6 +729,16 @@ async def cmd_order(
 
     log.info(f"set_key: {is_set_key}")
 
+    is_block = await admin_data.get_customer_block_status(tg_id=tg_id)
+
+    if is_block:
+        await message.answer(
+            text="🚫 <b>Вы были заблокированы и не можете больше делать заказы!</b>",
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode="HTML",
+        )
+        return
+
     if is_read_info:
 
         current_state = CustomerState.ai_voice_order.state
@@ -819,7 +831,9 @@ async def data_ai(
 # ---
 
 
-@customer_r.message(F.text == "/promo")
+@customer_r.message(
+    F.text == "/promo",
+)
 async def cmd_promo(
     message: Message,
     state: FSMContext,
@@ -890,6 +904,8 @@ async def data_set_PROMOKOD(
         parse_mode="HTML",
     )
 
+    await callback_query.message.delete()
+
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
@@ -916,6 +932,20 @@ async def data_PROMOKOD(
     if is_set_key:
         await customer_data.set_customer_discount(tg_id, discount)
         text = f"✅ PROMOKOD успешно установлен!\n\nСкидка на следующий заказ <b>{discount}%</b>"
+
+        (
+            partner_tg_id,
+            balance,
+            is_blocked,
+        ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
+
+        await partner_bot.send_message(
+            chat_id=partner_tg_id,
+            text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
     else:
         text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
 
@@ -1136,6 +1166,90 @@ async def cmd_become_partner(
         disable_notification=True,
         parse_mode="HTML",
     )
+
+
+# ---
+
+
+@customer_r.message(
+    F.text == "/notify",
+)
+async def cmd_notify(
+    message: Message,
+    state: FSMContext,
+):
+    """Обработчик команды /notify"""
+
+    current_state = CustomerState.default.state
+    tg_id = message.from_user.id
+
+    notify_status = await customer_data.get_customer_notify_status(tg_id=tg_id)
+
+    log.info(f"notify status: {notify_status}")
+
+    text = (
+        f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления об активных курьерах и акциях сервиса.</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию об активных курьерах и акциях сервиса.</i>'}\n\n"
+    )
+
+    reply_kb = await kb.get_turn_status_kb(
+        "notify",
+        status_notify=not notify_status,
+    )
+
+    await message.answer(
+        text=text,
+        reply_markup=reply_kb,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+
+@customer_r.callback_query(
+    F.data == "turn_on_notify",
+)
+@customer_r.callback_query(
+    F.data == "turn_off_notify",
+)
+async def data_turn_on_notify(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обработчик 'turn_on_notify' и 'turn_off_notify' для клиента."""
+
+    tg_id = callback_query.from_user.id
+    notify_status = await customer_data.get_customer_notify_status(tg_id=tg_id)
+
+    log.info(f"notify status: {notify_status}")
+
+    notify_status = not notify_status
+    await customer_data.set_customer_notify_status(
+        tg_id=tg_id,
+        status=notify_status,
+    )
+
+    text = (
+        f"Уведомления: {'<b>ON🔔</b>' if notify_status else '<b>OFF🔕</b>'}\n\n"
+        f"{'<i>*Вы будете получать уведомления об активных курьерах и акциях сервиса.</i>' if notify_status else '<i>*Включите уведомления, чтобы получать информацию об активных курьерах и акциях сервиса.</i>'}\n\n"
+    )
+
+    await callback_query.answer(
+        "✅ Уведомления обновлены",
+        show_alert=False,
+    )
+    await callback_query.message.answer(
+        text=text,
+        disable_notification=True,
+        parse_mode="HTML",
+    )
+
+    await callback_query.message.delete()
+
+    await state.set_state(CustomerState.default.state)
+    await rediska.set_state(customer_bot_id, tg_id, CustomerState.default.state)
 
 
 # ---

@@ -113,6 +113,14 @@ class AdminState(StatesGroup):
     choose_courier_by_ID = State()
     choose_partner_by_SEED = State()
 
+    mailing_users = State()
+    mailing_couriers = State()
+    mailing_partners = State()
+
+    add_XP = State()
+
+    change_max_orders_count = State()
+
 
 class PartnerState(StatesGroup):
 
