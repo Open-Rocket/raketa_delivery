@@ -197,6 +197,7 @@ async def data_phone_customer(
         f"Для того чтобы каждый раз не указывать город доставки, "
         f"скажите, в каком городе вы будете в основном делать заказы, "
         f"и он автоматически будет подставляться.\n\n"
+        f"<i>Доступны только города РФ.</i>\n\n"
         f"<b>Ваш город:</b>"
     )
 
@@ -1464,10 +1465,10 @@ async def get_my_orders(
 
 @customer_r.callback_query(
     F.data.in_(
-        {
+        [
             "next_right_mo",
             "back_left_mo",
-        },
+        ],
     ),
 )
 async def handle_order_navigation(
@@ -1582,11 +1583,11 @@ async def cancel_my_order(
         return
 
     try:
-        is_update_irder_status = await order_data.update_order_status(
+        is_update_order_status = await order_data.update_order_status(
             current_order_id, OrderStatus.CANCELLED
         )
 
-        if not is_update_irder_status:
+        if not is_update_order_status:
             raise Exception("Ошибка при обновлении статуса заказа")
 
         text = (

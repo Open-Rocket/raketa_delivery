@@ -752,14 +752,18 @@ class CourierData:
                 courier = await session.scalar(
                     select(Courier).where(Courier.courier_id == payer_id)
                 )
-                if courier and courier.partner_id:
+                refund_percent = await session.scalar(
+                    select(GlobalSettings.refund_percent)
+                )
+
+                if courier and courier.partner_id and refund_percent:
                     partner = await session.scalar(
                         select(Partner).where(Partner.partner_id == courier.partner_id)
                     )
-                    if partner:
-                        partner.balance += int(
-                            sum * 0.3
-                        )  # Начисляем 30% от суммы платежа
+                    if partner and not partner.is_blocked:
+                        partner.balance += int(sum * refund_percent / 100)
+                else:
+                    return False
 
                 await session.commit()
                 return True
@@ -1137,16 +1141,12 @@ class AdminData:
             settings = result.scalar_one_or_none()
 
             if not settings:
-                return 38, 100
+                return 37, 70
 
             if isinstance(settings, GlobalSettings):
-                return (
-                    settings.order_price_per_km if settings.order_price_per_km else 38,
-                    settings.order_max_price if settings.order_max_price else 100,
-                )
+                return settings.order_price_per_km, settings.order_max_price
             else:
-
-                return 38, 100
+                return 37, 70
 
     # ---
 

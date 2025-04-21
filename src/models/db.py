@@ -96,13 +96,13 @@ class GlobalSettings(Base):
     partner_program_is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     free_period_days: Mapped[intData] = mapped_column(Integer, default=30)
-    order_price_per_km: Mapped[intData] = mapped_column(Integer, default=38)
-    order_max_price: Mapped[intData] = mapped_column(Integer, default=100)
+    order_price_per_km: Mapped[intData] = mapped_column(Integer, default=37)
+    order_max_price: Mapped[intData] = mapped_column(Integer, default=70)
     subs_price: Mapped[intData] = mapped_column(Integer, default=99000)
     refund_percent: Mapped[intData] = mapped_column(Integer, default=30)
     discount_percent_first_order: Mapped[intData] = mapped_column(Integer, default=15)
 
-    distance_coefficient_less_5: Mapped[floatData] = mapped_column(Float, default=1.19)
+    distance_coefficient_less_5: Mapped[floatData] = mapped_column(Float, default=1.12)
     distance_coefficient_5_10: Mapped[floatData] = mapped_column(Float, default=1.1)
     distance_coefficient_10_20: Mapped[floatData] = mapped_column(Float, default=0.85)
     distance_coefficient_more_20: Mapped[floatData] = mapped_column(Float, default=0.75)
@@ -121,7 +121,7 @@ class GlobalSettings(Base):
 
     city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
     big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.12)
-    small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.9)
+    small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.87)
 
     new_orders_notification_interval: Mapped[intData] = mapped_column(
         Integer,

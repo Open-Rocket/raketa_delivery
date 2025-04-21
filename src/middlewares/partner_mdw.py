@@ -56,7 +56,7 @@ class AgentOuterMiddleware(BaseMiddleware):
 
         if is_block:
             await event.answer(
-                text="🚫 <b>Вы были заблокированы!</b>",
+                text="🚫 Вы были заблокированы!",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode="HTML",
             )
@@ -65,13 +65,13 @@ class AgentOuterMiddleware(BaseMiddleware):
         if not service_status:
             if isinstance(event, Message):
                 await event.answer(
-                    text="<b>🛠️ Сервис временно недоступен!\n\nВедутся технические работы.</b>",
+                    text="<b>🛠️ Сервис временно недоступен!</b>\nВедутся технические работы.",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode="HTML",
                 )
             elif isinstance(event, CallbackQuery):
                 await event.answer(
-                    text="<b>🛠️ Сервис временно недоступен!\n\nВедутся технические работы.</b>",
+                    text="🛠️ Сервис временно недоступен!\nВедутся технические работы.",
                     show_alert=True,
                 )
 

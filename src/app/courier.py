@@ -67,12 +67,14 @@ async def cmd_start_courier(
         )
 
     else:
+        subscription_price = await admin_data.get_subscription_price()
         current_state = CourierState.reg_state.state
         photo_title = await title.get_title_courier("/start")
         text = (
             "Добро пожаловать в сервис доставки <b>Raketa!</b>\n\n"
             "◉ <b>Наши условия:</b>\n"
             "<b>Ты оплачиваешь только подписку и получаешь 100% прибыли с каждого выполненного заказа.</b>\n\n"
+            f"<b>Подписка {subscription_price // 100}₽ в месяц!</b>\n\n"
             "Присоединяйся и начинай зарабатывать больше уже сегодня!"
         )
         reply_kb = await kb.get_courier_kb("/start")
@@ -194,6 +196,7 @@ async def data_phone_courier(
     text = (
         f"Последний шаг!\n\n"
         f"Чтобы сделать заказы максимально удобными, пожалуйста, введите город, где вы будете работать.\n\n"
+        f"<i>Доступны только города РФ.</i>\n\n"
         f"<b>Ваш город:</b>"
     )
 
@@ -581,12 +584,13 @@ async def data_PROMO(
             is_blocked,
         ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-        await partner_bot.send_message(
-            chat_id=partner_tg_id,
-            text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
-            disable_notification=True,
-            parse_mode="HTML",
-        )
+        if not is_blocked:
+            await partner_bot.send_message(
+                chat_id=partner_tg_id,
+                text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
+                disable_notification=True,
+                parse_mode="HTML",
+            )
 
         if end_date and end_date >= moscow_time:
             remaining_days = (end_date - moscow_time).days
@@ -2450,7 +2454,7 @@ async def send_payment_invoice(
         reply_markup=None,
     )
 
-    await event.message.delete()
+    # await event.message.delete()
 
 
 @payment_r.pre_checkout_query()
@@ -2550,15 +2554,14 @@ async def successful_payment(
                 is_blocked,
             ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-            refund_percent = await admin_data.get_refund_percent()
-
-            added_balance = (sum // 100) * refund_percent
-
-            await partner_bot.send_message(
-                chat_id=partner_tg_id,
-                text=f"Ваш реферал произвел оплату, +{added_balance}₽ к вашему балансу!\nБаланс: {balance}₽",
-                disable_notification=True,
-            )
+            if not is_blocked:
+                refund_percent = await admin_data.get_refund_percent()
+                added_balance = int(sum * refund_percent / 100)
+                await partner_bot.send_message(
+                    chat_id=partner_tg_id,
+                    text=f"Ваш реферал произвел оплату, <b>+{added_balance}₽</b> к вашему балансу!\nБаланс: <b>{balance}₽</b>",
+                    disable_notification=True,
+                )
 
             log.info(f"Subscription updated successfully for courier {tg_id}.")
         else:
