@@ -177,8 +177,7 @@ class CustomerData:
 
             log.info(f"seed_key_obj: {seed_key_obj}")
 
-            if not seed_key_obj.seed_key:
-                log.info(f"seed_key_obj.seed_key: {seed_key_obj.seed_key}")
+            if not seed_key_obj or not seed_key_obj.seed_key:
                 return False
 
             customer = await session.scalar(
@@ -661,6 +660,14 @@ class CourierData:
                     ]
                 )
 
+                cancelled_orders = len(
+                    [
+                        order
+                        for order in orders
+                        if order.order_status == OrderStatus.CANCELLED
+                    ]
+                )
+
                 total_money_earned = courier.total_earned
                 total_execution_time = sum(
                     (
@@ -684,6 +691,7 @@ class CourierData:
                 return (
                     total_orders,
                     completed_orders,
+                    cancelled_orders,
                     average_execution_time,
                     average_speed,
                     total_distance,
@@ -756,12 +764,17 @@ class CourierData:
                     select(GlobalSettings.refund_percent)
                 )
 
+                partner_program_status = await session.scalar(
+                    select(GlobalSettings.partner_program_is_active)
+                )
+
                 if courier and courier.partner_id and refund_percent:
                     partner = await session.scalar(
                         select(Partner).where(Partner.partner_id == courier.partner_id)
                     )
-                    if partner and not partner.is_blocked:
-                        partner.balance += int(sum * refund_percent / 100)
+                    if partner_program_status:
+                        if partner and not partner.is_blocked:
+                            partner.balance += int(sum * refund_percent / 100)
                 else:
                     return False
 
@@ -2291,6 +2304,28 @@ class AdminData:
             settings: GlobalSettings = res.scalar_one_or_none()
             return settings.taxi_orders_count if settings else 0
 
+    # ---
+
+    async def change_task_status(self, task_status: bool):
+        """Изменяет флаг активности воркера уведомлений"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(GlobalSettings))
+            settings = query.scalar_one_or_none()
+            if settings:
+                settings.task_status = task_status
+            else:
+                settings = GlobalSettings(task_status=task_status)
+                session.add(settings)
+
+            await session.commit()
+
+    async def get_task_status(self) -> bool:
+        """Возвращает флаг активности воркера уведомлений"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(select(GlobalSettings.task_status))
+            value = query.scalar_one_or_none()
+            return value if value is not None else True
+
 
 class PartnerData:
 
@@ -2734,6 +2769,16 @@ class OrderData:
 
     # ---
 
+    async def get_courier_tg_id_by_order_id(self, order_id: int) -> Optional[int]:
+        """Возвращает tg_id курьера по номеру заказа"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Order.courier_tg_id).where(Order.order_id == order_id)
+            )
+            return result.scalar_one_or_none()
+
+    # ---
+
     async def get_order_courier_info(self, order_id) -> tuple:
         """Возвращает информацию из заказа о курьере"""
 
@@ -2816,7 +2861,7 @@ class OrderData:
         async with self.async_session_factory() as session:
             order = await session.get(Order, order_id)
             if not order or order.order_status in (
-                OrderStatus.IN_PROGRESS,
+                # OrderStatus.IN_PROGRESS,
                 OrderStatus.COMPLETED,
                 OrderStatus.CANCELLED,
             ):
@@ -3007,7 +3052,7 @@ class OrderData:
                             "price_rub": order.price_rub,
                         }
                 except (ValueError, TypeError) as e:
-                    log.error(
+                    log.warning(
                         f"Ошибка обработки координат заказа {order.order_id}: {e}"
                     )
                 except Exception as e:

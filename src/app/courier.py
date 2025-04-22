@@ -14,6 +14,7 @@ from ._deps import (
     zlib,
     Time,
     json,
+    SUPER_ADMIN_TG_ID,
     courier_bot,
     courier_bot_id,
     handler,
@@ -562,7 +563,38 @@ async def data_PROMO(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-    seed_key = message.text.upper()
+    seed_key = message.text.strip().upper()
+
+    (
+        partner_tg_id,
+        _,
+        _,
+    ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
+
+    if partner_tg_id == None:
+
+        text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
+        await message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+        return
+
+    if tg_id != SUPER_ADMIN_TG_ID:
+        if tg_id == partner_tg_id:
+            await message.answer(
+                text="Вы не можете быть рефералом самому себе, используйте другой PROMOKOD!",
+                parse_mode="HTML",
+            )
+
+            await state.set_state(current_state)
+            await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+            return
 
     is_set_key = await courier_data.set_courier_seed_key(tg_id, seed_key)
 
@@ -584,13 +616,16 @@ async def data_PROMO(
             is_blocked,
         ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-        if not is_blocked:
-            await partner_bot.send_message(
-                chat_id=partner_tg_id,
-                text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
-                disable_notification=True,
-                parse_mode="HTML",
-            )
+        partner_program_status = await admin_data.get_partner_program_status()
+
+        if partner_program_status:
+            if not is_blocked:
+                await partner_bot.send_message(
+                    chat_id=partner_tg_id,
+                    text=f"Вашим ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
 
         if end_date and end_date >= moscow_time:
             remaining_days = (end_date - moscow_time).days
@@ -1233,6 +1268,26 @@ async def accept_order(
         await order_data.get_customer_info_by_order_id(current_order_id)
     )
 
+    if tg_id != SUPER_ADMIN_TG_ID:
+        if tg_id == customer_tg_id:
+            await callback_query.answer(
+                text="Вы не можете выполнить свой же заказ, выберите другой заказ!",
+                show_alert=True,
+            )
+            return
+
+    order = await order_data.get_order_by_id(order_id=current_order_id)
+
+    if order.order_status != OrderStatus.PENDING:
+        text = f"Заказ №{current_order_id} уже завершён или находится в другом статусе.\n\nСтатус: {'Завершен' if order.order_status == OrderStatus.COMPLETED else  'Отменен' if OrderStatus.CANCELLED else 'Не определен'}"
+
+        await callback_query.answer(
+            text=text,
+            show_alert=True,
+        )
+        # await callback_query.message.delete()
+        return
+
     if not order_ids:
 
         await callback_query.answer("Заказы не найдены.", show_alert=True)
@@ -1359,6 +1414,17 @@ async def complete_order(
         AVERAGE_SPEED_KMH = 8
         SPEED_MULTIPLIER = 10
 
+        if order.order_status != OrderStatus.IN_PROGRESS:
+
+            text = f"Заказ <b>№{current_order_id}</b> уже завершён или находится в другом статусе.\n\nСтатус: {'<b>Завершен</b>' if order.order_status == OrderStatus.COMPLETED else  '<b>Отменен</b>' if OrderStatus.CANCELLED else '<b>Не определен</b>'}"
+
+            await callback_query.message.answer(
+                text=text,
+                parse_mode="HTML",
+            )
+            await callback_query.message.delete()
+            return
+
         if speed > AVERAGE_SPEED_KMH * SPEED_MULTIPLIER:
             log.warning(
                 f"Заказ {current_order_id} завершён слишком быстро (скорость {speed:.2f} км/ч)"
@@ -1369,16 +1435,6 @@ async def complete_order(
                 f"Подобные действия рассматриваются как нарушение правил.\n"
                 f"При повторных попытках возможны штрафные санкции и блокировка профиля!",
                 show_alert=True,
-            )
-            return
-
-        if order.order_status != OrderStatus.IN_PROGRESS:
-
-            text = f"Заказ №{current_order_id} уже завершён или находится в другом статусе.\n\nСтатус: {'Завершен' if order.order_status == OrderStatus.COMPLETED else  'Отменен' if OrderStatus.CANCELLED else 'Не определен'}."
-
-            await callback_query.message.answer(
-                text=text,
-                parse_mode="HTML",
             )
             return
 
@@ -1437,9 +1493,9 @@ async def complete_order(
         )
 
         text_2 = (
-            f"+ {base_order_XP} очков опыта за заказ\n"
-            f"+ {calculate_distance_XP} очков опыта за расстояние\n"
-            f"+ {calculate_speed_XP} очков опыта за скорость\n"
+            f"<b>+ {base_order_XP}</b> очков опыта за заказ\n"
+            f"<b>+ {calculate_distance_XP}</b> очков опыта за расстояние\n"
+            f"<b>+ {calculate_speed_XP}</b> очков опыта за скорость\n"
             f"Итого заработано: <b>{new_XP} очков опыта</b>\n\n"
             f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n\n"
             # f"<i>В ближайшее время появятся новые возможности:</i>\n"
@@ -2079,7 +2135,7 @@ async def cmd_become_partner(
     text = (
         f"💼 <b>Станьте партнёром Raketa!</b>\n\n"
         f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
-        f"🔹 Приглашайте курьеров и получайте <b>{refund_percent}% с их подписки</b>\n"
+        f"🔹 Приглашайте курьеров и получайте <b>{refund_percent}%</b> с их подписки\n"
         f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
         f"🔹 Работайте когда хотите — без вложений и рисков!\n\n"
         f"💰 Чем больше курьеров — тем больше доход! Присоединяйтесь!"
@@ -2221,6 +2277,7 @@ async def get_courier_statistic(
     (
         total_orders,
         completed_orders,
+        cancelled_orders,
         average_execution_time,
         average_speed,
         total_distance,
@@ -2231,6 +2288,7 @@ async def get_courier_statistic(
         f"📊 <b>Ваша статистика</b>\n\n"
         f"Всего заказов: <b>{total_orders}</b>\n"
         f"Завершенные заказы: <b>{completed_orders}</b>\n"
+        f"Отмененные заказы: <b>{cancelled_orders}</b>\n"
         f"Среднее время выполнения: <b>{average_execution_time / 60:.2f} мин</b>\n"
         f"Средняя скорость: <b>{average_speed:.2f} км/ч</b>\n"
         f"Пройденное расстояние: <b>{total_distance:.2f} км</b>\n"
@@ -2548,20 +2606,24 @@ async def successful_payment(
 
             seed_key = await courier_data.get_courier_seed_key_by_tg_id(tg_id=tg_id)
 
+            partner_program_status = await admin_data.get_partner_program_status()
+
             (
                 partner_tg_id,
                 balance,
                 is_blocked,
             ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-            if not is_blocked:
-                refund_percent = await admin_data.get_refund_percent()
-                added_balance = int(sum * refund_percent / 100)
-                await partner_bot.send_message(
-                    chat_id=partner_tg_id,
-                    text=f"Ваш реферал произвел оплату, <b>+{added_balance}₽</b> к вашему балансу!\nБаланс: <b>{balance}₽</b>",
-                    disable_notification=True,
-                )
+            if partner_program_status:
+                if not is_blocked:
+                    refund_percent = await admin_data.get_refund_percent()
+                    added_balance = int(sum * refund_percent / 100)
+                    await partner_bot.send_message(
+                        chat_id=partner_tg_id,
+                        text=f"Ваш реферал произвел оплату, <b>+{added_balance}₽</b> к вашему балансу!\nБаланс: <b>{balance}₽</b>",
+                        parse_mode="HTML",
+                        disable_notification=True,
+                    )
 
             log.info(f"Subscription updated successfully for courier {tg_id}.")
         else:

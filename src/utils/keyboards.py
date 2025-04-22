@@ -112,7 +112,7 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="Разместить заказ ✎", callback_data="order_sent"
+                            text="Разместить заказ ✅", callback_data="order_sent"
                         )
                     ],
                 ]
@@ -132,7 +132,7 @@ class Keyboard:
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")]
                 ]
             ),
-            "one_my_pending": InlineKeyboardMarkup(
+            "one": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
@@ -143,7 +143,7 @@ class Keyboard:
                 ]
             ),
             # ---
-            "pending_orders": InlineKeyboardMarkup(
+            "many": InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(text="⇤", callback_data="back_left_mo"),
@@ -231,7 +231,8 @@ class Keyboard:
 
     @staticmethod
     async def get_customer_orders_kb(
-        pending_count: int, active_count: int, completed_count: int
+        pending_count: int,
+        active_count: int,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для заказов клиента"""
 
@@ -245,12 +246,6 @@ class Keyboard:
                 [
                     InlineKeyboardButton(
                         text=f"Активные {active_count}", callback_data="active_orders"
-                    ),
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=f"Доставленные {completed_count}",
-                        callback_data="completed_orders",
                     ),
                 ],
             ]
@@ -444,7 +439,7 @@ class Keyboard:
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="Доставил ✅", callback_data="order_delivered"
+                            text="Выполнил ✅", callback_data="order_delivered"
                         )
                     ],
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
@@ -458,7 +453,7 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="Доставил ✅", callback_data="order_delivered"
+                            text="Выполнил ✅", callback_data="order_delivered"
                         )
                     ],
                     [InlineKeyboardButton(text="Назад", callback_data="back_myOrders")],
@@ -1209,6 +1204,7 @@ class Keyboard:
         status_service: bool = False,
         status_partner: bool = True,
         status_notify: bool = True,
+        task_status: bool = True,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для админа"""
 
@@ -1225,6 +1221,12 @@ class Keyboard:
                         InlineKeyboardButton(
                             text=f"{'Включить партнерку ✅' if status_partner else 'Выключить партнерку ❌'}",
                             callback_data=f"{'turn_on_partner' if status_partner else 'turn_off_partner'}",
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'Включить уведомления 🔔' if task_status else 'Выключить уведомления 🔕'}",
+                            callback_data=f"{'turn_on_task' if task_status else 'turn_off_task'}",
                         ),
                     ],
                     [

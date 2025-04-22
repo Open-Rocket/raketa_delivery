@@ -6,6 +6,8 @@ from src.app.admin import admin_r, admin_fallback
 from src.app.partner import partner_r, partner_fallback
 from src.utils.tasks import send_notification_to_couriers
 from aiogram.exceptions import TelegramBadRequest
+from src.tasks.worker import main_worker
+from src.tasks.scheduler import main_scheduler
 
 
 from src.middlewares import (
@@ -63,7 +65,8 @@ async def main():
             courier_dp.start_polling(courier_bot, skip_updates=True),
             admin_dp.start_polling(admin_bot, skip_updates=True),
             partner_dp.start_polling(partner_bot, skip_updates=True),
-            send_notification_to_couriers(),
+            main_worker(),
+            main_scheduler(),
         )
 
     finally:

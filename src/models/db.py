@@ -120,7 +120,7 @@ class GlobalSettings(Base):
     time_coefficient_21_00: Mapped[floatData] = mapped_column(Float, default=1.1)
 
     city_coefficient_default: Mapped[floatData] = mapped_column(Float, default=1.0)
-    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.12)
+    big_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=1.07)
     small_cities_coefficient: Mapped[floatData] = mapped_column(Float, default=0.87)
 
     new_orders_notification_interval: Mapped[intData] = mapped_column(
@@ -146,6 +146,8 @@ class GlobalSettings(Base):
     base_order_XP: Mapped[floatData] = mapped_column(Float, default=0.5)
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
+
+    task_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Customer(Base):

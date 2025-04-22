@@ -12,8 +12,10 @@ from ._deps import (
     time,
     Time,
     zlib,
+    SUPER_ADMIN_TG_ID,
     handler,
     customer_bot,
+    courier_bot,
     partner_bot,
     customer_bot_id,
     customer_r,
@@ -456,14 +458,14 @@ async def _process_order_logic(
     moscow_time = await Time.get_moscow_time()
 
     try:
-        city, addresses, delivery_object, description = (
+        moderation, city, addresses, delivery_object, description = (
             await gemini_assistant.process_order(
                 text_msg,
                 customer_city,
             )
         )
 
-        if city == "N":
+        if moderation == "N":
             await _handle_error_response(
                 message,
                 wait_message,
@@ -480,14 +482,7 @@ async def _process_order_logic(
                         customer_city,
                     )
                 )
-                if city == "N":
-                    await _handle_error_response(
-                        message,
-                        wait_message,
-                        "moderation_failed",
-                        state,
-                    )
-                    return
+
             except Exception as e:
                 await _handle_error_response(
                     message,
@@ -592,7 +587,16 @@ async def _handle_error_response(
         "general": "<b>‼️ Ошибка при обработке заказа!</b>\n\nПопробуйте снова",
         "timeout": "<b>‼️ Превышено время ожидания!</b>\n\nПопробуйте снова",
         "unrecognized": "<b>‼️ Не удалось распознать голосовое сообщение!</b>\n\nПопробуйте снова",
-        "moderation_failed": "<b>‼️ Модерация не прошла!</b>\n\nПопробуйте снова",
+        "moderation_failed": (
+            "<b>‼️ Модерация не прошла!</b>\n\n"
+            "Ваше сообщение не соответствует требованиям сервиса.\n\n"
+            "⛔ Запрещено:\n"
+            "— вызывать такси,\n"
+            "— заказывать доставку табака, вейпов, алкоголя,\n"
+            "— передавать наркотики или любые товары, противоречащие законодательству.\n\n"
+            "Пожалуйста, оформите <b>законный и допустимый заказ на доставку или поручение</b> в пределах города.\n"
+            "Попробуйте снова"
+        ),
     }
 
     reply_kb = await kb.get_customer_kb("rerecord")
@@ -797,10 +801,9 @@ async def data_ai(
 
     if is_read_info:
         text = (
-            "◉ Вы можете сделать заказ с помощью текста или голоса, "
-            "и наш ИИ ассистент быстро его обработает и передаст курьеру.\n\n"
-            "<i>*При записи голосового сообщения или набора текста описывайте заказ так, как вам удобно, "
-            "ассистент создаст заявку для вашего заказа.</i>"
+            f"<i>*Вы можете отправить как голосовое сообщение, так и текстовое — "
+            f"заказ будет оформлен в считанные секунды.</i>\n\n"
+            f"ゞ <b>Опишите ваш заказ ...</b>"
         )
 
     else:
@@ -808,8 +811,8 @@ async def data_ai(
             f"<i>*Вы можете отправить как голосовое сообщение так и текстовое, "
             f"заказ будет оформлен в считанные секунды.</i>\n\n"
             f"<b>Пример:</b>\n"
-            f"<code>Город - {customer_city}\nЗабрать заказ - адрес.\nДоставить - адрес.\n"
-            f"Нужно доставить - предмет.\nПолучатель - Имя.\nТелефон - номер.</code>\n\n"
+            f"<code>Нужно сделать доставку документов с улицы Арбат дом 12  строение 1  подъезд 1 квартира 6 "
+            f"и отвезти на Пресненскую набережную, дом 10, офис 417.</code>\n\n"
             f"👆 <i>Нажмите чтобы скопировать</i>\n\n"
             f"<i>Можете использовать текст выше в качестве шаблона или описать заказ так как вам удобно. *ИИ готов принять заказ</i>\n\n"
             f"ゞ <b>Опишите ваш заказ ...</b>"
@@ -922,7 +925,38 @@ async def data_PROMOKOD(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
-    seed_key = message.text.upper()
+    seed_key = message.text.strip().upper()
+
+    (
+        partner_tg_id,
+        _,
+        _,
+    ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
+
+    if partner_tg_id == None:
+
+        text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
+        await message.answer(
+            text=text,
+            parse_mode="HTML",
+        )
+
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+        return
+
+    if tg_id != SUPER_ADMIN_TG_ID:
+        if tg_id == partner_tg_id:
+            await message.answer(
+                text="Вы не можете быть рефералом самому себе, используйте другой PROMOKOD!",
+                parse_mode="HTML",
+            )
+
+            await state.set_state(current_state)
+            await rediska.set_state(customer_bot_id, tg_id, current_state)
+
+            return
 
     is_set_key = await customer_data.set_customer_seed_key(tg_id, seed_key)
 
@@ -940,12 +974,16 @@ async def data_PROMOKOD(
             is_blocked,
         ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-        await partner_bot.send_message(
-            chat_id=partner_tg_id,
-            text=f"Ваши ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
-            disable_notification=True,
-            parse_mode="HTML",
-        )
+        partner_program_status = await admin_data.get_partner_program_status()
+
+        if partner_program_status:
+            if not is_blocked:
+                await partner_bot.send_message(
+                    chat_id=partner_tg_id,
+                    text=f"Вашим ключем <b>{seed_key}</b> только что воспользовались!👍\nПродолжайте в том же духе!",
+                    disable_notification=True,
+                    parse_mode="HTML",
+                )
 
     else:
         text = "‼️ Ошибка при установке PROMOKOD-а\n\nВозможно такого промокода не существует!"
@@ -1149,10 +1187,12 @@ async def cmd_become_partner(
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
+    refund_percent = await admin_data.get_refund_percent()
+
     text = (
         f"💼 <b>Станьте партнёром Raketa Delivery!</b>\n\n"
         f"🚀 <b>Зарабатывайте на привлечении курьеров и клиентов!</b>\n\n"
-        f"🔹 Приглашайте курьеров и получайте <b>30% с их подписки</b>\n"
+        f"🔹 Приглашайте курьеров и получайте <b>{refund_percent}%</b> с их подписки\n"
         f"🔹 Продвигайте сервис среди клиентов и увеличивайте свои доходы\n"
         f"🔹 Работайте когда хотите — без вложений и рисков!\n\n"
         f"💰 Чем больше курьеров — тем больше доход! Присоединяйтесь!"
@@ -1316,12 +1356,10 @@ async def cmd_my_orders(
 
     pending_count = len(await order_data.get_pending_orders(tg_id))
     active_count = len(await order_data.get_active_orders(tg_id))
-    completed_count = len(await order_data.get_completed_orders(tg_id))
 
     reply_kb = await kb.get_customer_orders_kb(
         pending_count,
         active_count,
-        completed_count,
     )
     text = (
         f"✎ <b>Мои заказы</b>\n\n"
@@ -1348,11 +1386,10 @@ async def cmd_my_orders(
 
 @customer_r.callback_query(
     F.data.in_(
-        {
+        [
             "pending_orders",
             "active_orders",
-            "completed_orders",
-        },
+        ],
     )
 )
 async def get_my_orders(
@@ -1373,11 +1410,6 @@ async def get_my_orders(
             order_data.get_active_orders,
             CustomerState.myOrders_active,
             "активных",
-        ),
-        "completed_orders": (
-            order_data.get_completed_orders,
-            CustomerState.myOrders_completed,
-            "завершённых",
         ),
     }
 
@@ -1431,8 +1463,6 @@ async def get_my_orders(
             text_answer = "📋 Ожидающие"
         elif callback_query.data == "active_orders":
             text_answer = "📋 Активные"
-        elif callback_query.data == "completed_orders":
-            text_answer = "📋 Завершенные"
         await callback_query.answer(text_answer, show_alert=False)
 
     first_order_id = list(orders_data.keys())[0]
@@ -1445,14 +1475,7 @@ async def get_my_orders(
     await state.set_state(state_status)
     await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
-    if callback_query.data == "pending_orders":
-        reply_kb = await kb.get_customer_kb(
-            "one_my_pending" if len(orders_data) == 1 else callback_query.data
-        )
-    else:
-        reply_kb = await kb.get_customer_kb(
-            "one_my_order" if len(orders_data) == 1 else callback_query.data
-        )
+    reply_kb = await kb.get_customer_kb("one" if len(orders_data) == 1 else "many")
 
     await callback_query.message.edit_text(
         orders_data[first_order_id]["text"],
@@ -1556,33 +1579,17 @@ async def cancel_my_order(
         )
         return
 
-    if order.order_status != OrderStatus.PENDING:
-        log.warning(
-            f"Заказ {current_order_id} не в статусе PENDING: {order.order_status}"
+    current_order_status = order.order_status
+
+    if order.order_status == OrderStatus.CANCELLED:
+        await callback_query.message.answer(
+            f"Заказ №{current_order_id} уже отменен.", disable_notification=False
         )
-
-        if order.order_status == OrderStatus.CANCELLED:
-            await callback_query.message.answer(
-                f"Заказ №{current_order_id} уже отменен.", disable_notification=False
-            )
-
-            await callback_query.message.delete()
-
-            return
-
-        if order.order_status == OrderStatus.IN_PROGRESS:
-            await callback_query.message.answer(
-                f"Заказ №{current_order_id} уже в работе.",
-                show_alert=False,
-            )
-
-            await callback_query.message.delete()
-
-            return
-
+        await callback_query.message.delete()
         return
 
     try:
+
         is_update_order_status = await order_data.update_order_status(
             current_order_id, OrderStatus.CANCELLED
         )
@@ -1591,15 +1598,27 @@ async def cancel_my_order(
             raise Exception("Ошибка при обновлении статуса заказа")
 
         text = (
-            f"<b>Заказ №{current_order_id} успешно отменён.</b>\n\n"
-            f"<i>*Посмотреть информацию вы можете в своих заказах в пункте</i> <b>Отменённые.</b>\n\n"
+            f"Заказ <b>№{current_order_id}</b> успешно отменён.\n\n"
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
         await callback_query.message.answer(
-            text,
+            text=text,
             disable_notification=False,
             parse_mode="HTML",
         )
+
+        if current_order_status == OrderStatus.IN_PROGRESS:
+            courier_tg_id = await order_data.get_courier_tg_id_by_order_id(
+                order_id=current_order_id
+            )
+
+            cancelled_message = f"❌ Клиент отменил заказ <b>№{current_order_id}</b>"
+
+            await courier_bot.send_message(
+                chat_id=courier_tg_id,
+                text=cancelled_message,
+                parse_mode="HTML",
+            )
 
         await callback_query.answer("❌ Заказ отменен", show_alert=False)
 

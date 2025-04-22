@@ -2,7 +2,7 @@ import urllib3
 import requests
 from datetime import datetime
 from math import cos, radians, sin, sqrt, atan2
-from src.config import YANDEX_API_KEY, YANDEX_API_KEY_2
+from src.config import YANDEX_API_KEY_Gogich, YANDEX_API_KEY_Olia, YANDEX_API_KEY_Erel
 from src.services.fuzzy import cities
 from src.config import log
 from src.confredis import rediska
@@ -15,8 +15,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class RouteMaster:
 
     YANDEX_API_KEYS = [
-        YANDEX_API_KEY,
-        YANDEX_API_KEY_2,
+        YANDEX_API_KEY_Gogich,
+        YANDEX_API_KEY_Olia,
+        YANDEX_API_KEY_Erel,
     ]
 
     @staticmethod
@@ -26,6 +27,10 @@ class RouteMaster:
         counter = await rediska.get_yandex_api_counter()
 
         while True:
+
+            if not address.strip():
+                log.warning("Пустой адрес передан в геокодирование")
+                return (None, None)
 
             coordinates = await RouteMaster._get_coordinates_from_yandex(
                 address, counter
@@ -47,6 +52,10 @@ class RouteMaster:
         counter: int,
     ) -> tuple:
         """Попытка получить координаты через Яндекс API с конкретным ключом"""
+
+        if not address.strip():
+            log.warning("Пустой адрес передан в геокодирование")
+            return (None, None)
 
         api_key = RouteMaster.YANDEX_API_KEYS[counter]
         base_url = "https://geocode-maps.yandex.ru/1.x/"

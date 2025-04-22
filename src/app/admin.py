@@ -780,22 +780,16 @@ async def send_XP_to_courier(
 
 
 @admin_r.callback_query(
-    F.data == "block_customer",
-)
-@admin_r.callback_query(
-    F.data == "unblock_customer",
-)
-@admin_r.callback_query(
-    F.data == "block_courier",
-)
-@admin_r.callback_query(
-    F.data == "unblock_courier",
-)
-@admin_r.callback_query(
-    F.data == "block_partner",
-)
-@admin_r.callback_query(
-    F.data == "unblock_partner",
+    F.data.in_(
+        [
+            "block_customer",
+            "unblock_customer",
+            "block_courier",
+            "unblock_courier",
+            "block_partner",
+            "unblock_partner",
+        ],
+    )
 )
 async def call_block_unblock_customer(
     callback_query: CallbackQuery,
@@ -1043,7 +1037,7 @@ async def get_entered_order(
     await rediska.set_state(admin_bot_id, tg_id, current_state)
 
 
-# ---
+# --- global
 # ---
 # ---
 
@@ -1077,6 +1071,8 @@ async def cmd_global(
 
     service_status = await admin_data.get_service_status()
     partner_program_status = await admin_data.get_partner_program_status()
+    task_status = await admin_data.get_task_status()
+
     common_price, max_price = await admin_data.get_order_prices()
     subs_price = await admin_data.get_subscription_price() // 100
     discount_percent_first_order = await admin_data.get_first_order_discount()
@@ -1188,6 +1184,7 @@ async def cmd_global(
         f"<b>⚙️ Сервис</b>\n"
         f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
         f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
+        f" ▸ Уведомления: <b>{'ON 🔔' if task_status else 'OFF 🔕'}</b>\n"
         f" •\n"
         f" Пользователей: <b>{all_users}</b>\n"
         f" Заказов: <b>{all_orders}</b>\n\n"
@@ -1298,19 +1295,17 @@ async def cmd_global(
 
 
 @admin_r.callback_query(
-    F.data == "service_data",
-)
-@admin_r.callback_query(
-    F.data == "turn_on_service",
-)
-@admin_r.callback_query(
-    F.data == "turn_off_service",
-)
-@admin_r.callback_query(
-    F.data == "turn_on_partner",
-)
-@admin_r.callback_query(
-    F.data == "turn_off_partner",
+    F.data.in_(
+        [
+            "service_data",
+            "turn_on_service",
+            "turn_off_service",
+            "turn_on_partner",
+            "turn_off_partner",
+            "turn_on_task",
+            "turn_off_task",
+        ],
+    )
 )
 async def data_service_data(
     callback_query: CallbackQuery,
@@ -1355,11 +1350,26 @@ async def data_service_data(
                 show_alert=False,
             )
 
+        case "turn_on_task":
+            await admin_data.change_task_status(task_status=True)
+            await callback_query.answer(
+                text="Task ON✅",
+                show_alert=False,
+            )
+
+        case "turn_off_task":
+            await admin_data.change_task_status(task_status=False)
+            await callback_query.answer(
+                text="Task OFF❌",
+                show_alert=False,
+            )
+
         case _:
             await callback_query.answer("Неизвестное действие", show_alert=True)
 
     service_status = await admin_data.get_service_status()
     partner_program_status = await admin_data.get_partner_program_status()
+    task_status = await admin_data.get_task_status()
 
     data = await state.get_data()
     global_state_data: dict = data.get("global_state_data")
@@ -1379,6 +1389,7 @@ async def data_service_data(
         f"<b>⚙️ Сервис</b>\n\n"
         f" ▸ Сервис: <b>{'ON ✅' if service_status else 'OFF ❌'}</b>\n"
         f" ▸ Партнерская программа: <b>{'ON ✅' if partner_program_status else 'OFF ❌'}</b>\n"
+        f" ▸ Уведомления: <b>{'ON 🔔' if task_status else 'OFF 🔕'}</b>\n"
         f" •\n"
         f" ▸ Пользователей: <b>{all_users}</b>\n"
         f"   ‣ Клиентов: <b>{customers}</b>\n"
@@ -1399,6 +1410,7 @@ async def data_service_data(
         key="service_and_data",
         status_service=not service_status,
         status_partner=not partner_program_status,
+        task_status=not task_status,
     )
 
     await callback_query.message.edit_text(
