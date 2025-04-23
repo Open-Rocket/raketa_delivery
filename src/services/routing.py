@@ -29,7 +29,7 @@ class RouteMaster:
         while True:
 
             if not address.strip():
-                log.warning("Пустой адрес передан в геокодирование")
+                log.warning(f"Пустой адрес передан в геокодирование: {address}")
                 return (None, None)
 
             coordinates = await RouteMaster._get_coordinates_from_yandex(
@@ -53,10 +53,6 @@ class RouteMaster:
     ) -> tuple:
         """Попытка получить координаты через Яндекс API с конкретным ключом"""
 
-        if not address.strip():
-            log.warning("Пустой адрес передан в геокодирование")
-            return (None, None)
-
         api_key = RouteMaster.YANDEX_API_KEYS[counter]
         base_url = "https://geocode-maps.yandex.ru/1.x/"
         params = {"apikey": api_key, "geocode": address, "format": "json"}
@@ -64,10 +60,6 @@ class RouteMaster:
         log.info(f"yandex_api_counter: {counter}")
 
         try:
-
-            # if api_key == YANDEX_API_KEY:
-            #     raise requests.RequestException("Искусственная ошибка для теста")
-
             response = requests.get(base_url, params=params)
             response.raise_for_status()
 

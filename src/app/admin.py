@@ -2760,7 +2760,7 @@ async def call_change_price(
             text = "Введите новый XP за скорость:"
         case "change_radius_km":
             current_state = AdminState.change_radius_km.state
-            text = "Введите новый радиус поиска:"
+            text = "Введите новый радиус поиска в км:"
         case "change_max_orders_count":
             current_state = AdminState.change_max_orders_count.state
             text = "Введите максимальное количество выполняемых заказов:"
@@ -2834,7 +2834,7 @@ async def change_prices_filer(
             text = f"✅ Новая цена подписки: {int(new_value)}₽"
 
         case AdminState.change_standard_order_price.state:
-            await admin_data.change_standard_order_price(int(new_value))
+            await admin_data.change_standard_order_price(new_price=int(new_value))
             text = f"✅ Новая цена за 1 км: {int(new_value)}₽"
 
         case AdminState.change_max_order_price.state:
@@ -2907,7 +2907,7 @@ async def change_prices_filer(
 
         case AdminState.change_radius_km.state:
             await admin_data.change_distance_radius(new_value)
-            text = f"✅ Новый радиус поиска: {new_value}"
+            text = f"✅ Новый радиус поиска: {new_value} км"
 
         case AdminState.change_max_orders_count.state:
             await admin_data.change_courier_max_active_orders_count(new_value)
@@ -3324,7 +3324,7 @@ async def data_messages(
         caption="📄 Список запросов на выплаты",
     )
 
-    total_sum = sum(data[2] for data in all_earn_waiting_requests.values())
+    total_sum = sum(data[3] for data in all_earn_waiting_requests.values())
 
     summary_text = (
         f"💬 <b>Сообщения</b>\n\n"

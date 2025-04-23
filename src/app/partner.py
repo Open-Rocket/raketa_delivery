@@ -794,18 +794,18 @@ async def data_earn(
             f"✅ Ваш запрос принят!\n\n"
             f"С вами свяжется наш менеджер для уточнения деталей.\n\n"
             f"🔸 <b>Сумма вывода:</b> <b>{balance}₽</b>\n"
-            f"<i>*Подготовьте номер своей банковской карты на которую нужно совершить перевод или номер телефона в случае с переводом через СПБ.\nВам будет переведена вся сумма на вашем балансе!</i>.\n\n"
             f"{additional_message}"
         )
 
-        user = callback_query.from_user
+        seed_key = await partner_data.get_my_seed_key(tg_id)
 
+        user = callback_query.from_user
         username = user.username
         user_link = (
             f"<a href='tg://user?id={tg_id}'>{username if username else tg_id}</a>"
         )
 
-        await partner_data.create_new_earn_request(tg_id, user_link, balance)
+        await partner_data.create_new_earn_request(seed_key, tg_id, user_link, balance)
 
     else:
         text = (

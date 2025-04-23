@@ -246,7 +246,7 @@ async def data_city_courier(
         reply_kb = await kb.get_courier_kb("accept_tou")
         text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
-            f"<a href='https://drive.google.com/file/d/16NYgi7_7GL830A4xwaeHBYsYKyduOiSS/view?usp=drive_link'>"
+            f"<a href='https://disk.yandex.ru/i/rFtwNvr9bguSLw'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
             f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
             f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -352,7 +352,7 @@ async def courier_accept_tou(
         reply_kb = await kb.get_courier_kb("accept_tou")
         tou_text = (
             f"Начиная использование сервиса, вы соглашаетесь с "
-            f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
+            f"<a href='https://disk.yandex.ru/i/rFtwNvr9bguSLw'>"
             f"Пользовательским соглашением и правилами использования</a>, а также "
             f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
             f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -2037,7 +2037,7 @@ async def cmd_info(
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
         f"Здесь вы можете ознакомиться с основной информацией о сервисе, задать вопрос или предложить свою идею!\n\n"
-        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
+        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"https://disk.yandex.ru/i/NiwitOTuU0YPXQ
         f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>\n"
         f" •\n"
         f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
@@ -2069,7 +2069,7 @@ async def cmd_rules(
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
+        f"<a href='https://disk.yandex.ru/i/rFtwNvr9bguSLw'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
@@ -2374,38 +2374,47 @@ async def extend_subscription(
 async def _use_XP(
     event: Message | CallbackQuery,
 ):
-    """Использует очки опыта для оплаты подписки."""
+    """Использует очки опыта для оплаты подписки, не снижая цену ниже 200₽."""
+
+    tg_id = event.from_user.id
+
+    # Получаем количество XP и цену подписки в рублях
+    courier_XP = await courier_data.get_courier_XP(tg_id)
+    price_rub = await admin_data.get_subscription_price()
+    price_rub = price_rub // 100  # Перевод из копеек
+
+    if courier_XP is None:
+        courier_XP = 0
+
+    # Расчёт максимально возможного списания XP (чтобы не опуститься ниже 200₽)
+    max_xp_to_apply = max(price_rub - 200, 0)
+
+    # Фактически применяем XP (если хватает, применим максимум)
+    applied_xp = min(courier_XP, max_xp_to_apply)
+
+    # Финальная цена после списания XP
+    new_price_rub = round(price_rub - applied_xp, 2)
+
+    log.info(
+        f"price_rub: {price_rub}, new_price_rub: {new_price_rub}, "
+        f"courier_XP: {courier_XP}, applied_XP: {applied_xp}"
+    )
 
     text = (
         f"🚀 <b>Оплатить подписку</b>\n\n"
         f"Выберите способ оплаты:\n\n"
         f"💵 Оплатить подписку\n"
-        f"✴️ Использовать очки опыта"
+        f"✴️ Использовать очки опыта\n\n"
+        f"<b>Текущий XP:</b> {courier_XP}\n"
+        f"<b>Используем XP:</b> {applied_xp}\n"
+        f"<b>К оплате:</b> {new_price_rub}₽"
     )
-
-    tg_id = event.from_user.id
-
-    courier_XP = await courier_data.get_courier_XP(tg_id)
-
-    if courier_XP is None:
-        courier_XP = 0
-
-    price_rub = await admin_data.get_subscription_price()
-    price_rub = price_rub // 100
-    new_price_rub = round((price_rub - courier_XP), 2)
-
-    log.info(
-        f"price_rub: {price_rub}, new_price_rub: {new_price_rub}, courier_XP: {courier_XP}"
-    )
-
-    if courier_XP >= price_rub:
-        courier_XP = price_rub
 
     keyboard = await kb.courier_XP_kb(
         "use_XP",
-        rub=round(price_rub, 2),
-        current_xp=round(courier_XP, 2),
-        new_price=round(new_price_rub, 2),
+        rub=price_rub,
+        current_xp=applied_xp,
+        new_price=new_price_rub,
     )
 
     if isinstance(event, Message):
@@ -2426,48 +2435,68 @@ async def _use_XP(
 
 
 @payment_r.callback_query(
-    F.data == "use_rub",
+    F.data.in_(
+        [
+            "use_rub",
+            "use_XP",
+        ],
+    )
 )
-@payment_r.callback_query(
-    F.data == "use_XP",
-)
-async def send_payment_invoice(
-    event: CallbackQuery,
-    state: FSMContext,
-):
+async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
     """Отправляет инвойс для оплаты подписки."""
-
-    price_rub = await admin_data.get_subscription_price()
 
     tg_id = event.from_user.id
     chat_id = event.message.chat.id
+    full_price_rub = await admin_data.get_subscription_price()  # в копейках
+    use_XP = event.data == "use_XP"
+    new_XP = 0
 
-    use_XP = False
+    data = await state.get_data()
+
+    try:
+        invoice_message_id = data.get("invoice_message_id")
+        log.info(f"invoise_message_id: {invoice_message_id}")
+        if invoice_message_id:
+            await event.bot.delete_message(
+                chat_id=event.message.chat.id, message_id=invoice_message_id
+            )
+            log.info(f"Инвойс удалён для пользователя {tg_id}.")
+            await state.update_data(invoice_message_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+    except Exception as e:
+        log.warning(f"Не удалось удалить инвойс: {e}")
+
+    if use_XP:
+        courier_XP = await courier_data.get_courier_XP(tg_id) or 0
+        price_rub = full_price_rub // 100
+
+        # Максимум XP, который можно применить, чтобы цена не опустилась ниже 200₽
+        max_xp_to_apply = max(price_rub - 200, 0)
+        used_XP = min(courier_XP, max_xp_to_apply)
+
+        # Обновляем цену (в копейках)
+        price_rub = (price_rub - used_XP) * 100
+        price_rub = max(0, price_rub)
+
+        new_XP = -used_XP
+    else:
+        price_rub = full_price_rub
 
     log.info(f"event.data: {event.data}")
+    log.info(f"price_rub: {price_rub}")
+    log.info(f"use_XP: {use_XP}")
+    log.info(f"used_XP: {new_XP}")
 
-    if event.data == "use_XP":
+    await state.update_data(
+        use_XP=use_XP,
+        new_XP=new_XP,
+        new_price=price_rub,
+    )
+    await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
-        use_XP = True
-
-        courier_XP = await courier_data.get_courier_XP(tg_id)
-        if courier_XP is None:
-            courier_XP = 0
-        price_rub = price_rub - (courier_XP * 100)
-        new_XP = -courier_XP
-        if price_rub < 0:
-            price_rub = 0
-
-        await state.update_data(
-            use_XP=use_XP,
-            new_XP=new_XP,
-            new_price=price_rub,
-        )
-        await rediska.save_fsm_state(
-            state,
-            courier_bot_id,
-            tg_id,
-        )
+    if not payment_provider:
+        log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
+        return
 
     prices = [
         LabeledPrice(
@@ -2476,24 +2505,7 @@ async def send_payment_invoice(
         ),
     ]
 
-    log.info(f"price_rub: {price_rub}")
-    log.info(f"use_XP: {use_XP}")
-
-    await state.update_data(
-        use_XP=use_XP,
-        new_price=price_rub,
-    )
-    await rediska.save_fsm_state(
-        state,
-        courier_bot_id,
-        tg_id,
-    )
-
-    if not payment_provider:
-        log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
-        return
-
-    await event.bot.send_invoice(
+    invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
         description="Оформите подписку Raketa",
@@ -2512,7 +2524,8 @@ async def send_payment_invoice(
         reply_markup=None,
     )
 
-    # await event.message.delete()
+    await state.update_data(invoice_message_id=invoice_message.message_id)
+    await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
 
 @payment_r.pre_checkout_query()
@@ -2575,14 +2588,16 @@ async def successful_payment(
 
         courier_id = await courier_data.get_courier_id(tg_id)
 
-        sum = round((message.successful_payment.total_amount / 100), 2)
+        summa = round((message.successful_payment.total_amount / 100), 2)
 
-        log.info(f"sum: {sum}")
+        log.info(f"summa: {summa}")
 
-        _ = await courier_data.set_payment(
+        is_set_payment = await courier_data.set_payment(
             courier_id,
-            sum,
+            summa,
         )
+
+        log.info(f"is_set_payment: {is_set_payment}")
 
         if use_XP:
             new_XP = data.get("new_XP")
@@ -2594,7 +2609,7 @@ async def successful_payment(
 
         if is_updated:
             ttl = await title.get_title_courier("success_payment")
-            text = f"Спасибо за подписку!\nСумма: {sum} {message.successful_payment.currency}"
+            text = f"Спасибо за подписку!\nСумма: {summa} {message.successful_payment.currency}"
             reply_kb = await kb.get_courier_kb(
                 "success_payment",
             )
@@ -2614,22 +2629,34 @@ async def successful_payment(
                 is_blocked,
             ) = await admin_data.get_partner_full_info_by_SEED(seed=seed_key)
 
-            if partner_program_status:
-                if not is_blocked:
-                    refund_percent = await admin_data.get_refund_percent()
-                    added_balance = int(sum * refund_percent / 100)
-                    await partner_bot.send_message(
-                        chat_id=partner_tg_id,
-                        text=f"Ваш реферал произвел оплату, <b>+{added_balance}₽</b> к вашему балансу!\nБаланс: <b>{balance}₽</b>",
-                        parse_mode="HTML",
-                        disable_notification=True,
-                    )
+            if partner_program_status and partner_tg_id and not is_blocked:
+                refund_percent = await admin_data.get_refund_percent()
+                added_balance = int(summa * refund_percent / 100)
+                await partner_bot.send_message(
+                    chat_id=partner_tg_id,
+                    text=f"Ваш реферал произвел оплату, <b>+{added_balance}₽</b> к вашему балансу!\nБаланс: <b>{balance}₽</b>",
+                    parse_mode="HTML",
+                    disable_notification=True,
+                )
 
             log.info(f"Subscription updated successfully for courier {tg_id}.")
         else:
             log.error(f"Failed to update subscription for courier {tg_id}.")
+
     except Exception as e:
         log.error(f"Error updating subscription for courier {tg_id}: {e}")
+    finally:
+        try:
+            invoice_message_id = data.get("invoice_message_id")
+            if invoice_message_id:
+                await message.bot.delete_message(
+                    chat_id=message.chat.id, message_id=invoice_message_id
+                )
+                log.info(f"Инвойс удалён для пользователя {tg_id}.")
+                await state.update_data(invoice_message_id=None)
+                await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+        except Exception as e:
+            log.warning(f"Не удалось удалить инвойс: {e}")
 
 
 # ---

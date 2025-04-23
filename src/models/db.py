@@ -262,6 +262,7 @@ class EarnRequest(Base):
     __tablename__ = "earn_requests"
 
     earn_request_id: Mapped[intPK]
+    partner_seed: Mapped[stringData] = mapped_column(String, nullable=True)
     partner_user_link: Mapped[stringData]
     partner_id = mapped_column(
         Integer,

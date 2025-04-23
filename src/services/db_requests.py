@@ -744,39 +744,32 @@ class CourierData:
 
     # ---
 
-    async def set_payment(self, payer_id: int, sum: int):
-        """Добавляет платёж в БД и начисляет 30% партнёру, если он есть"""
+    async def set_payment(self, payer_id: int, summa: int):
+        """Добавляет платёж в БД и начисляет 30% партнёру, если он есть и не заблокирован."""
         async with self.async_session_factory() as session:
             try:
-                # Добавляем новый платёж
+                # Сохраняем платёж
                 new_payment = Payment(
                     payment_date=await Time.get_moscow_time(),
-                    payment_sum_rub=sum,
+                    payment_sum_rub=summa,
                     payer_id=payer_id,
                 )
                 session.add(new_payment)
 
-                # Проверяем, есть ли у курьера партнер
+                # Проверяем, есть ли партнёр
                 courier = await session.scalar(
                     select(Courier).where(Courier.courier_id == payer_id)
                 )
-                refund_percent = await session.scalar(
-                    select(GlobalSettings.refund_percent)
-                )
 
-                partner_program_status = await session.scalar(
-                    select(GlobalSettings.partner_program_is_active)
-                )
-
-                if courier and courier.partner_id and refund_percent:
+                if courier and courier.partner_id:
+                    refund_percent = await session.scalar(
+                        select(GlobalSettings.refund_percent)
+                    )
                     partner = await session.scalar(
                         select(Partner).where(Partner.partner_id == courier.partner_id)
                     )
-                    if partner_program_status:
-                        if partner and not partner.is_blocked:
-                            partner.balance += int(sum * refund_percent / 100)
-                else:
-                    return False
+
+                    partner.balance += int(summa * refund_percent / 100)
 
                 await session.commit()
                 return True
@@ -1113,7 +1106,7 @@ class AdminData:
 
     # ---
 
-    async def change_standard_order_price(self, price: int):
+    async def change_standard_order_price(self, new_price: int):
         """Обновляет стандартную цену заказа"""
         async with self.async_session_factory() as session:
 
@@ -1121,9 +1114,9 @@ class AdminData:
             settings: GlobalSettings = result.scalar_one_or_none()
 
             if settings:
-                settings.order_price_per_km = price
+                settings.order_price_per_km = new_price
             else:
-                settings = GlobalSettings(order_price_per_km=price)
+                settings = GlobalSettings(order_price_per_km=new_price)
                 session.add(settings)
 
             await session.commit()
@@ -1146,11 +1139,7 @@ class AdminData:
     async def get_order_prices(self) -> tuple:
         """Возвращает минимальную и максимальную цену заказа"""
         async with self.async_session_factory() as session:
-            result = await session.execute(
-                select(
-                    GlobalSettings.order_price_per_km, GlobalSettings.order_max_price
-                )
-            )
+            result = await session.execute(select(GlobalSettings))
             settings = result.scalar_one_or_none()
 
             if not settings:
@@ -2159,7 +2148,7 @@ class AdminData:
                     courier.courier_name or None,
                     courier.courier_phone or None,
                     courier.courier_city or None,
-                    courier.courier_XP or None,
+                    courier.courier_XP or 0,
                     courier.is_blocked or None,
                 )
             return (None,) * 6
@@ -2503,6 +2492,7 @@ class PartnerData:
 
     async def create_new_earn_request(
         self,
+        seed_key: str,
         tg_id: int,
         user_link: str,
         amount: int,
@@ -2523,18 +2513,21 @@ class PartnerData:
                     )
                 )
 
+                current_time = await Time.get_moscow_time()
+
                 if existing_request:
                     existing_request.partner_user_link = user_link
                     existing_request.amount = amount
-                    existing_request.request_date = await Time.get_moscow_time()
+                    existing_request.request_date = current_time
+                    existing_request.partner_seed = seed_key
                     await session.flush()
                 else:
-
                     request = EarnRequest(
                         partner_id=partner.partner_id,
                         partner_tg_id=tg_id,
                         partner_user_link=user_link,
-                        request_date=await Time.get_moscow_time(),
+                        partner_seed=seed_key,
+                        request_date=current_time,
                         amount=amount,
                         refund_status=RefundStatus.WAITING,
                     )
@@ -2560,6 +2553,7 @@ class PartnerData:
 
             result = {
                 request.earn_request_id: (
+                    request.partner_seed,
                     request.partner_tg_id,
                     request.partner_user_link,
                     request.amount,

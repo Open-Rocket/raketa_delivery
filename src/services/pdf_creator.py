@@ -53,14 +53,20 @@ class PDFcreator:
         y -= 80
 
         pdf.setFont("Helvetica", 16)
-        pdf.drawString(x, y, "No. | Amount rub | TG | Date Y.M.D")
+        pdf.drawString(x, y, "SEED | TG_ID | No. | Amount rub | TG | Date Y.M.D")
         y -= 30
 
         pdf.setFont("Helvetica", 12)
         total_sum = 0
 
-        for req_id, (_, user_link, balance, request_date) in data.items():
-            line = f"{req_id} | {balance} rub | {user_link} | {request_date}"
+        for req_id, (
+            user_seed,
+            user_tg_id,
+            user_link,
+            balance,
+            request_date,
+        ) in data.items():
+            line = f"{user_seed} | {user_tg_id} | {req_id} | {balance} rub | {user_link} | {request_date}"
             clean_line = await self.remove_html_tags(line)
             pdf.drawString(x, y, clean_line)
             y -= 15

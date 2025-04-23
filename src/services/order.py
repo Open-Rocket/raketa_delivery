@@ -22,67 +22,57 @@ class OrderFormatter:
     ) -> dict:
         """Готовит все необходимые данные для формирования заказа и возвращает их."""
 
-        coordinates = []
-        formatted_addresses = []
+        log.info(f"_perepare_data addresses: {addresses}")
 
-        # 1. Проверка на отсутствие адресов
-        if not addresses:
-            addresses_text = (
-                "📍 <i>Адрес не указан, свяжитесь с заказчиком для уточнения</i>"
-            )
-            yandex_maps_url = "https://maps.yandex.ru"
-            distance = 0
-            price = await route.get_price(distance, time, city)
-
+        if not addresses or addresses == "no_address":
             return {
                 "city": city,
                 "customer_name": customer_name,
                 "customer_phone": customer_phone,
-                "addresses_text": addresses_text,
+                "addresses_text": "⚠️ <b>Адреса не указаны.</b>\nСвяжитесь с заказчиком для уточнения.",
                 "delivery_object": delivery_object,
                 "description": description,
-                "yandex_maps_url": yandex_maps_url,
-                "distance": distance,
-                "price": price,
+                "yandex_maps_url": "-",
+                "distance": 0,
+                "price": 0,
                 "starting_point": None,
             }
 
-        # 2. Обработка адресов, геокодирование
+        coordinates = []
+        address_links = []
+        formatted_addresses = []
+        order_addresses_data = []
+
+        # Обрабатываем все адреса
         for address in addresses:
             coords = await route.get_coordinates(address)
             if coords:
                 coordinates.append(coords)
+
                 maps_url = f"https://maps.yandex.ru/?text={address.replace(' ', '+')}"
+
+                address_links.append(maps_url)
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
+                order_addresses_data.append([coords, address])
+
             else:
-                formatted_addresses.append(
-                    f"❗️<i>Не удалось определить координаты:</i> {address}"
-                )
+                return {}
 
-        # 3. Проверка на отсутствие валидных координат
-        if not coordinates:
-            yandex_maps_url = "https://maps.yandex.ru"
+        # Если есть только один адрес, создаем маршрут без второго адреса
+        if len(coordinates) == 1:
+            yandex_maps_url = (
+                f"https://maps.yandex.ru/?text={addresses[0].replace(' ', '+')}"
+            )
             distance = 0
-            price = await route.get_price(distance, time, city)
+        else:
+            yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
+            distance = round(await route.calculate_total_distance(coordinates), 2)
 
-            return {
-                "city": city,
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-                "addresses_text": "\n".join(formatted_addresses),
-                "delivery_object": delivery_object,
-                "description": description,
-                "yandex_maps_url": yandex_maps_url,
-                "distance": distance,
-                "price": price,
-                "starting_point": None,
-            }
-
-        # 4. Если есть координаты — строим маршрут, считаем цену
-        yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
-        distance = round(await route.calculate_total_distance(coordinates), 2)
-        price = await route.get_price(distance, time, city)
-
+        price = await route.get_price(
+            distance,
+            time,
+            city=city,
+        )
         addresses_text = "\n".join(
             [
                 f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
@@ -126,22 +116,28 @@ class OrderFormatter:
             plus_price = int(price * 1.0)
             price = int(plus_price - discount * plus_price / 100)
 
-        if len(addresses_text) < 2 or price == 0 or distance == 0:
-            additional_text = f"<i>В случае если адрес доставки один или адреса не указаны то система не может рассчитать стоимость такого заказа, возможно это личное поручение и для уточнения деталей доставки и оплаты свяжитесь друг с другом и договоритесь.</i>\n\n"
-        else:
-            additional_text = ""
+        routing_addresses = (
+            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+            if yandex_maps_url != "-"
+            else ""
+        )
+
+        additional_msg = ""
+
+        if price == 0:
+            additional_msg = f"<i>Если стоимость не указывается, то по оплате вам нужно договориться между собой.</i>\n\n"
 
         order_forma = (
             f"<b>Город:</b> {city}\n\n"
             f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
             f"<b>Телефон:</b> {customer_phone if customer_phone else '-'}\n\n"
             f"{addresses_text}\n\n"
-            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+            f"{routing_addresses}"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
             f"<b>Стоимость доставки:</b> {price} ₽\n"
             f"<i>Наличными или переводом!\n\n</i>"
-            f"{additional_text}"
+            f"{additional_msg}"
             f"<b>Описание:</b> {description}\n\n"
         )
 
