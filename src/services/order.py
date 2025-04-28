@@ -117,7 +117,7 @@ class OrderFormatter:
             price = int(plus_price - discount * plus_price / 100)
 
         routing_addresses = (
-            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут доставки</a>\n\n"
+            f"⦿⌁⦿ <a href='{yandex_maps_url}'>Маршрут заказа</a>\n\n"
             if yandex_maps_url != "-"
             else ""
         )
@@ -135,7 +135,7 @@ class OrderFormatter:
             f"{routing_addresses}"
             f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
             f"<b>Расстояние:</b> {distance} км\n"
-            f"<b>Стоимость доставки:</b> {price} ₽\n"
+            f"<b>Стоимость:</b> {price} ₽\n"
             f"<i>Наличными или переводом!\n\n</i>"
             f"{additional_msg}"
             f"<b>Описание:</b> {description}\n\n"

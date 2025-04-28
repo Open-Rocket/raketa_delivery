@@ -242,8 +242,6 @@ class Keyboard:
                     InlineKeyboardButton(
                         text=f"Ожидают {pending_count}", callback_data="pending_orders"
                     ),
-                ],
-                [
                     InlineKeyboardButton(
                         text=f"Активные {active_count}", callback_data="active_orders"
                     ),

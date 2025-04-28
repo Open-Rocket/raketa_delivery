@@ -9,6 +9,7 @@ from ._deps import (
     OrderStatus,
     CustomerState,
     ReplyKeyboardRemove,
+    defaultdict,
     time,
     Time,
     zlib,
@@ -23,6 +24,7 @@ from ._deps import (
     kb,
     title,
     customer_data,
+    courier_data,
     admin_data,
     order_data,
     recognizer,
@@ -34,6 +36,7 @@ from ._deps import (
     log,
     randint,
     find_closest_city,
+    delete_message_after_delay,
     F,
 )
 
@@ -325,6 +328,7 @@ async def customer_accept_tou(
 
         current_state = CustomerState.default.state
         await callback_query.answer("✅ Принято", show_alert=False)
+
         text = (
             f"Вы успешно зарегистрировались! 🎉\n\n"
             f"Имя: {customer_name}\n"
@@ -333,9 +337,31 @@ async def customer_accept_tou(
             f"<i>Введите PROMOKOD для активации скидки на первый заказ</i> /promo\n\n"
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
+
+        new_customers_info = (
+            "Добро пожаловать!\n\n"
+            "Это приложение создано для того, чтобы быстро и удобно связывать клиентов (вас) и курьеров — исполнителей ваших поручений.\n\n"
+            "Наши преимущества:\n"
+            "• Цены в 2 раза ниже, чем в других службах доставки.\n"
+            "• Процесс оформления заказа — в 10 раз проще и быстрее c помощью ИИ.\n"
+            "• Пока сервис работает через Telegram-бота, но это полноценное приложение со своим удобным интерфейсом.\n"
+            "• Наша команда сделала всё, чтобы пользоваться ботом было легко и понятно.\n"
+            "• Мы уже работаем над разработкой отдельного мобильного приложения!\n\n"
+            "Что можно заказать:\n"
+            "• Доставку документов, ключей, мелких посылок (p2p — от человека к человеку).\n"
+            "• Доставку товаров из магазинов, кафе к вам домой (b2c — бизнес к клиенту).\n\n"
+            "<b>⚡️ Важно: только нормальные и легальные заказы. Никаких странных поручений или запрещённых товаров.</b>\n\n"
+            "Надеемся, наш продукт вам понравится!"
+        )
+
+        await callback_query.message.answer(
+            text=new_customers_info,
+            disable_notification=False,
+            parse_mode="HTML",
+        )
         new_message = await callback_query.message.answer(
             text=text,
-            disable_notification=True,
+            disable_notification=False,
             parse_mode="HTML",
         )
 
@@ -597,7 +623,7 @@ async def _process_order_logic(
 
     try:
         is_moderation, city, addresses, delivery_object, description = (
-            await gemini_assistant.process_order(
+            await assistant.process_order(
                 text_msg,
                 customer_city,
             )
@@ -615,41 +641,14 @@ async def _process_order_logic(
             return
 
         if city is None:
-            try:
-                is_moderation, city, addresses, delivery_object, description = (
-                    await assistant.process_order(
-                        text_msg,
-                        customer_city,
-                    )
-                )
-
-                if is_moderation is False:
-                    await _handle_error_response(
-                        message,
-                        wait_message,
-                        "moderation_failed",
-                        state,
-                    )
-                    return
-
-                if city is None:
-                    await _handle_error_response(
-                        message,
-                        wait_message,
-                        "moderation_failed",
-                        state,
-                    )
-                    return
-
-            except Exception as e:
-                await _handle_error_response(
-                    message,
-                    wait_message,
-                    "general",
-                    state,
-                )
-                log.error(f"Error: {e}")
-                return
+            await _handle_error_response(
+                message,
+                wait_message,
+                "general",
+                state,
+            )
+            log.error(f"Error: {e}")
+            return
 
     except Exception as e:
         await _handle_error_response(
@@ -795,6 +794,7 @@ async def set_order_to_db(
 
     if current_order_info:
         data, order_forma = [*current_order_info]
+        data: dict
         order_forma = zlib.compress(order_forma.encode("utf-8"))
     else:
         log.error("Ключ 'current_order_info' отсутствует в состоянии FSM")
@@ -823,6 +823,34 @@ async def set_order_to_db(
             f"<i>*Информацию о заказах можно посмотреть в разделе</i> <b>Мои заказы</b>.\n\n"
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
+
+        try:
+
+            order_city = data.get("city")
+            price_rub = data.get("price")
+
+            all_couriers_tg_ids_in_order_city = await courier_data.get_all_couriers_tg_ids_notify_status_true_in_current_city(
+                city=order_city
+            )
+
+            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n●\nНачать работу! /run"
+
+            for tg_id in all_couriers_tg_ids_in_order_city:
+                try:
+                    msg = await courier_bot.send_message(
+                        chat_id=tg_id,
+                        text=notification_for_couriers,
+                        parse_mode="HTML",
+                    )
+
+                    asyncio.create_task(
+                        delete_message_after_delay(tg_id, msg.message_id, delay=900)
+                    )
+                except Exception as e:
+                    log.error(f"Ошибка при отправке уведомления курьеру {tg_id}: {e}")
+
+        except Exception as e:
+            log.error(f"Ошибка: {e}")
 
     except Exception as e:
         log.error(f"Ошибка при создании заказа: {str(e)}")
@@ -1005,6 +1033,7 @@ async def cmd_promo(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     customer_seed_key = await customer_data.get_customer_seed_key(tg_id)
 
@@ -1030,12 +1059,27 @@ async def cmd_promo(
 
         reply_kb = await kb.get_customer_kb("promo")
 
-        await message.answer(
+        promo_msg = await message.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            promo_msg_id = data.get("promo_msg_id")
+            if promo_msg_id:
+                await message.bot.delete_message(
+                    chat_id=tg_id,
+                    message_id=promo_msg_id,
+                )
+                await state.update_data(promo_msg_id=None)
+                await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+                await message.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(promo_msg_id=promo_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1171,6 +1215,7 @@ async def cmd_profile(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     await title.get_title_customer(message.text)
     name, phone, city = await rediska.get_user_info(
@@ -1189,12 +1234,27 @@ async def cmd_profile(
         f"<b>Город:</b> {city}"
     )
 
-    await message.answer(
+    my_profile_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        my_profile_msg_id = data.get("my_profile_msg_id")
+        if my_profile_msg_id:
+            await message.bot.delete_message(
+                chat_id=message.chat.id,
+                message_id=my_profile_msg_id,
+            )
+            await state.update_data(my_profile_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(my_profile_msg_id=my_profile_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1211,6 +1271,7 @@ async def cmd_info(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
@@ -1221,12 +1282,27 @@ async def cmd_info(
         f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
     )
 
-    await message.answer(
+    info_msg = await message.answer(
         text=text,
         disable_notification=True,
         disable_web_page_preview=True,
         parse_mode="HTML",
     )
+
+    try:
+        info_msg_id = data.get("info_msg_id")
+        if info_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=info_msg_id,
+            )
+            await state.update_data(info_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(info_msg_id=info_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1243,6 +1319,7 @@ async def cmd_rules(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
@@ -1255,12 +1332,27 @@ async def cmd_rules(
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
-    await message.answer(
+    rules_msg = await message.answer(
         text=text,
         disable_notification=True,
         disable_web_page_preview=True,
         parse_mode="HTML",
     )
+
+    try:
+        rules_msg_id = data.get("rules_msg_id")
+        if rules_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=rules_msg_id,
+            )
+            await state.update_data(rules_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(rules_msg_id=rules_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1277,9 +1369,7 @@ async def cmd_channel(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     text = (
         f"📺 <b>Официальный канал Raketa Delivery</b>\n\n"
@@ -1291,12 +1381,30 @@ async def cmd_channel(
 
     reply_kb = await kb.get_customer_kb("/channel")
 
-    await message.answer(
+    channel_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        channel_msg_id = data.get("channel_msg_id")
+        if channel_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=channel_msg_id,
+            )
+            await state.update_data(channel_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(channel_msg_id=channel_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 @customer_r.message(
@@ -1310,6 +1418,7 @@ async def cmd_become_courier(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     photo_title = await title.get_title_customer("/become_courier")
     text = (
@@ -1319,13 +1428,28 @@ async def cmd_become_courier(
     )
     reply_kb = await kb.get_customer_kb("/become_courier")
 
-    await message.answer_photo(
+    become_courier_msg = await message.answer_photo(
         photo=photo_title,
         caption=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        become_courier_msg_id = data.get("become_courier_msg_id")
+        if become_courier_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=become_courier_msg_id,
+            )
+            await state.update_data(become_courier_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(become_courier_msg_id=become_courier_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1342,9 +1466,7 @@ async def cmd_become_partner(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     refund_percent = await admin_data.get_refund_percent()
 
@@ -1359,13 +1481,31 @@ async def cmd_become_partner(
     ttl = await title.get_title_customer("/become_partner")
     reply_kb = await kb.get_customer_kb("/become_partner")
 
-    await message.answer_photo(
+    partners_msg = await message.answer_photo(
         photo=ttl,
         caption=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        partners_msg_id = data.get("partners_msg_id")
+        if partners_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=partners_msg_id,
+            )
+            await state.update_data(partners_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(partners_msg_id=partners_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 # ---
@@ -1382,6 +1522,7 @@ async def cmd_notify(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     notify_status = await customer_data.get_customer_notify_status(tg_id=tg_id)
 
@@ -1397,12 +1538,27 @@ async def cmd_notify(
         status_notify=not notify_status,
     )
 
-    await message.answer(
+    notify_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        notify_msg_id = data.get("notify_msg_id")
+        if notify_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=notify_msg_id,
+            )
+            await state.update_data(notify_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(notify_msg_id=notify_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1466,6 +1622,7 @@ async def cmd_support(
 
     current_state = CustomerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"👨‍💼 <b>Поддержка</b>\n\n"
@@ -1476,12 +1633,27 @@ async def cmd_support(
 
     reply_kb = await kb.get_customer_kb("/support")
 
-    await message.answer(
+    support_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        support_msg_id = data.get("support_msg_id")
+        if support_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=support_msg_id,
+            )
+            await state.update_data(support_msg_id=None)
+            await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(support_msg_id=support_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(customer_bot_id, tg_id, current_state)
@@ -1505,7 +1677,9 @@ async def cmd_my_orders(
 
     current_state = CustomerState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
+    is_message = isinstance(event, Message)
     tg_id = event.from_user.id
+    data = await state.get_data()
 
     if is_callback:
         await event.answer("↩️ Назад", show_alert=False)
@@ -1534,13 +1708,30 @@ async def cmd_my_orders(
             disable_notification=True,
             parse_mode="HTML",
         )
-    else:
-        await event.answer(
+    elif is_message:
+        my_orders_message = await event.answer(
             text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            my_orders_message_id = data.get("my_orders_message_id")
+            if my_orders_message_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id, message_id=my_orders_message_id
+                )
+                await state.update_data(my_orders_message_id=None)
+                await rediska.save_fsm_state(state, customer_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(my_orders_message_id=my_orders_message.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(customer_bot_id, tg_id, current_state)
 
 
 @customer_r.callback_query(

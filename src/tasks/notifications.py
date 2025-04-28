@@ -3,6 +3,23 @@ from collections import defaultdict
 from src.config import courier_bot, customer_bot, log, Time
 from src.services.db_requests import courier_data, admin_data, order_data, customer_data
 from src.confredis import rediska
+import asyncio
+
+
+async def delete_message_after_delay(
+    bot,
+    chat_id: int,
+    message_id: int,
+    delay: int = 600,
+):
+    try:
+        log.info(f"delete_message_id: {message_id}")
+        await asyncio.sleep(delay)
+        if message_id:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+            log.info(f"Удалено сообщение {message_id} у {chat_id}")
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение {message_id} у {chat_id}: {e}")
 
 
 async def new_orders_notification():
@@ -28,11 +45,22 @@ async def new_orders_notification():
                 f"<i>Отключить уведомления</i> /notify"
             )
             for tg_id in tg_ids:
-                await courier_bot.send_message(
-                    chat_id=tg_id,
-                    text=text,
-                    parse_mode="HTML",
-                )
+                try:
+                    msg = await courier_bot.send_message(
+                        chat_id=tg_id,
+                        text=text,
+                        parse_mode="HTML",
+                    )
+                    asyncio.create_task(
+                        delete_message_after_delay(
+                            courier_bot,
+                            tg_id,
+                            msg.message_id,
+                            delay=14400,
+                        )
+                    )
+                except Exception as e:
+                    log.error(f"Ошибка при отправке уведомления курьеру {tg_id}: {e}")
 
 
 async def city_couriers_notification():
@@ -56,9 +84,23 @@ async def city_couriers_notification():
             )
 
             for tg_id in tg_ids:
-                await customer_bot.send_message(
-                    chat_id=tg_id, text=text, parse_mode="HTML"
-                )
+                try:
+                    msg = await customer_bot.send_message(
+                        chat_id=tg_id,
+                        text=text,
+                        parse_mode="HTML",
+                    )
+
+                    asyncio.create_task(
+                        delete_message_after_delay(
+                            customer_bot,
+                            tg_id,
+                            msg.message_id,
+                            delay=14400,
+                        )
+                    )
+                except Exception as e:
+                    log.error(f"Ошибка при отправке уведомления клиенту {tg_id}: {e}")
 
 
 async def XP_points_notification():

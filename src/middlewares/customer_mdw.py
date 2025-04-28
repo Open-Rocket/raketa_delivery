@@ -18,6 +18,21 @@ from aiogram.types import ReplyKeyboardRemove
 from src.services import admin_data, customer_data
 from aiogram.exceptions import TelegramBadRequest
 
+RESTRICTED_COMMANDS_CUSTOMER = [
+    "/order",
+    "/my_orders",
+    "/profile",
+    "/faq",
+    "/rules",
+    "/become_courier",
+    "/become_partner",
+    "/channel",
+    "/notify",
+    "/promo",
+    "/support",
+    "/restart",
+]
+
 
 class CustomerOuterMiddleware(BaseMiddleware):
 
@@ -98,21 +113,6 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния пользователя и обработка сообщения"""
 
-    RESTRICTED_COMMANDS = [
-        "/order",
-        "/my_orders",
-        "/profile",
-        "/faq",
-        "/rules",
-        "/become_courier",
-        "/become_partner",
-        "/channel",
-        "/notify",
-        "/promo",
-        "/support",
-        "/restart",
-    ]
-
     async def restart_bot():
         await fsm_context.set_state(CustomerState.default.state)
         await customer_bot.send_message(
@@ -125,7 +125,7 @@ async def _check_state_and_handle_message(
 
     if state == CustomerState.ai_voice_order.state:
 
-        if event.text in RESTRICTED_COMMANDS or event.text == "/start":
+        if event.text in RESTRICTED_COMMANDS_CUSTOMER or event.text == "/start":
 
             await fsm_context.set_state(CustomerState.default.state)
             await customer_bot.send_message(
@@ -159,7 +159,7 @@ async def _check_state_and_handle_message(
         CustomerState.change_City.state,
         CustomerState.set_seed_key.state,
     ):
-        if event.text in RESTRICTED_COMMANDS:
+        if event.text in RESTRICTED_COMMANDS_CUSTOMER:
 
             await fsm_context.set_state(CustomerState.default.state)
             await asyncio.sleep(0.3)
@@ -193,7 +193,7 @@ async def _check_state_and_handle_message(
         CustomerState.reg_City.state,
         CustomerState.reg_tou.state,
     ):
-        if event.text in RESTRICTED_COMMANDS:
+        if event.text in RESTRICTED_COMMANDS_CUSTOMER:
             await event.delete()
             return
 
@@ -207,12 +207,12 @@ async def _check_state_and_handle_message(
     log.info(f"reg_status: {tg_id} {user_is_reg}")
 
     if not user_is_reg:
-        if event.text in RESTRICTED_COMMANDS:
+        if event.text in RESTRICTED_COMMANDS_CUSTOMER:
             await event.answer(text="Вы не зарегистрировались!\n\n/start")
             return
 
     if state in (CustomerState.change_Phone.state,):
-        if event.text in RESTRICTED_COMMANDS or event.text == "/start":
+        if event.text in RESTRICTED_COMMANDS_CUSTOMER or event.text == "/start":
             await customer_bot.send_message(
                 chat_id=event.from_user.id,
                 text="-",

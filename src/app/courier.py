@@ -14,6 +14,7 @@ from ._deps import (
     zlib,
     Time,
     json,
+    asyncio,
     SUPER_ADMIN_TG_ID,
     courier_bot,
     courier_bot_id,
@@ -38,6 +39,7 @@ from ._deps import (
     F,
     find_closest_city,
     send_notification_to_couriers,
+    delete_message_after_delay,
     ceil,
 )
 
@@ -340,6 +342,32 @@ async def courier_accept_tou(
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
 
+        new_courier_info = (
+            "Добро пожаловать в команду курьеров!\n\n"
+            "Наш сервис создан, чтобы напрямую связывать вас — исполнителей, с клиентами.\n"
+            "Без посредников. Без скрытых комиссий.\n\n"
+            "Что важно знать:\n"
+            "• Вы получаете оплату напрямую от клиента — никаких процентов и вычетов.\n"
+            "• Чтобы работать, нужно оформить подписку — она стоит совсем недорого и быстро окупается.\n"
+            "• Уже после 2–3 доставок вы полностью покрываете стоимость подписки и начинаете зарабатывать в плюс.\n"
+            "• Сейчас сервис работает через Telegram-бота, но по сути это полноценное приложение, которое мы активно развиваем.\n"
+            "• Мы уже строим отдельное мобильное приложение — с каждой неделей сервис будет становиться удобнее, быстрее и технологичнее.\n"
+            "• У проекта есть чёткий вектор развития и амбициозные цели — мы растём вместе с вами.\n\n"
+            "Какие типы доставок доступны:\n"
+            "• p2p — передача вещей между людьми (ключи, документы, покупки).\n"
+            "• b2c — доставка от магазинов и сервисов клиентам.\n\n"
+            "<b>⚡️ Важно: только нормальные и легальные заказы. Никаких странных поручений или запрещённых товаров.</b>\n\n"
+            "Вы сами выбираете, сколько работать и какие заказы брать.\n"
+            "Спасибо, что стали частью нашего сообщества. Всё только начинается!\n\n"
+            "<i>Принимайте оплату наличными или переводом!</i>"
+        )
+
+        await callback_query.message.answer(
+            text=new_courier_info,
+            disable_notification=False,
+            parse_mode="HTML",
+        )
+
         new_message = await callback_query.message.answer(
             text=text,
             disable_notification=False,
@@ -399,6 +427,7 @@ async def cmd_notify(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     notify_status = await courier_data.get_courier_notify_status(tg_id=tg_id)
 
@@ -414,12 +443,27 @@ async def cmd_notify(
         status_notify=not notify_status,
     )
 
-    await message.answer(
+    notify_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        notify_msg_id = data.get("notify_msg_id")
+        if notify_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=notify_msg_id,
+            )
+            await state.update_data(notify_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(notify_msg_id=notify_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -483,6 +527,7 @@ async def cmd_promo(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     courier_seed_key = await courier_data.get_courier_seed_key(tg_id)
 
@@ -508,12 +553,27 @@ async def cmd_promo(
 
         reply_kb = await kb.get_courier_kb("promo")
 
-        await message.answer(
+        promo_msg = await message.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            promo_msg_id = data.get("promo_msg_id")
+            if promo_msg_id:
+                await message.bot.delete_message(
+                    chat_id=tg_id,
+                    message_id=promo_msg_id,
+                )
+                await state.update_data(promo_msg_id=None)
+                await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+                await message.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(promo_msg_id=promo_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -546,16 +606,16 @@ async def data_set_PROMO(
         parse_mode="HTML",
     )
 
-    await callback_query.message.delete()
-
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+    await callback_query.message.delete()
 
 
 @courier_r.message(
     filters.StateFilter(CourierState.set_seed_key),
 )
-async def data_PROMO(
+async def msg_PROMO(
     message: Message,
     state: FSMContext,
 ):
@@ -787,6 +847,9 @@ async def cmd_run(
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 
+    if isinstance(event, Message):
+        await event.delete()
+
 
 @courier_r.callback_query(
     F.data == "lets_go_first",
@@ -867,6 +930,7 @@ async def get_location(
     courier_tg_id = event.from_user.id
     courier_city = await courier_data.get_courier_city(courier_tg_id)
     radius_km = await admin_data.get_distance_radius()
+    data = await state.get_data()
 
     if isinstance(event, CallbackQuery):
 
@@ -964,12 +1028,26 @@ async def get_location(
             disable_notification=True,
         )
 
-        await event.answer(
+        try:
+            orders_location_msg_id = data.get("orders_location_msg_id")
+            if orders_location_msg_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id,
+                    message_id=orders_location_msg_id,
+                )
+                await state.update_data(orders_location_msg_id=None)
+                await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        orders_location_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        await state.update_data(orders_location_msg_id=orders_location_msg.message_id)
 
     await state.set_state(current_state)
     await state.update_data(
@@ -1338,7 +1416,7 @@ async def accept_order(
             f"<i>*Принимайте оплату наличными или переводом!</i>\n\n"
             f"<i>*Поделитесь пожалуйста с заказчиком транслируемой геопозицией на время выполнения заказа чтобы он мог видеть его текущее местоположение!</i>\n\n"
             f"<i>*Нажмите на знак 📎 -> Геопозиция -> Транслировать геопозицию.</i>\n\n"
-            f"<i>*После завершения заказ перейдите в Меню -> Мои заказы -> Активные и нажмите на кнопку '✅ Доставил'</i>\n\n"
+            f"<i>*После завершения заказ перейдите в Меню -> Мои заказы -> Активные и нажмите на кнопку '✅ Выполнил'</i>\n\n"
         )
 
         await callback_query.answer("✅ Заказ принят!", show_alert=False)
@@ -1549,7 +1627,9 @@ async def cmd_my_orders(
 
     current_state = CourierState.myOrders.state
     is_callback = isinstance(event, CallbackQuery)
+    is_message = isinstance(event, Message)
     tg_id = event.from_user.id
+    data = await state.get_data()
 
     if is_callback:
         await event.answer(
@@ -1557,8 +1637,8 @@ async def cmd_my_orders(
             show_alert=False,
         )
 
-    active_count = len(await order_data.get_active_orders(tg_id))
-    completed_count = len(await order_data.get_completed_orders(tg_id))
+    active_count = len(await order_data.get_active_courier_orders(tg_id))
+    completed_count = len(await order_data.get_completed_courier_orders(tg_id))
 
     reply_kb = await kb.get_courier_orders_kb(active_count, completed_count)
     text = (
@@ -1576,14 +1656,29 @@ async def cmd_my_orders(
             disable_notification=True,
             parse_mode="HTML",
         )
-    else:
+    elif is_message:
 
-        await event.answer(
+        my_orders_message = await event.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            my_orders_message_id = data.get("my_orders_message_id")
+            if my_orders_message_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id,
+                    message_id=my_orders_message_id,
+                )
+                await state.update_data(my_orders_message_id=None)
+                await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(my_orders_message_id=my_orders_message.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -1607,12 +1702,12 @@ async def get_my_orders(
 
     order_status_mapping = {
         "active_orders": (
-            order_data.get_active_orders,
+            order_data.get_active_courier_orders,
             CourierState.myOrders_active,
             "активных",
         ),
         "completed_orders": (
-            order_data.get_completed_orders,
+            order_data.get_completed_courier_orders,
             CourierState.myOrders_completed,
             "завершённых",
         ),
@@ -1772,8 +1867,7 @@ async def cmd_profile(
     tg_id = message.from_user.id
     moscow_time = await Time.get_moscow_time()
 
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     courier_name, courier_phone, courier_city, end_date = (
         await courier_data.get_courier_full_info(tg_id)
@@ -1799,17 +1893,36 @@ async def cmd_profile(
         f"<b>Номер:</b> {courier_phone}\n"
         f"<b>Город:</b> {courier_city}\n\n"
         f"{subscription_status}"
-        f"Ваши очки опыта: <b>{courier_XP}</b>\n\n"
+        f"Ваши очки опыта: <b>{round(courier_XP, 2)}</b>\n\n"
     )
 
     reply_kb = await kb.get_courier_kb("/profile")
 
-    await message.answer(
+    my_profile_msg = await message.answer(
         text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        my_profile_msg_id = data.get("my_profile_msg_id")
+        if my_profile_msg_id:
+            await message.bot.delete_message(
+                chat_id=message.chat.id,
+                message_id=my_profile_msg_id,
+            )
+            await state.update_data(my_profile_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(my_profile_msg_id=my_profile_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
 @courier_r.callback_query(
@@ -2030,25 +2143,41 @@ async def cmd_info(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
         f"Здесь вы можете ознакомиться с основной информацией о сервисе, задать вопрос или предложить свою идею!\n\n"
-        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"https://disk.yandex.ru/i/NiwitOTuU0YPXQ
+        f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
         f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>\n"
         f" •\n"
         f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
     )
 
-    await message.answer(
+    info_msg = await message.answer(
         text,
         disable_notification=True,
         disable_web_page_preview=True,
         parse_mode="HTML",
     )
+
+    try:
+        info_msg_id = data.get("info_msg_id")
+        if info_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=info_msg_id,
+            )
+            await state.update_data(info_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(info_msg_id=info_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
 @courier_r.message(
@@ -2062,9 +2191,7 @@ async def cmd_rules(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
@@ -2077,12 +2204,30 @@ async def cmd_rules(
         f"вашего государства и общепринятым этическим нормам.</i>\n\n"
     )
 
-    await message.answer(
+    rules_msg = await message.answer(
         text,
         disable_notification=True,
         disable_web_page_preview=True,
         parse_mode="HTML",
     )
+
+    try:
+        rules_msg_id = data.get("rules_msg_id")
+        if rules_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=rules_msg_id,
+            )
+            await state.update_data(rules_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(rules_msg_id=rules_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
 @courier_r.message(
@@ -2126,9 +2271,7 @@ async def cmd_become_partner(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
+    data = await state.get_data()
 
     refund_percent = await admin_data.get_refund_percent()
 
@@ -2143,13 +2286,31 @@ async def cmd_become_partner(
     ttl = await title.get_title_courier("/become_partner")
     reply_kb = await kb.get_courier_kb("/become_partner")
 
-    await message.answer_photo(
+    partners_msg = await message.answer_photo(
         photo=ttl,
         caption=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        partners_msg_id = data.get("partners_msg_id")
+        if partners_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=partners_msg_id,
+            )
+            await state.update_data(partners_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(partners_msg_id=partners_msg.message_id)
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
 
 
 @courier_r.message(
@@ -2196,6 +2357,7 @@ async def cmd_channel(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -2210,12 +2372,27 @@ async def cmd_channel(
 
     reply_kb = await kb.get_courier_kb("/channel")
 
-    await message.answer(
+    channel_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        channel_msg_id = data.get("channel_msg_id")
+        if channel_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=channel_msg_id,
+            )
+            await state.update_data(channel_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(channel_msg_id=channel_msg.message_id)
 
 
 # ---
@@ -2232,6 +2409,7 @@ async def cmd_support(
 
     current_state = CourierState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"👨‍💼 <b>Поддержка</b>\n\n"
@@ -2242,12 +2420,27 @@ async def cmd_support(
 
     reply_kb = await kb.get_customer_kb("/support")
 
-    await message.answer(
+    support_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        support_msg_id = data.get("support_msg_id")
+        if support_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=support_msg_id,
+            )
+            await state.update_data(support_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(support_msg_id=support_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
@@ -2322,6 +2515,7 @@ async def payment_invoice(
 
     tg_id = event.from_user.id
     moscow_time = await Time.get_moscow_time()
+    data = await state.get_data()
 
     current_state = CourierState.default.state
     await state.set_state(current_state)
@@ -2329,7 +2523,19 @@ async def payment_invoice(
 
     if isinstance(event, CallbackQuery):
         await event.answer("💵 Оформить подписку", show_alert=False)
-        await event.message.delete()
+    elif isinstance(event, Message):
+        try:
+            extend_msg_id = data.get("extend_msg_id")
+            if extend_msg_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id,
+                    message_id=extend_msg_id,
+                )
+                await state.update_data(extend_msg_id=None)
+                await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
 
     _, _, _, end_date = await courier_data.get_courier_full_info(tg_id)
 
@@ -2346,16 +2552,18 @@ async def payment_invoice(
 
         keyboard = await kb.get_courier_kb("extend_sub")
 
-        await event.answer(
+        extend_msg = await event.answer(
             text=text,
             reply_markup=keyboard,
             disable_notification=True,
             parse_mode="HTML",
         )
 
+        await state.update_data(extend_msg_id=extend_msg.message_id)
+
     else:
 
-        await _use_XP(event)
+        await _use_XP(event, state)
 
 
 @payment_r.callback_query(
@@ -2363,20 +2571,26 @@ async def payment_invoice(
 )
 async def extend_subscription(
     event: CallbackQuery,
+    state: FSMContext,
 ):
     """Обрабатывает запрос на продление подписки. extend_sub"""
 
     await event.message.delete()
 
-    await _use_XP(event)
+    await _use_XP(event, state)
 
 
 async def _use_XP(
     event: Message | CallbackQuery,
+    state: FSMContext,
 ):
     """Использует очки опыта для оплаты подписки, не снижая цену ниже 200₽."""
 
     tg_id = event.from_user.id
+    data = await state.get_data()
+
+    is_message = isinstance(event, Message)
+    is_callback = isinstance(event, CallbackQuery)
 
     # Получаем количество XP и цену подписки в рублях
     courier_XP = await courier_data.get_courier_XP(tg_id)
@@ -2390,7 +2604,7 @@ async def _use_XP(
     max_xp_to_apply = max(price_rub - 200, 0)
 
     # Фактически применяем XP (если хватает, применим максимум)
-    applied_xp = min(courier_XP, max_xp_to_apply)
+    applied_xp = round(min(courier_XP, max_xp_to_apply), 2)
 
     # Финальная цена после списания XP
     new_price_rub = round(price_rub - applied_xp, 2)
@@ -2405,7 +2619,7 @@ async def _use_XP(
         f"Выберите способ оплаты:\n\n"
         f"💵 Оплатить подписку\n"
         f"✴️ Использовать очки опыта\n\n"
-        f"<b>Текущий XP:</b> {courier_XP}\n"
+        f"<b>Текущий XP:</b> {round(courier_XP,2)}\n"
         f"<b>Используем XP:</b> {applied_xp}\n"
         f"<b>К оплате:</b> {new_price_rub}₽"
     )
@@ -2417,21 +2631,39 @@ async def _use_XP(
         new_price=new_price_rub,
     )
 
-    if isinstance(event, Message):
-        await event.answer(
+    invoice_msg = None
+
+    if is_message:
+        invoice_msg = await event.answer(
             text=text,
             reply_markup=keyboard,
             disable_notification=True,
             parse_mode="HTML",
         )
 
-    elif isinstance(event, CallbackQuery):
-        await event.message.answer(
+    elif is_callback:
+        invoice_msg = await event.message.answer(
             text=text,
             reply_markup=keyboard,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+    try:
+        invoice_msg_id = data.get("invoice_msg_id")
+        if invoice_msg_id:
+            await event.bot.delete_message(
+                chat_id=event.message.chat.id if is_callback else event.chat.id,
+                message_id=invoice_msg_id,
+            )
+            await state.update_data(extend_msg_id=None)
+            await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+            if is_message:
+                await event.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(invoice_msg_id=invoice_msg.message_id)
 
 
 @payment_r.callback_query(
@@ -2609,11 +2841,11 @@ async def successful_payment(
 
         if is_updated:
             ttl = await title.get_title_courier("success_payment")
-            text = f"Спасибо за подписку!\nСумма: {summa} {message.successful_payment.currency}"
+            text = f"Спасибо за подписку!\nСумма: {summa} {message.successful_payment.currency}\n+30 дней!"
             reply_kb = await kb.get_courier_kb(
                 "success_payment",
             )
-            await message.answer_photo(
+            success_msg = await message.answer_photo(
                 photo=ttl,
                 caption=text,
                 reply_markup=reply_kb,
@@ -2646,6 +2878,12 @@ async def successful_payment(
     except Exception as e:
         log.error(f"Error updating subscription for courier {tg_id}: {e}")
     finally:
+        try:
+            asyncio.create_task(
+                delete_message_after_delay(tg_id, success_msg.message_id, delay=900)
+            )
+        except Exception as e:
+            log.error(f"Ошибка при удалении успешной оплаты: {e}")
         try:
             invoice_message_id = data.get("invoice_message_id")
             if invoice_message_id:

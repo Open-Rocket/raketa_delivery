@@ -1,5 +1,6 @@
 import re
 import emoji
+import asyncio
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from typing import Callable, Dict, Any, Awaitable
@@ -15,6 +16,23 @@ from src.config import courier_bot
 from aiogram.types import ReplyKeyboardRemove, ContentType
 from src.services import admin_data, courier_data
 from aiogram.exceptions import TelegramBadRequest
+
+RESTRICTED_COMMANDS_COURIER = [
+    "/run",
+    "/my_orders",
+    "/profile",
+    "/subs",
+    "/faq",
+    "/rules",
+    "/make_order",
+    "/channel",
+    "/become_partner",
+    "/orders_bot",
+    "/promo",
+    "/notify",
+    "/support",
+    "/restart",
+]
 
 
 class CourierOuterMiddleware(BaseMiddleware):
@@ -94,23 +112,6 @@ async def _check_state_and_handle_message(
 ):
     """Проверка состояния курьера и обработка сообщения"""
 
-    RESTRICTED_COMMANDS = [
-        "/run",
-        "/my_orders",
-        "/profile",
-        "/subs",
-        "/faq",
-        "/rules",
-        "/make_order",
-        "/channel",
-        "/become_partner",
-        "/orders_bot",
-        "/promo",
-        "/notify",
-        "/support",
-        "/restart",
-    ]
-
     async def restart_bot():
         await fsm_context.set_state(CourierState.default.state)
         await courier_bot.send_message(
@@ -127,14 +128,18 @@ async def _check_state_and_handle_message(
         ]:
             return await handler(event, data)
 
+    if state == CourierState.set_seed_key.state:
+        if event.text in RESTRICTED_COMMANDS_COURIER:
+            await fsm_context.set_state(CourierState.default.state)
+            return await handler(event, data)
+
     if state in (
         CourierState.change_Name.state,
         CourierState.change_City.state,
-        CourierState.set_seed_key.state,
     ):
-        if event.text in RESTRICTED_COMMANDS:
-
+        if event.text in RESTRICTED_COMMANDS_COURIER:
             await fsm_context.set_state(CourierState.default.state)
+            await asyncio.sleep(0.3)
             return await handler(event, data)
 
     if state in (
@@ -165,7 +170,7 @@ async def _check_state_and_handle_message(
         CourierState.reg_City.state,
         CourierState.reg_tou.state,
     ):
-        if event.text in RESTRICTED_COMMANDS:
+        if event.text in RESTRICTED_COMMANDS_COURIER:
             await event.delete()
             return
 
@@ -174,7 +179,7 @@ async def _check_state_and_handle_message(
     log.info(f"reg_status: {tg_id} {user_is_reg}")
 
     if not user_is_reg:
-        if event.text in RESTRICTED_COMMANDS:
+        if event.text in RESTRICTED_COMMANDS_COURIER:
             await event.answer(text="Вы не зарегистрировались!\n\n/start")
             return
 

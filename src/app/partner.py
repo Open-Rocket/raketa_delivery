@@ -206,6 +206,7 @@ async def cmd_refs(
 
     tg_id = event.from_user.id
     current_state = PartnerState.default.state
+    data = await state.get_data()
 
     customers, couriers = await partner_data.get_all_my_seed_key_referrals(tg_id=tg_id)
     paid_subscriptions = await partner_data.get_paid_subscriptions_count(tg_id=tg_id)
@@ -231,12 +232,27 @@ async def cmd_refs(
     new_kb_json = json.dumps(reply_kb.model_dump())
 
     if isinstance(event, Message):
-        await event.answer(
+        refs_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            refs_msg_id = data.get("refs_msg_id")
+            if refs_msg_id:
+                await event.bot.delete_message(
+                    chat_id=tg_id,
+                    message_id=refs_msg_id,
+                )
+                await state.update_data(refs_msg_id=None)
+                await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(refs_msg_id=refs_msg.message_id)
 
     elif isinstance(event, CallbackQuery):
 
@@ -269,6 +285,7 @@ async def cmd_key(
 
     current_state = PartnerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     seed_key = await partner_data.get_my_seed_key(tg_id)
     refund_percent = await admin_data.get_refund_percent()
@@ -279,11 +296,26 @@ async def cmd_key(
         f"<b>🔑 Ваш ключ:</b> <code>{seed_key}</code>  👈 <i>Нажмите</i>"
     )
 
-    await message.answer(
+    key_msg = await message.answer(
         text=text,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        key_msg_id = data.get("key_msg_id")
+        if key_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=key_msg_id,
+            )
+            await state.update_data(key_msg_id=None)
+            await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(key_msg_id=key_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
@@ -300,6 +332,7 @@ async def cmd_info(
 
     current_state = PartnerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"ℹ️ <b>Информация</b>\n\n"
@@ -308,12 +341,27 @@ async def cmd_info(
         f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
     )
 
-    await message.answer(
+    info_msg = await message.answer(
         text=text,
         disable_notification=True,
         parse_mode="HTML",
         disable_web_page_preview=True,
     )
+
+    try:
+        info_msg_id = data.get("info_msg_id")
+        if info_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=info_msg_id,
+            )
+            await state.update_data(info_msg_id=None)
+            await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(info_msg_id=info_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
@@ -333,6 +381,7 @@ async def cmd_balance(
 
     tg_id = event.from_user.id
     current_state = PartnerState.default.state
+    data = await state.get_data()
 
     balance = await partner_data.get_partner_balance(tg_id)
 
@@ -351,12 +400,27 @@ async def cmd_balance(
     new_kb_json = json.dumps(reply_kb.model_dump())
 
     if isinstance(event, Message):
-        await event.answer(
+        balance_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             parse_mode="HTML",
         )
+
+        try:
+            balance_msg_id = data.get("balance_msg_id")
+            if balance_msg_id:
+                await event.bot.delete_message(
+                    chat_id=tg_id,
+                    message_id=balance_msg_id,
+                )
+                await state.update_data(balance_msg_id=None)
+                await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(balance_msg_id=balance_msg.message_id)
 
     elif isinstance(event, CallbackQuery):
 
@@ -392,6 +456,7 @@ async def cmd_support(
 
     current_state = PartnerState.default.state
     tg_id = message.from_user.id
+    data = await state.get_data()
 
     text = (
         f"👨‍💼 <b>Поддержка</b>\n\n"
@@ -402,12 +467,27 @@ async def cmd_support(
 
     reply_kb = await kb.get_customer_kb("/support")
 
-    await message.answer(
+    support_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        support_msg_id = data.get("support_msg_id")
+        if support_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=support_msg_id,
+            )
+            await state.update_data(support_msg_id=None)
+            await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(support_msg_id=support_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)
@@ -428,6 +508,7 @@ async def cmd_adv(
 
     tg_id = message.from_user.id
     current_state = PartnerState.default.state
+    data = await state.get_data()
 
     text = (
         f"📈 <b>Рекламные материалы</b>\n\n"
@@ -441,12 +522,27 @@ async def cmd_adv(
 
     reply_kb = await kb.get_partner_kb("adv_request")
 
-    await message.answer(
+    adv_msg = await message.answer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
         parse_mode="HTML",
     )
+
+    try:
+        adv_msg_id = data.get("adv_msg_id")
+        if adv_msg_id:
+            await message.bot.delete_message(
+                chat_id=tg_id,
+                message_id=adv_msg_id,
+            )
+            await state.update_data(adv_msg_id=None)
+            await rediska.save_fsm_state(state, partner_bot_id, tg_id)
+            await message.delete()
+    except Exception as e:
+        log.warning(f"Не удалось удалить сообщение: {e}")
+
+    await state.update_data(adv_msg_id=adv_msg.message_id)
 
     await state.set_state(current_state)
     await rediska.set_state(partner_bot_id, tg_id, current_state)

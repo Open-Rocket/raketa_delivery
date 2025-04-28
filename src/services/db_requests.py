@@ -405,6 +405,19 @@ class CourierData:
             )
             return query.scalars().all()
 
+    async def get_all_couriers_tg_ids_notify_status_true_in_current_city(
+        self, city: str
+    ) -> list:
+        """Возвращает список tg_id всех курьеров в указанном городе"""
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Courier.courier_tg_id).where(
+                    Courier.notify_status == True,
+                    Courier.courier_city == city,
+                ),
+            )
+            return query.scalars().all()
+
     # ---
 
     async def get_couriers_in_city(self, city) -> list:
@@ -885,7 +898,7 @@ class CourierData:
                 if not courier:
                     return False
 
-                courier.courier_XP += new_XP
+                courier.courier_XP += round(new_XP, 2)
                 await session.commit()
                 return True
             except Exception as e:
@@ -903,7 +916,7 @@ class CourierData:
                 if not courier:
                     return 0
 
-                return courier.courier_XP
+                return round(courier.courier_XP, 2)
             except Exception as e:
                 log.error(f"Ошибка при получении XP курьера: {e}")
                 return 0
@@ -2927,6 +2940,7 @@ class OrderData:
                     Customer.customer_tg_id == tg_id,
                     Order.order_status == OrderStatus.PENDING,
                 )
+                .order_by(Order.created_at_moscow_time.desc())
             )
             return query.scalars().all()
 
@@ -2944,6 +2958,25 @@ class OrderData:
                     Customer.customer_tg_id == tg_id,
                     Order.order_status == OrderStatus.IN_PROGRESS,
                 )
+                .order_by(Order.created_at_moscow_time.desc())
+            )
+            return query.scalars().all()
+
+    async def get_active_courier_orders(self, tg_id: int) -> list:
+        """Возвращает активные заказы курьера"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Courier,
+                    Courier.courier_id == Order.courier_id,
+                )
+                .where(
+                    Courier.courier_tg_id == tg_id,
+                    Order.order_status == OrderStatus.IN_PROGRESS,
+                )
+                .order_by(Order.created_at_moscow_time.desc())
             )
             return query.scalars().all()
 
@@ -2978,6 +3011,25 @@ class OrderData:
                     Customer.customer_tg_id == tg_id,
                     Order.order_status == OrderStatus.COMPLETED,
                 )
+                .order_by(Order.completed_at_moscow_time.desc())
+            )
+            return query.scalars().all()
+
+    async def get_completed_courier_orders(self, tg_id: int) -> list:
+        """Возвращает завершенные заказы"""
+
+        async with self.async_session_factory() as session:
+            query = await session.execute(
+                select(Order)
+                .join(
+                    Courier,
+                    Courier.courier_id == Order.courier_id,
+                )
+                .where(
+                    Courier.courier_tg_id == tg_id,
+                    Order.order_status == OrderStatus.COMPLETED,
+                )
+                .order_by(Order.completed_at_moscow_time.desc())
             )
             return query.scalars().all()
 
@@ -3022,7 +3074,9 @@ class OrderData:
         async with self.async_session_factory() as session:
 
             query = await session.execute(
-                select(Order).where(Order.order_status == OrderStatus.PENDING)
+                select(Order)
+                .where(Order.order_status == OrderStatus.PENDING)
+                .order_by(Order.created_at_moscow_time.desc())
             )
 
             all_orders = query.scalars().all()
@@ -3062,9 +3116,12 @@ class OrderData:
         """Возвращает все ожидающие заказы в указанном городе"""
         async with self.async_session_factory() as session:
             query = await session.execute(
-                select(Order).where(
-                    Order.order_city == city, Order.order_status == OrderStatus.PENDING
+                select(Order)
+                .where(
+                    Order.order_city == city,
+                    Order.order_status == OrderStatus.PENDING,
                 )
+                .order_by(Order.created_at_moscow_time.desc())
             )
 
             city_orders = query.scalars().all()

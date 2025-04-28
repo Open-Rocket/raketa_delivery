@@ -68,7 +68,8 @@ async def main():
             main_worker(),
             main_scheduler(),
         )
-
+    except Exception as e:
+        log.error(f"Глобальная ошибка: {e}")
     finally:
         await rediska.redis.aclose()
 

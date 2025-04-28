@@ -154,6 +154,7 @@ async def cmd_users(
     """Обработчик команды /users и обновления списка пользователей."""
 
     tg_id = event.from_user.id
+    data = await state.get_data()
 
     all_admins = await admin_data.get_all_admins()
 
@@ -189,11 +190,26 @@ async def cmd_users(
     new_kb_json = json.dumps(reply_kb.model_dump())
 
     if isinstance(event, Message):
-        await event.answer(
+        users_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             parse_mode="HTML",
         )
+
+        try:
+            users_msg_id = data.get("users_msg_id")
+            if users_msg_id:
+                await event.bot.delete_message(
+                    chat_id=tg_id,
+                    message_id=users_msg_id,
+                )
+                await state.update_data(users_msg_id=None)
+                await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        await state.update_data(users_msg_id=users_msg.message_id)
 
     elif isinstance(event, CallbackQuery):
 
@@ -479,6 +495,7 @@ async def send_mailing(
                     chat_id=tg_id,
                     text=msg_text_mailing,
                     disable_notification=True,
+                    disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
         case AdminState.mailing_couriers.state:
@@ -490,6 +507,7 @@ async def send_mailing(
                     chat_id=tg_id,
                     text=msg_text_mailing,
                     disable_notification=True,
+                    disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
         case AdminState.mailing_partners.state:
@@ -499,6 +517,7 @@ async def send_mailing(
                     chat_id=tg_id,
                     text=msg_text_mailing,
                     disable_notification=True,
+                    disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
 
@@ -893,8 +912,8 @@ async def cmd_orders(
     """Обработчик команды /orders для админа."""
 
     tg_id = event.from_user.id
-
     all_admins = await admin_data.get_all_admins()
+    data = await state.get_data()
 
     if tg_id != SUPER_ADMIN_TG_ID and tg_id not in [
         admin.admin_tg_id for admin in all_admins
@@ -939,11 +958,27 @@ async def cmd_orders(
     new_kb_json = json.dumps(reply_kb.model_dump())
 
     if isinstance(event, Message):
-        await event.answer(
+
+        try:
+            orders_msg_id = data.get("orders_msg_id")
+            if orders_msg_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id,
+                    message_id=orders_msg_id,
+                )
+                await state.update_data(orders_msg_id=None)
+                await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        orders_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             parse_mode="HTML",
         )
+
+        await state.update_data(orders_msg_id=orders_msg.message_id)
 
     elif isinstance(event, CallbackQuery):
 
@@ -1060,6 +1095,8 @@ async def cmd_global(
     tg_id = event.from_user.id
     current_state = AdminState.default.state
     all_admins = await admin_data.get_all_admins()
+
+    data = await state.get_data()
 
     if tg_id != SUPER_ADMIN_TG_ID and tg_id not in [
         admin.admin_tg_id for admin in all_admins
@@ -1244,13 +1281,29 @@ async def cmd_global(
     new_kb_json = json.dumps(reply_kb.model_dump())
 
     if isinstance(event, Message):
-        await event.answer(
+
+        try:
+            global_msg_id = data.get("global_msg_id")
+            if global_msg_id:
+                await event.bot.delete_message(
+                    chat_id=event.chat.id,
+                    message_id=global_msg_id,
+                )
+                await state.update_data(my_profile_msg_id=None)
+                await rediska.save_fsm_state(state, admin_bot_id, tg_id)
+                await event.delete()
+        except Exception as e:
+            log.warning(f"Не удалось удалить сообщение: {e}")
+
+        global_msg = await event.answer(
             text=text,
             reply_markup=reply_kb,
             disable_notification=True,
             disable_web_page_preview=True,
             parse_mode="HTML",
         )
+
+        await state.update_data(global_msg_id=global_msg.message_id)
 
     elif isinstance(event, CallbackQuery):
 
