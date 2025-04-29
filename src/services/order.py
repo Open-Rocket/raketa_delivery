@@ -22,7 +22,7 @@ class OrderFormatter:
     ) -> dict:
         """Готовит все необходимые данные для формирования заказа и возвращает их."""
 
-        log.info(f"_perepare_data addresses: {addresses}")
+        # log.info(f"_perepare_data addresses: {addresses}")
 
         if not addresses or addresses == "no_address":
             return {

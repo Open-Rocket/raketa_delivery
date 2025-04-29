@@ -2,6 +2,7 @@ from .clock import Time
 from .db import db_settings
 from .logger import log
 from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY, GEMINI_API_KEY
+from .rabbit_mq import RABBIT_URL
 from .geocoder import YANDEX_API_KEY_Gogich, YANDEX_API_KEY_Olia, YANDEX_API_KEY_Erel
 from .payment import payment_provider
 from .routers import (
@@ -75,4 +76,5 @@ __all__ = [
     "admin_fallback",
     "partner_r",
     "partner_fallback",
+    "RABBIT_URL",
 ]

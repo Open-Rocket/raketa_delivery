@@ -15,7 +15,7 @@ class SeedMaker:
     async def generate_seed():
         """Генерирует уникальный ключ для партнёра"""
         return "".join(
-            secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8)
+            secrets.choice(string.ascii_uppercase + string.digits) for _ in range(5)
         )
 
     @staticmethod
@@ -55,9 +55,9 @@ class SeedMaker:
         c.setFillColorRGB(1, 1, 1)
 
         x, y = (
-            (150, 85)
+            (205, 85)
             if type_template in ("business_card_courier", "business_card_customer")
-            else (300, 170)
+            else (470, 170)
         )
         c.drawString(x, y, seed_key)
 

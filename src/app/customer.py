@@ -158,7 +158,7 @@ async def data_name_customer(
         f"Привет, {customer_name}!👋\n\nЧтобы мы могли быстро оформить заказ и курьер смог связаться с вами "
         f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
         f"<i>*Нажмите на значок команд рядом с полем ввода.</i>\n\n"
-        f"<i>*Отправка номера возможно только по клику на кнопку 'Поделиться номером'!</i>\n\n"
+        f"<b>⚡️ Отправка номера возможно только по клику на кнопку 'Поделиться номером'!</b>\n\n"
         f"<b>Ваш номер:</b>"
     )
     new_message = await message.answer(
@@ -484,144 +484,6 @@ async def _process_order_logic(
     moscow_time = await Time.get_moscow_time()
 
     try:
-        city, addresses, delivery_object, description = (
-            await gemini_assistant.process_order(
-                text_msg,
-                customer_city,
-            )
-        )
-
-        if city == "N":
-            await _handle_error_response(
-                message,
-                wait_message,
-                "moderation_failed",
-                state,
-            )
-            return
-
-        if city == None:
-            try:
-                city, addresses, delivery_object, description = (
-                    await assistant.process_order(
-                        text_msg,
-                        customer_city,
-                    )
-                )
-                if city == "N":
-                    await _handle_error_response(
-                        message,
-                        wait_message,
-                        "moderation_failed",
-                        state,
-                    )
-                    return
-            except Exception as e:
-                await _handle_error_response(
-                    message,
-                    wait_message,
-                    "general",
-                    state,
-                )
-                log.error(f"Error: {e}")
-                return
-
-    except Exception as e:
-        await _handle_error_response(
-            message,
-            wait_message,
-            "general",
-            state,
-        )
-        log.error(f"Error: {e}")
-        return
-
-    prepare_dict = await formatter._prepare_data(
-        time=moscow_time,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
-        city=city,
-        addresses=addresses,
-        delivery_object=delivery_object,
-        description=description,
-    )
-
-    if not prepare_dict:
-        await _handle_error_response(
-            message,
-            wait_message,
-            "general",
-            state,
-        )
-        return
-
-    customer_discount = await customer_data.get_customer_discount(tg_id)
-
-    order_info_data = await formatter.format_order_form(
-        prepare_dict,
-        customer_discount,
-    )
-
-    show_discount = False
-
-    if len(order_info_data) == 3:
-        order_info, price, discount_price = order_info_data
-        prepare_dict["price"] = discount_price
-        show_discount = True
-
-    elif len(order_info_data) == 1:
-        order_info = order_info_data[0]
-        show_discount = False
-
-    reply_kb = await kb.get_customer_kb("voice_order_accept")
-
-    await message.answer(
-        text=f"Проверяйте правильность заказа!",
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    await message.answer(
-        text=order_info,
-        reply_markup=reply_kb,
-        disable_notification=False,
-        disable_web_page_preview=True,
-        parse_mode="HTML",
-    )
-
-    if show_discount:
-        await message.answer(
-            text=f"🪙 Ваша скидка 50% = <s>{price}₽</s> {discount_price}₽",
-            disable_notification=True,
-            parse_mode="HTML",
-        )
-
-    if wait_message:
-        await wait_message.delete()
-
-    await state.set_state(current_state)
-    await state.update_data(current_order_info=(prepare_dict, order_info))
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
-    await rediska.save_fsm_state(state, customer_bot_id, tg_id)
-
-
-async def _process_order_logic(
-    text_msg: str,
-    message: Message,
-    state: FSMContext,
-    wait_message: Message,
-):
-    """Логика обработки заказа клиента."""
-
-    current_state = CustomerState.assistant_run.state
-    tg_id = message.from_user.id
-    customer_name, customer_phone, customer_city = await rediska.get_user_info(
-        customer_bot_id,
-        tg_id,
-    )
-    moscow_time = await Time.get_moscow_time()
-
-    try:
         is_moderation, city, addresses, delivery_object, description = (
             await assistant.process_order(
                 text_msg,
@@ -629,7 +491,7 @@ async def _process_order_logic(
             )
         )
 
-        log.info(f"moderation status: {is_moderation}")
+        # log.info(f"moderation status: {is_moderation}")
 
         if is_moderation is False:
             await _handle_error_response(

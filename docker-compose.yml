@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres_raketa
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    ports:
+      - '5432:5432'
+    networks:
+      - raketa_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq_raketa
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - '5672:5672' # порт для работы брокера
+      - '15672:15672' # порт для веб-панели RabbitMQ
+    networks:
+      - raketa_network
+
+  redis:
+    image: redis:7
+    container_name: redis_raketa
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - ./src/confredis/redisdata:/data
+    command: ['redis-server', '--dir', '/data']
+    networks:
+      - raketa_network
+
+  raketa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raketa_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - raketa_network
+    ports:
+      - '8000:80'
+
+networks:
+  raketa_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -4,10 +4,8 @@ from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
 from src.app.admin import admin_r, admin_fallback
 from src.app.partner import partner_r, partner_fallback
-from src.utils.tasks import send_notification_to_couriers
 from aiogram.exceptions import TelegramBadRequest
 from src.tasks.worker import main_worker
-from src.tasks.scheduler import main_scheduler
 
 
 from src.middlewares import (
@@ -66,7 +64,6 @@ async def main():
             admin_dp.start_polling(admin_bot, skip_updates=True),
             partner_dp.start_polling(partner_bot, skip_updates=True),
             main_worker(),
-            main_scheduler(),
         )
     except Exception as e:
         log.error(f"Глобальная ошибка: {e}")

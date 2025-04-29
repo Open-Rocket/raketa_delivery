@@ -113,7 +113,7 @@ class AssistantOpenAi:
             description = response.get("description", "-")
             taxi_order = response.get("is_taxi", "")
 
-            log.info(f"response_str: {response_str}")
+            # log.info(f"response_str: {response_str}")
 
             if isinstance(addresses, str):
                 if addresses == "no_address":

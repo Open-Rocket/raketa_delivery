@@ -1,9 +1,15 @@
+import os
+from dotenv import load_dotenv
 import redis.asyncio as aioredis
+
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST")
 
 
 class RedisConfig:
 
-    REDIS_URL = "redis://localhost"
+    REDIS_URL = f"redis://{REDIS_HOST}"
 
     @staticmethod
     async def create_redis() -> aioredis.Redis:
