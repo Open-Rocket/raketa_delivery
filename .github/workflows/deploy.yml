@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: raketa deploy
 
 on:
   push:
@@ -19,5 +19,4 @@ jobs:
           script: |
             cd /opt/raketa
             git pull origin main
-            docker-compose build
-            docker-compose up -d
+            docker-compose up --build -d
