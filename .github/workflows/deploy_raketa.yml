@@ -1,4 +1,4 @@
-name: raketa deploy
+name: deploy_raketa
 
 on:
   push:

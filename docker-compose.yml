@@ -34,7 +34,7 @@ services:
     ports:
       - '127.0.0.1:6379:6379'
     volumes:
-      - ./src/confredis/redisdata:/data
+      - redisdata:/data
     command: ['redis-server', '--dir', '/data']
     networks:
       - raketa_network
