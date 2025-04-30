@@ -20,7 +20,4 @@ jobs:
             cd /opt/raketa_delivery
             git pull origin main
 
-            docker-compose down --volumes --remove-orphans || true
-            docker image prune -f || true
-
             docker-compose up --build -d
