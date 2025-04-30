@@ -27,4 +27,4 @@ RUN chmod +x src/models/create_db.py
 RUN pkill -f "python run.py" || true 
 
 # Запуск
-CMD ["sh", "-c", "python -m src.models.create_db && ./run.py"]
+CMD ["python", "-m", "src.models.create_db && ./run.py"]
