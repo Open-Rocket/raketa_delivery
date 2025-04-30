@@ -1,23 +1,30 @@
 FROM python:3.11.12
 
-RUN apt-get update && apt-get install -y gcc musl-dev python3-dev libffi-dev libssl-dev cargo ffmpeg flac
+# Устанавливаем зависимости системы
+RUN apt-get update && apt-get install -y \
+    gcc musl-dev python3-dev libffi-dev libssl-dev \
+    cargo ffmpeg flac git
 
-WORKDIR /raketa
-
-COPY requirements.txt /raketa
-
+# Устанавливаем uv
 RUN pip install --no-cache-dir uv
 
-RUN uv pip install --system --no-cache -r requirements.txt --verbose
+# Рабочая директория
+WORKDIR /raketa_delivery
 
-COPY . /raketa
+# Копируем проект
+COPY . /raketa_delivery
 
-EXPOSE 80
+# Устанавливаем зависимости через uv из pyproject.toml
+RUN uv pip install --system --verbose
 
+# Настройки
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/raketa_delivery/src
 
-ENV PYTHONPATH=/raketa/src
-
+# Делаем файлы исполняемыми
 RUN chmod +x src/models/create_db.py
 
-CMD ["sh", "-c", "python -m src.models.create_db", "python run.py"]
+RUN pkill -f "python run.py" || true 
+
+# Запуск
+CMD ["sh", "-c", "python -m src.models.create_db && ./run.py"]
