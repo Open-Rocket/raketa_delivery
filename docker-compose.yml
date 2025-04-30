@@ -44,7 +44,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: raketa_bot
-    restart: unless-stopped
+    restart: no
     env_file:
       - .env
     depends_on:
