@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  deploy_to_vds:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,6 +18,8 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /opt/raketa_delivery
+            git stash --include-untracked
             git pull origin main
+            git stash pop
 
             docker-compose up --build -d
