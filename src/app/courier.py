@@ -2874,12 +2874,6 @@ async def successful_payment(
         log.error(f"Error updating subscription for courier {tg_id}: {e}")
     finally:
         try:
-            asyncio.create_task(
-                delete_message_after_delay(tg_id, success_msg.message_id, delay=900)
-            )
-        except Exception as e:
-            log.error(f"Ошибка при удалении успешной оплаты: {e}")
-        try:
             invoice_message_id = data.get("invoice_message_id")
             if invoice_message_id:
                 await message.bot.delete_message(
