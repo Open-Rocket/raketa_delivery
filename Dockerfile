@@ -4,11 +4,13 @@ RUN apt-get update && apt-get install -y gcc musl-dev python3-dev libffi-dev lib
 
 WORKDIR /raketa
 
-COPY . /raketa
+COPY requirements.txt /raketa
 
 RUN pip install --no-cache-dir uv
 
-RUN uv pip install --system --no-cache --requirements requirements.txt --verbose
+RUN uv pip install --system --no-cache -r requirements.txt --verbose
+
+COPY . /raketa
 
 EXPOSE 80
 

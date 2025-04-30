@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import defaultdict
-from src.config import courier_bot, customer_bot, log, Time
+from src.config import Time, courier_bot, customer_bot, log
 from src.services.db_requests import courier_data, customer_data, order_data, admin_data
 from src.confredis import rediska
 

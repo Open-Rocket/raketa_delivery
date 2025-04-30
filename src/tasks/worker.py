@@ -7,8 +7,7 @@ from src.config import log
 
 async def main_worker():
     log.info("Запуск планировщика уведомлений...")
-    start_scheduler()
+    await start_scheduler()
 
-    # Бесконечная работа
     while True:
         await asyncio.sleep(3600)

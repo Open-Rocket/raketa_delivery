@@ -10,8 +10,11 @@ from src.tasks.notifications import (
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 
-def start_scheduler():
-    scheduler.add_job(notify_couriers_about_orders, "interval", minutes=30)
-    scheduler.add_job(notify_customers_about_couriers, "interval", minutes=30)
+async def start_scheduler():
+    scheduler.add_job(notify_couriers_about_orders, "cron", hour=12, minute=5)
+    scheduler.add_job(notify_couriers_about_orders, "cron", hour=20, minute=30)
+    scheduler.add_job(notify_customers_about_couriers, "cron", hour=12, minute=5)
+    scheduler.add_job(notify_customers_about_couriers, "cron", hour=20, minute=30)
+    scheduler.add_job(notify_customers_about_couriers, "cron", hour=16, minute=5)
     scheduler.add_job(notify_couriers_about_XP_rewards, "cron", hour=0, minute=1)
     scheduler.start()
