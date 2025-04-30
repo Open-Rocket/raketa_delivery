@@ -1,8 +1,10 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:14
     container_name: postgres_raketa
-    restart: 'unless-stopped'
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -17,7 +19,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq_raketa
-    restart: 'unless-stopped'
+    restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
@@ -30,26 +32,27 @@ services:
   redis:
     image: redis:7
     container_name: redis_raketa
-    restart: 'unless-stopped'
+    restart: unless-stopped
     ports:
       - '127.0.0.1:6379:6379'
-    volumes:
-      - redisdata:/data
     command: ['redis-server', '--dir', '/data']
     networks:
       - raketa_network
+    volumes:
+      - redisdata:/data
 
   raketa:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: raketa_bot
-    restart: 'unless-stopped'
+    restart: unless-stopped
     env_file:
       - .env
     depends_on:
       - postgres
       - rabbitmq
+      - redis
     networks:
       - raketa_network
     ports:
@@ -61,3 +64,4 @@ networks:
 
 volumes:
   postgres_data:
+  redisdata:
