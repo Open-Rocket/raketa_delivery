@@ -24,7 +24,5 @@ ENV PYTHONPATH=/raketa_delivery/src
 # Делаем файлы исполняемыми
 RUN chmod +x src/models/create_db.py
 
-RUN pkill -f "python run.py" || true 
-
 # Запуск
 CMD ["python", "-m", "src.models.create_db && ./run.py"]
