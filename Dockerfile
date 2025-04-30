@@ -15,7 +15,7 @@ WORKDIR /raketa_delivery
 COPY . /raketa_delivery
 
 # Устанавливаем зависимости через uv из pyproject.toml
-RUN uv pip install --system --verbose
+RUN uv pip install --system --verbose .
 
 # Настройки
 ENV PYTHONUNBUFFERED=1
