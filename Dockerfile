@@ -25,4 +25,4 @@ ENV PYTHONPATH=/raketa_delivery/src
 RUN chmod +x src/models/create_db.py
 
 # Запуск
-CMD ["sh", "-c", "python -m src.models.create_db && python src/run.py"]
+CMD ["sh", "-c", "python -m src.models.create_db && python ./run.py"]
