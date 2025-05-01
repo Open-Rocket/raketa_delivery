@@ -56,6 +56,22 @@ services:
     ports:
       - '127.0.0.1:8000:80'
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3000:3000' # Порт для доступа к веб-интерфейсу Grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - raketa_network
+    depends_on:
+      - postgres
+    volumes:
+      - grafana_data:/var/lib/grafana
+
 networks:
   raketa_network:
     driver: bridge
@@ -63,3 +79,4 @@ networks:
 volumes:
   postgres_data:
   redisdata:
+  grafana_data:
