@@ -693,7 +693,12 @@ async def set_order_to_db(
                 city=order_city
             )
 
-            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n●\nНачать работу! /run"
+            if int(price_rub) == 0:
+                add_text = "\nЕсл цена не указана, то возможно это поручение, свяжитесь с заказчиком для уточнения деталей.\n"
+            else:
+                add_text = ""
+
+            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n<i>{add_text}</i>●\nНачать работу! /run"
 
             for tg_id in all_couriers_tg_ids_in_order_city:
                 try:
