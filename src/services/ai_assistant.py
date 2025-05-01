@@ -106,7 +106,7 @@ class AssistantOpenAi:
             response: dict = json.loads(response_str)
 
             is_moderation = response.get("is_moderation", "")
-            is_moderation = True
+            # is_moderation = True
             city = response.get("city", "")
             addresses = response.get("addresses", [])
             delivery_object = response.get("delivery_object", "-")
