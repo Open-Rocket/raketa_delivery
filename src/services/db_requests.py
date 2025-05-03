@@ -3211,7 +3211,7 @@ class OrderData:
                         func.date_trunc("day", Order.completed_at_moscow_time) == date,
                         Order.order_status == OrderStatus.COMPLETED,
                     )
-                    .order_by((Order.execution_time_seconds).desc())
+                    .order_by((Order.speed_kmh).desc())
                 )
                 fastest_order = result.scalars().first()
                 return (
@@ -3248,7 +3248,7 @@ class OrderData:
                         <= date_2,
                         (Order.order_status) == OrderStatus.COMPLETED,
                     )
-                    .order_by((Order.execution_time_seconds).desc())
+                    .order_by((Order.speed_kmh).desc())
                 )
                 fastest_order = result.scalars().first()
                 return (
