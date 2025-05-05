@@ -49,6 +49,8 @@ class OrderFormatter:
             if coords:
                 coordinates.append(coords)
 
+                log.info(f"address: {address} coords: {coords}")
+
                 maps_url = f"https://maps.yandex.ru/?text={address.replace(' ', '+')}"
 
                 address_links.append(maps_url)
