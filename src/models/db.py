@@ -181,6 +181,8 @@ class Customer(Base):
 
     notify_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    activation_seed_date: Mapped[datetimeData] = mapped_column(DateTime, nullable=True)
+
     orders = relationship("Order", back_populates="customer")
     seed_key = relationship("SeedKey", back_populates="customers")
     partner = relationship("Partner", back_populates="customers")
