@@ -60,6 +60,8 @@ class OrderFormatter:
             else:
                 return {}
 
+        log.info(f"url: {maps_url} address: {address}")
+
         # Если есть только один адрес, создаем маршрут без второго адреса
         if len(coordinates) == 1:
             yandex_maps_url = (
