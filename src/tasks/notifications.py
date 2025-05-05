@@ -96,7 +96,7 @@ async def notify_couriers_about_XP_rewards():
     if last_speed_award != today:
         data = await order_data.get_fastest_order_by_date(today)
         if data:
-            (order_id, courier_tg_id, _, _, _, _, speed, _, _) = data
+            (_, courier_tg_id, _, _, _, _, speed, _, _) = data
 
             if courier_tg_id:
                 try:
