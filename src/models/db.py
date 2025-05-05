@@ -143,6 +143,8 @@ class GlobalSettings(Base):
 
     taxi_orders_count: Mapped[intData] = mapped_column(Integer, default=0)
 
+    frod_orders_count: Mapped[intData] = mapped_column(Integer, default=0)
+
     base_order_XP: Mapped[floatData] = mapped_column(Float, default=0.5)
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
