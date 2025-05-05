@@ -52,29 +52,23 @@ class OrderFormatter:
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])
 
-            else:
-                return (
-                    {}
-                )  # Если не удается найти координаты, возвращаем пустой результат
+                log.info(f"Address: {address}, Coordinates: {coords}")
 
-        # Строим маршрут, если есть больше одного адреса
+            else:
+                return {}
+
         if len(coordinates) == 1:
-            # Если только один адрес, маршрут не требуется
+
             yandex_maps_url = (
                 f"https://maps.yandex.ru/?text={addresses[0].replace(' ', '+')}"
             )
             distance = 0
         else:
-            # Строим маршрут, используя все координаты
-            yandex_maps_url = await route.get_rout(
-                coordinates[0], coordinates[1:]
-            )  # Передаем все координаты
-            distance = round(
-                await route.calculate_total_distance(coordinates), 2
-            )  # Вычисляем общее расстояние
+
+            yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
+            distance = round(await route.calculate_total_distance(coordinates), 2)
 
         log.info(f"yandex_maps_url: {yandex_maps_url}")
-        log.info(f"coordinates: {coordinates}")
 
         price = await route.get_price(
             distance,
