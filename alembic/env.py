@@ -1,7 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 from src.models import Base
-from src.config import db_settings_dev
+from src.config import db_settings_alembic
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -29,7 +29,7 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-config.set_main_option("sqlalchemy.url", db_settings_dev.DB_URL_asyncpg_dev)
+config.set_main_option("sqlalchemy.url", db_settings_alembic.DB_URL_asyncpg_alembic)
 
 
 def run_migrations_offline() -> None:
