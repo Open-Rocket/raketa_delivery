@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class SettingsDB(BaseSettings):
+class SettingsDB_DEV(BaseSettings):
     DB_HOST_DEV: str
     DB_PORT: int
     DB_USER: str
@@ -17,7 +17,7 @@ class SettingsDB(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env.dev", extra="allow")
 
 
-db_settings_dev = SettingsDB()
+db_settings_dev = SettingsDB_DEV()
 
 
 __all__ = ["db_settings_dev"]
