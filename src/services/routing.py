@@ -21,7 +21,7 @@ class RouteMaster:
     ]
 
     @staticmethod
-    async def get_coordinates(address: str) -> tuple:
+    async def get_coordinates(address: str, city: str) -> tuple:
         """Попытка получить координаты через Яндекс с несколькими ключами"""
 
         counter = await rediska.get_yandex_api_counter()
@@ -33,7 +33,9 @@ class RouteMaster:
                 return (None, None)
 
             coordinates = await RouteMaster._get_coordinates_from_yandex(
-                address, counter
+                city,
+                address,
+                counter,
             )
 
             if coordinates != (None, None):
@@ -48,6 +50,7 @@ class RouteMaster:
 
     @staticmethod
     async def _get_coordinates_from_yandex(
+        city: str,
         address: str,
         counter: int,
     ) -> tuple:
@@ -55,7 +58,8 @@ class RouteMaster:
 
         api_key = RouteMaster.YANDEX_API_KEYS[counter]
         base_url = "https://geocode-maps.yandex.ru/1.x/"
-        params = {"apikey": api_key, "geocode": address, "format": "json"}
+
+        params = {"apikey": api_key, "geocode": f"{address}, {city}", "format": "json"}
 
         log.info(f"yandex_api_counter: {counter}")
 

@@ -41,9 +41,14 @@ class OrderFormatter:
         formatted_addresses = []
         order_addresses_data = []
 
+        log.info(f"Addresses: {addresses}")
+
         # Обрабатываем все адреса и получаем координаты
         for address in addresses:
-            coords = await route.get_coordinates(address)
+            coords = await route.get_coordinates(
+                address,
+                city,
+            )
             if coords:
                 coordinates.append(coords)
 
@@ -52,7 +57,7 @@ class OrderFormatter:
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])
 
-                log.info(f"Address: {address}, Coordinates: {coords}")
+                log.info(f"Address: {address}, Coordinates: {coords}, city: {city}")
 
             else:
                 return {}
