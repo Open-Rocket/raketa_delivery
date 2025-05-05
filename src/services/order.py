@@ -22,8 +22,6 @@ class OrderFormatter:
     ) -> dict:
         """Готовит все необходимые данные для формирования заказа и возвращает их."""
 
-        # log.info(f"_perepare_data addresses: {addresses}")
-
         if not addresses or addresses == "no_address":
             return {
                 "city": city,
@@ -43,43 +41,50 @@ class OrderFormatter:
         formatted_addresses = []
         order_addresses_data = []
 
-        # Обрабатываем все адреса
+        # Обрабатываем все адреса и получаем координаты
         for address in addresses:
             coords = await route.get_coordinates(address)
             if coords:
                 coordinates.append(coords)
 
-                log.info(f"address: {address} coords: {coords}")
-
                 maps_url = f"https://maps.yandex.ru/?text={address.replace(' ', '+')}"
-
                 address_links.append(maps_url)
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])
 
             else:
-                return {}
+                return (
+                    {}
+                )  # Если не удается найти координаты, возвращаем пустой результат
 
-        log.info(f"url: {maps_url} address: {address}")
-
-        # Если есть только один адрес, создаем маршрут без второго адреса
+        # Строим маршрут, если есть больше одного адреса
         if len(coordinates) == 1:
+            # Если только один адрес, маршрут не требуется
             yandex_maps_url = (
                 f"https://maps.yandex.ru/?text={addresses[0].replace(' ', '+')}"
             )
             distance = 0
         else:
-            yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
-            distance = round(await route.calculate_total_distance(coordinates), 2)
+            # Строим маршрут, используя все координаты
+            yandex_maps_url = await route.get_rout(
+                coordinates[0], coordinates[1:]
+            )  # Передаем все координаты
+            distance = round(
+                await route.calculate_total_distance(coordinates), 2
+            )  # Вычисляем общее расстояние
+
+        log.info(f"yandex_maps_url: {yandex_maps_url}")
 
         price = await route.get_price(
             distance,
             time,
             city=city,
         )
+
+        # Формируем текст для отображения адресов
         addresses_text = "\n".join(
             [
-                f"⦿ <b>Адрес {i+1}:</b> {formatted_addresses[i]}"
+                f"⦿ <b>Адрес {i + 1}:</b> {formatted_addresses[i]}"
                 for i in range(len(formatted_addresses))
             ]
         )
