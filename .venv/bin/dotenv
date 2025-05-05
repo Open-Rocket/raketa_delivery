@@ -1,4 +1,4 @@
-#!/Users/ruslanchukavin/Desktop/Raketa/.venv/bin/python
+#!/Users/ruslanchukavin/Desktop/Raketa/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import sys
 from dotenv.__main__ import cli

@@ -146,6 +146,20 @@ wheels = [
 ]
 
 [[package]]
+name = "alembic"
+version = "1.15.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mako" },
+    { name = "sqlalchemy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/57/e314c31b261d1e8a5a5f1908065b4ff98270a778ce7579bd4254477209a7/alembic-1.15.2.tar.gz", hash = "sha256:1c72391bbdeffccfe317eefba686cb9a3c078005478885413b95c3b26c57a8a7", size = 1925573, upload_time = "2025-03-28T13:52:00.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/41/18/d89a443ed1ab9bcda16264716f809c663866d4ca8de218aa78fd50b38ead/alembic-1.15.2-py3-none-any.whl", hash = "sha256:2e76bd916d547f6900ec4bb5a90aeac1485d2c92536923d0b138c02b126edc53", size = 231911, upload_time = "2025-03-28T13:52:02.218Z" },
+]
+
+[[package]]
 name = "amqp"
 version = "5.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1062,6 +1076,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mako"
+version = "1.3.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9e/38/bd5b78a920a64d708fe6bc8e0a2c075e1389d53bef8413725c63ba041535/mako-1.3.10.tar.gz", hash = "sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28", size = 392474, upload_time = "2025-04-10T12:44:31.16Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/fb/99f81ac72ae23375f22b7afdb7642aba97c00a713c217124420147681a2f/mako-1.3.10-py3-none-any.whl", hash = "sha256:baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59", size = 78509, upload_time = "2025-04-10T12:50:53.297Z" },
+]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1687,6 +1713,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "aiormq" },
     { name = "aiosignal" },
+    { name = "alembic" },
     { name = "amqp" },
     { name = "annotated-types" },
     { name = "anyio" },
@@ -1723,13 +1750,11 @@ dependencies = [
     { name = "greenlet" },
     { name = "grpcio" },
     { name = "grpcio-status" },
-    { name = "h11" },
     { name = "httpcore" },
     { name = "httplib2" },
     { name = "httpx" },
     { name = "idna" },
     { name = "iniconfig" },
-    { name = "jinja2" },
     { name = "jiter" },
     { name = "kombu" },
     { name = "levenshtein" },
@@ -1803,6 +1828,7 @@ requires-dist = [
     { name = "aiohttp", specifier = "==3.11.12" },
     { name = "aiormq", specifier = "==6.8.1" },
     { name = "aiosignal", specifier = "==1.3.2" },
+    { name = "alembic", specifier = ">=1.15.2" },
     { name = "amqp", specifier = "==5.3.1" },
     { name = "annotated-types", specifier = "==0.7.0" },
     { name = "anyio", specifier = "==4.8.0" },
@@ -1839,13 +1865,11 @@ requires-dist = [
     { name = "greenlet", specifier = "==3.1.1" },
     { name = "grpcio", specifier = "==1.72.0rc1" },
     { name = "grpcio-status", specifier = "==1.71.0" },
-    { name = "h11", specifier = "==0.14.0" },
     { name = "httpcore", specifier = "==1.0.7" },
     { name = "httplib2", specifier = "==0.22.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "idna", specifier = "==3.10" },
     { name = "iniconfig", specifier = "==2.0.0" },
-    { name = "jinja2", specifier = "==3.1.5" },
     { name = "jiter", specifier = "==0.8.2" },
     { name = "kombu", specifier = "==5.5.2" },
     { name = "levenshtein", specifier = "==0.26.1" },

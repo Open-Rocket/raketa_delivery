@@ -38,8 +38,8 @@ setenv PATH "$VIRTUAL_ENV:q/bin:$PATH:q"
 
 
 
-if ('raketa' != "") then
-    setenv VIRTUAL_ENV_PROMPT 'raketa'
+if ('' != "") then
+    setenv VIRTUAL_ENV_PROMPT ''
 else
     setenv VIRTUAL_ENV_PROMPT "$VIRTUAL_ENV:t:q"
 endif

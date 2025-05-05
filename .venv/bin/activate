@@ -98,8 +98,8 @@ _OLD_VIRTUAL_PATH="$PATH"
 PATH="$VIRTUAL_ENV/bin:$PATH"
 export PATH
 
-if [ "xraketa" != x ] ; then
-    VIRTUAL_ENV_PROMPT="(raketa) "
+if [ "x" != x ] ; then
+    VIRTUAL_ENV_PROMPT="() "
 else
     VIRTUAL_ENV_PROMPT="($(basename "$VIRTUAL_ENV")) "
 fi
