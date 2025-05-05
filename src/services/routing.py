@@ -114,9 +114,21 @@ class RouteMaster:
     ) -> str:
         """Генерирует URL маршрута на Яндекс.Картах."""
 
+        # Проверяем правильность координат
+        if not all(
+            isinstance(coord, tuple) and len(coord) == 2
+            for coord in [pickup_coords] + delivery_coords
+        ):
+            return "Ошибка: некорректный формат координат"
+
         route_points = [f"{pickup_coords[0]},{pickup_coords[1]}"] + [
             f"{coord[0]},{coord[1]}" for coord in delivery_coords
         ]
+
+        # Логируем координаты для отладки
+        log.info(f"Pickup coordinates: {pickup_coords}")
+        log.info(f"Delivery coordinates: {delivery_coords}")
+
         return f"https://yandex.ru/maps/?rtext={'~'.join(route_points)}&rtt=auto"
 
     @staticmethod
