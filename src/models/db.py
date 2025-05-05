@@ -233,6 +233,8 @@ class Courier(Base):
 
     notify_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    activation_seed_date: Mapped[datetimeData]
+
     orders = relationship("Order", back_populates="courier")
     subscription = relationship("Subscription", back_populates="couriers")
     partner = relationship("Partner", back_populates="couriers")

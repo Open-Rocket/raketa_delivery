@@ -61,7 +61,7 @@ class RouteMaster:
 
         params = {"apikey": api_key, "geocode": f"{address}, {city}", "format": "json"}
 
-        log.info(f"yandex_api_counter: {counter}")
+        # log.info(f"yandex_api_counter: {counter}")
 
         try:
             response = requests.get(base_url, params=params)

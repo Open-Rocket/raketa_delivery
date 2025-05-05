@@ -57,7 +57,7 @@ class OrderFormatter:
                 formatted_addresses.append(f"<a href='{maps_url}'>{address}</a>")
                 order_addresses_data.append([coords, address])
 
-                log.info(f"Address: {address}, Coordinates: {coords}, city: {city}")
+                # log.info(f"Address: {address}, Coordinates: {coords}, city: {city}")
 
             else:
                 return {}
@@ -73,7 +73,7 @@ class OrderFormatter:
             yandex_maps_url = await route.get_rout(coordinates[0], coordinates[1:])
             distance = round(await route.calculate_total_distance(coordinates), 2)
 
-        log.info(f"yandex_maps_url: {yandex_maps_url}")
+        # log.info(f"yandex_maps_url: {yandex_maps_url}")
 
         price = await route.get_price(
             distance,
