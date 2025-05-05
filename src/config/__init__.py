@@ -1,6 +1,7 @@
 from .clock import Time
 from .db import db_settings
-from .db_alembic import db_settings_dev
+
+# from .db_alembic import db_settings_dev
 from .logger import log
 from .ai import PROXY, AI_ASSISTANT_ID, OPENAI_API_KEY, GEMINI_API_KEY
 from .rabbit_mq import RABBIT_URL
@@ -78,5 +79,5 @@ __all__ = [
     "partner_r",
     "partner_fallback",
     "RABBIT_URL",
-    "db_settings_dev",
+    # "db_settings_dev",
 ]
