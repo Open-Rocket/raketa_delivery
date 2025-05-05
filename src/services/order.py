@@ -74,6 +74,7 @@ class OrderFormatter:
             )  # Вычисляем общее расстояние
 
         log.info(f"yandex_maps_url: {yandex_maps_url}")
+        log.info(f"coordinates: {coordinates}")
 
         price = await route.get_price(
             distance,
