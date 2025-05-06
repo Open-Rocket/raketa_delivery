@@ -188,6 +188,7 @@ class CustomerData:
                 log.info(f"customer: {customer.customer_id}")
                 customer.seed_key_id = seed_key_obj.seed_key_id
                 customer.partner_id = seed_key_obj.partner_id
+                customer.activation_seed_date = (await Time.get_moscow_time()).date()
                 await session.flush()
                 await session.commit()
                 return True
@@ -817,6 +818,7 @@ class CourierData:
                 log.info(f"courier: {courier.courier_id}")
                 courier.seed_key_id = seed_key_obj.seed_key_id
                 courier.partner_id = seed_key_obj.partner_id
+                courier.activation_seed_date = (await Time.get_moscow_time()).date()
                 await session.flush()
                 await session.commit()
                 return True
@@ -956,6 +958,8 @@ class CourierData:
             )
             seed_key = result.scalar_one_or_none()
             return seed_key
+
+    # ---
 
 
 class AdminData:
