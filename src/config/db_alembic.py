@@ -10,14 +10,11 @@ class SettingsDB_ALEMBIC(BaseSettings):
 
     @property
     def DB_URL_asyncpg_alembic(self) -> str:
-        """Возвращает строку подключения к базе данных для asyncpg"""
-
         return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASS}@{self.DB_HOST_ORIGINAL}:{self.DB_PORT}/{self.DB_NAME}"
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
 
 
 db_settings_alembic = SettingsDB_ALEMBIC()
-
 
 __all__ = ["db_settings_alembic"]
