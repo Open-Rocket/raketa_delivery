@@ -578,10 +578,10 @@ class Keyboard:
             inline_keyboard=[
                 [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")],
                 [
-                    InlineKeyboardButton(
-                        text=f"Завершеные {completed_count}",
-                        callback_data="completed_orders",
-                    ),
+                    # InlineKeyboardButton(
+                    #     text=f"Завершеные {completed_count}",
+                    #     callback_data="completed_orders",
+                    # ),
                     InlineKeyboardButton(
                         text=f"Активные {active_count}", callback_data="active_orders"
                     ),

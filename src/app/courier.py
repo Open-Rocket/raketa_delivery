@@ -1633,9 +1633,9 @@ async def cmd_my_orders(
         )
 
     active_count = len(await order_data.get_active_courier_orders(tg_id))
-    completed_count = len(await order_data.get_completed_courier_orders(tg_id))
+    # completed_count = len(await order_data.get_completed_courier_orders(tg_id))
 
-    reply_kb = await kb.get_courier_orders_kb(active_count, completed_count)
+    reply_kb = await kb.get_courier_orders_kb(active_count)
     text = (
         f"✎  <b>Мои заказы</b>\n\n"
         f"Здесь вы можете посмотреть статус ваших заказов, "
