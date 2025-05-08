@@ -570,7 +570,8 @@ class Keyboard:
 
     @staticmethod
     async def get_courier_orders_kb(
-        active_count: int, completed_count: int
+        active_count: int,
+        completed_count: int = None,
     ) -> InlineKeyboardMarkup:
         """Возвращает клавиатуру для заказов курьера"""
 
