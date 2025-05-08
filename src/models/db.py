@@ -143,8 +143,6 @@ class GlobalSettings(Base):
 
     taxi_orders_count: Mapped[intData] = mapped_column(Integer, default=0)
 
-    frod_orders_count: Mapped[intData] = mapped_column(Integer, default=0)
-
     base_order_XP: Mapped[floatData] = mapped_column(Float, default=0.5)
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
@@ -335,6 +333,7 @@ class Order(Base):
 
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    started_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     cancelled_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     speed_kmh: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
