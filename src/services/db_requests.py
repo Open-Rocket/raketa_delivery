@@ -2878,6 +2878,9 @@ class OrderData:
             ):
                 return False
 
+            if new_status == OrderStatus.CANCELLED:
+                order.cancelled_at_moscow_time = await Time.get_moscow_time()
+
             order.order_status = new_status
             await session.flush()
             await session.commit()

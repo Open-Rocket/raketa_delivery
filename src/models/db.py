@@ -336,6 +336,7 @@ class Order(Base):
     created_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     started_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     completed_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    cancelled_at_moscow_time: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     speed_kmh: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     execution_time_seconds: Mapped[int] = mapped_column(
