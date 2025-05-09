@@ -86,6 +86,7 @@ services:
       - raketa_network
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - ./loki-data:/loki
 
   promtail:
     image: grafana/promtail:2.9.1
