@@ -937,7 +937,7 @@ class CourierData:
 
                 courier.orders_completed += count
                 courier.total_earned += earned
-                courier.covered_distance_km += distance
+                courier.covered_distance_km += round(distance, 2)
 
                 await session.commit()
                 return True

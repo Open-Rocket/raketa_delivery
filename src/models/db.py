@@ -240,7 +240,7 @@ class Courier(Base):
     courier_accept_terms_of_use: Mapped[stringData]
     courier_registration_date: Mapped[datetimeData]
 
-    orders_active_now: Mapped[intData]
+    orders_active_now: Mapped[intData] = mapped_column(Integer, default=0)
 
     notify_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
