@@ -49,10 +49,19 @@ sync_engine = create_engine(url=db_settings.DB_URL_psycopg2, echo=False)
 sync_session_factory = sessionmaker(sync_engine)
 
 intPK = Annotated[int, mapped_column(Integer, primary_key=True)]
+big_intPK = Annotated[int, mapped_column(BigInteger, primary_key=True)]
 textData = Annotated[str, mapped_column(Text, nullable=True)]
 stringData = Annotated[str, mapped_column(String(256), nullable=True)]
 intData = Annotated[int, mapped_column(Integer, nullable=True)]
 intDataUnique = Annotated[int, mapped_column(Integer, unique=True, nullable=True)]
+big_intDataUnique = Annotated[
+    int,
+    mapped_column(
+        BigInteger,
+        unique=True,
+        nullable=True,
+    ),
+]
 floatData = Annotated[float, mapped_column(Float, nullable=True)]
 coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
@@ -167,7 +176,7 @@ class Customer(Base):
         nullable=True,
     )
 
-    customer_tg_id: Mapped[intDataUnique]
+    customer_tg_id: Mapped[big_intDataUnique]
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
     customer_city: Mapped[stringData]
@@ -211,7 +220,7 @@ class Courier(Base):
         nullable=True,
     )
 
-    courier_tg_id: Mapped[intDataUnique]
+    courier_tg_id: Mapped[big_intDataUnique]
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
     courier_city: Mapped[stringData]
@@ -249,7 +258,7 @@ class Partner(Base):
 
     partner_id: Mapped[intPK]
 
-    partner_tg_id: Mapped[intDataUnique]
+    partner_tg_id: Mapped[big_intDataUnique]
     partner_registration_date: Mapped[datetimeData]
 
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -303,7 +312,7 @@ class SeedKey(Base):
 class Admin(Base):
     __tablename__ = "admins"
 
-    admin_id: Mapped[intPK]
+    admin_id: Mapped[big_intPK]
 
     admin_tg_id: Mapped[intDataUnique]
     admin_name: Mapped[stringData]
