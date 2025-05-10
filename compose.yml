@@ -39,32 +39,6 @@ services:
     volumes:
       - redisdata:/data
 
-  promtail:
-    image: grafana/promtail:2.9.1
-    container_name: promtail
-    restart: unless-stopped
-    networks:
-      - raketa_network
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./promtail-config.yaml:/etc/promtail/config.yaml
-    command: -config.file=/etc/promtail/config.yaml
-    privileged: true
-
-  loki:
-    image: grafana/loki:2.9.1
-    container_name: loki
-    restart: unless-stopped
-    ports:
-      - '3100:3100'
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - raketa_network
-    volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
-      - ./loki-data:/loki
-
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -100,6 +74,32 @@ services:
       - raketa_network
     ports:
       - '127.0.0.1:8000:80'
+
+  promtail:
+    image: grafana/promtail:2.9.1
+    container_name: promtail
+    restart: unless-stopped
+    networks:
+      - raketa_network
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    privileged: true
+
+  loki:
+    image: grafana/loki:2.9.1
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - raketa_network
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - ./loki-data:/loki
 
 networks:
   raketa_network:
