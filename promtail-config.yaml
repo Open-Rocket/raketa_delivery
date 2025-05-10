@@ -9,19 +9,19 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: containers
+  - job_name: docker-logs
     static_configs:
       - targets:
           - localhost
         labels:
-          job: container-logs
+          job: docker-logs
           __path__: /var/lib/docker/containers/*/*.log
-          container_name: raketa_bot
+
     pipeline_stages:
       - docker: {}
+
       - regex:
-          expression: '^\[(?P<bot_name>\w+_bot)\]'
+          expression: '.*@(?P<botname>raketadelivery[^ ]*)'
+
       - labels:
-          bot_name: ''
-      - output:
-          source: log
+          botname:
