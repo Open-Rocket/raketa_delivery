@@ -30,6 +30,7 @@ from ._deps import (
     partner_data,
     courier_data,
     customer_data,
+    admin_fallback,
 )
 
 

@@ -26,6 +26,8 @@ services:
       - '127.0.0.1:15672:15672'
     networks:
       - raketa_network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
   redis:
     image: redis:7
@@ -80,6 +82,7 @@ networks:
     driver: bridge
 
 volumes:
+  rabbitmq_data:
   postgres_data:
   redisdata:
   grafana_data:
