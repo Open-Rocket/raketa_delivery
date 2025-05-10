@@ -37,7 +37,7 @@ table_manager:
   retention_deletes_enabled: false
   retention_period: 168h
 
-querry_scheduler:
+query_scheduler:
   max_outstanding_requests_per_tenant: 2048
 
 common:
