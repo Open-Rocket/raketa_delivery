@@ -20,7 +20,9 @@ scrape_configs:
     pipeline_stages:
       - docker: {}
 
+      - regex:
+          expression: 'bot @(?P<botname>raketadelivery[^ ]*)'
+
       - labels:
+          botname:
           container_name:
-          image:
-          stream:
