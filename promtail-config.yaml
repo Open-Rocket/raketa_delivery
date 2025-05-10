@@ -21,7 +21,6 @@ scrape_configs:
       - docker: {}
 
       - labels:
-          container_id:
-          container:
-          name:
+          container_name:
           image:
+          stream:
