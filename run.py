@@ -65,6 +65,7 @@ async def main():
             partner_dp.start_polling(partner_bot, skip_updates=True),
             main_worker(),
         )
+
     except Exception as e:
         log.error(f"Глобальная ошибка: {e}")
     finally:

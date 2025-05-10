@@ -1,6 +1,5 @@
 from ._deps import (
     CommandStart,
-    TelegramBadRequest,
     FSMContext,
     ContentType,
     ReplyKeyboardRemove,
@@ -14,7 +13,6 @@ from ._deps import (
     zlib,
     Time,
     json,
-    asyncio,
     SUPER_ADMIN_TG_ID,
     courier_bot,
     courier_bot_id,
@@ -22,13 +20,11 @@ from ._deps import (
     courier_r,
     courier_fallback,
     courier_data,
-    customer_data,
     payment_r,
     kb,
     title,
     courier_bot_id,
     order_data,
-    partner_data,
     partner_bot,
     admin_data,
     rediska,
@@ -38,9 +34,6 @@ from ._deps import (
     log,
     F,
     find_closest_city,
-    send_notification_to_couriers,
-    delete_message_after_delay,
-    ceil,
 )
 
 
