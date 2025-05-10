@@ -8,9 +8,7 @@ fsm_courier_storage = MemoryStorage()
 fsm_admin_storage = MemoryStorage()
 fsm_partner_storage = MemoryStorage()
 
-
 load_dotenv()
-load_dotenv(".env.dev")
 
 SUPER_ADMIN_TG_ID = int(os.getenv("SUPER_ADMIN_TG_ID"))
 
@@ -18,12 +16,6 @@ customer_bot = Bot(token=os.getenv("CUSTOMER_BOT"))
 courier_bot = Bot(token=os.getenv("COURIER_BOT"))
 admin_bot = Bot(token=os.getenv("ADMIN_BOT"))
 partner_bot = Bot(token=os.getenv("AGENT_BOT"))
-
-
-customer_bot_dev = Bot(token=os.getenv("CUSTOMER_BOT_DEV"))
-courier_bot_dev = Bot(token=os.getenv("COURIER_BOT_DEV"))
-admin_bot_dev = Bot(token=os.getenv("ADMIN_BOT_DEV"))
-partner_bot_dev = Bot(token=os.getenv("AGENT_BOT_DEV"))
 
 
 customer_bot_id = customer_bot.id
