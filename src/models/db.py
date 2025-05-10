@@ -156,6 +156,8 @@ class GlobalSettings(Base):
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
 
+    frod_count: Mapped[intData] = mapped_column(Integer, default=0)
+
     task_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

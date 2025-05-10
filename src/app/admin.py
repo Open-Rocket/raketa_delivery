@@ -24,7 +24,6 @@ from ._deps import (
     admin_r,
     admin_bot,
     customer_bot,
-    admin_fallback,
     courier_bot,
     partner_bot,
     admin_bot_id,
@@ -1266,7 +1265,6 @@ async def cmd_global(
         f" ▸ Минимальная выплата: <b>{min_refund_amount}₽</b>\n"
         f" ▸ Максимальная выплата: <b>{max_refund_amount}₽</b>\n\n"
         f"🔔 <b>уведомления</b>\n"
-        f" ▸ Новые заказы: <b>{interval} сек</b>\n"
         f" ▸ Поддержка: <b>{support_link}</b>\n\n"
         f" ▸ Заказов Taxi: <b>{taxi_orders_count}</b>\n\n"
         f"<b>Выберите действие:</b>\n"
