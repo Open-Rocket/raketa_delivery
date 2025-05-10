@@ -46,10 +46,9 @@ services:
     networks:
       - raketa_network
     volumes:
-      - /opt/raketa_delivery/promtail-config.yaml:/etc/promtail/config.yaml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
     privileged: true
 
