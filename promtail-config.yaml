@@ -20,4 +20,5 @@ scrape_configs:
       - docker: {}
       - labels:
           container_name:
-          stream:
+      - regex:
+          expression: 'container_name="raketa_bot"'
