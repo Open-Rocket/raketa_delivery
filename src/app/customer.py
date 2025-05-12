@@ -688,17 +688,18 @@ async def set_order_to_db(
 
             order_city = data.get("city")
             price_rub = data.get("price")
+            description = data.get("description")
 
             all_couriers_tg_ids_in_order_city = await courier_data.get_all_couriers_tg_ids_notify_status_true_in_current_city(
                 city=order_city
             )
 
             if int(price_rub) == 0:
-                add_text = "\nЕсл цена не указана, то возможно это поручение, свяжитесь с заказчиком для уточнения деталей.\n\n"
+                add_text = "\nЕсли цена не указана, то возможно это поручение, свяжитесь с заказчиком для уточнения деталей.\n"
             else:
                 add_text = ""
 
-            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n<i>{add_text}</i>●\nНачать работу! /run"
+            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n<i>{add_text}</i>\nОписание: {description}\n●\nНачать работу! /run"
 
             for tg_id in all_couriers_tg_ids_in_order_city:
                 try:
