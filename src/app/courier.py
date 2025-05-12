@@ -1559,10 +1559,10 @@ async def complete_order(
         )
 
         text_2 = (
-            f"<b>+ {base_order_XP}</b> очков опыта за заказ\n"
-            f"<b>+ {calculate_distance_XP}</b> очков опыта за расстояние\n"
-            f"<b>+ {calculate_speed_XP}</b> очков опыта за скорость\n"
-            f"Итого заработано: <b>{new_XP} очков опыта</b>\n\n"
+            f"<b>+ {base_order_XP}</b> за заказ\n"
+            f"<b>+ {calculate_distance_XP}</b> за расстояние\n"
+            f"<b>+ {calculate_speed_XP}</b> за скорость\n"
+            f"Итого заработано: <b>{new_XP} очков</b>\n\n"
             f"<i>Сейчас вы можете использовать очки опыта для покупки подписки!</i>\n\n"
             # f"<i>В ближайшее время появятся новые возможности:</i>\n"
             # f"🔹 Приоритет к лучшим заказам\n"
@@ -2299,39 +2299,6 @@ async def cmd_become_partner(
 
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-
-@courier_r.message(
-    F.text == "/orders_bot",
-)
-async def cmd_orders_bot(
-    message: Message,
-    state: FSMContext,
-):
-    """Обрабатывает запрос на переход в бот заказов. /orders_bot"""
-
-    current_state = CourierState.default.state
-    tg_id = message.from_user.id
-
-    await state.set_state(current_state)
-    await rediska.set_state(courier_bot_id, tg_id, current_state)
-
-    text = (
-        f"📋 <b>Бот заказов Raketa Delivery</b>\n\n"
-        f"🔹 <b>Получайте заказы</b> в удобном формате и выбирайте подходящие\n"
-        f"🔹 <b>Оперативные уведомления</b> о новых заказах в вашем городе\n"
-        f"🔹 <b>Гибкий график</b> — работайте когда удобно\n\n"
-        f"🚀 <b>Подключайтесь и начните зарабатывать с Raketa прямо сейчас!</b>"
-    )
-
-    reply_kb = await kb.get_courier_kb("/orders_bot")
-
-    await message.answer(
-        text=text,
-        reply_markup=reply_kb,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
 
 
 @courier_r.message(
