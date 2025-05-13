@@ -2692,7 +2692,11 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         ),
     ]
 
-    log.info(f"prices: {prices[0]['amount']}")
+    amount_kopecks = prices[0].amount
+    amount_rub = amount_kopecks / 100
+
+    log.info(f"prices kopeks: {amount_kopecks}")
+    log.info(f"prices rub: {amount_rub}")
 
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
@@ -2719,8 +2723,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": prices[0]["amount"]
-                                / 100,  # Переводим копейки в рубли
+                                "value": amount_rub,
                                 "currency": "RUB",
                             },
                             "vat_code": 1,  # Ставка НДС (1 = 20%)
