@@ -2707,7 +2707,8 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         photo_height=720,
         need_name=False,
         need_phone_number=False,
-        need_email=False,
+        need_email=True,
+        send_email_to_provider=True,
         reply_markup=None,
     )
 
