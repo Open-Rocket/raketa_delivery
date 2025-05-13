@@ -35,6 +35,7 @@ limits_config:
   allow_structured_metadata: false
   reject_old_samples: false
   max_age: 168h
+  max_entry_age: 24h
 
 table_manager:
   retention_deletes_enabled: false
