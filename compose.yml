@@ -89,6 +89,8 @@ services:
       - ./promtail-confing.yaml:/etc/promtail/config.yaml
     command: -config.file=/etc/promtail/config.yaml
     privileged: true
+    networks:
+      - raketa_network
 
   loki:
     image: grafana/loki:latest
@@ -99,6 +101,8 @@ services:
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - raketa_network
 
 networks:
   raketa_network:
