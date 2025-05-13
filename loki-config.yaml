@@ -32,6 +32,7 @@ storage_config:
 limits_config:
   retention_period: 168h
   allow_structured_metadata: false
+  max_age: 720h
 
 table_manager:
   retention_deletes_enabled: false
