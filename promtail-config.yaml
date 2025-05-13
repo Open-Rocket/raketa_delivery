@@ -1,9 +1,5 @@
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
-
 positions:
-  filename: /tmp/positions.yaml
+  filename: /data/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
@@ -15,12 +11,10 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Оставляем только контейнер raketa_bot
       - source_labels: [__meta_docker_container_name]
         regex: raketa_bot
         action: keep
 
-      # Делаем имя контейнера лейблом
       - source_labels: [__meta_docker_container_name]
         target_label: container
 

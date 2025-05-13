@@ -87,11 +87,11 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
+      - ./promtail-data:/data # ← вот эта строка нужна
     command: -config.file=/etc/promtail/config.yaml
     privileged: true
     networks:
       - raketa_network
-
   loki:
     image: grafana/loki:latest
     container_name: loki
