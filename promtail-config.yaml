@@ -10,19 +10,18 @@ clients:
 
 scrape_configs:
   - job_name: 'raketa_bot'
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-
-    relabel_configs:
-      - source_labels: [__meta_docker_container_name]
-        regex: raketa_bot
-        action: keep
-
-      - source_labels: [__meta_docker_container_log_stream]
-        target_label: stream
-      - source_labels: [__meta_docker_container_name]
-        target_label: container
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: raketa_bot
+          __path__: /var/lib/docker/containers/*/*.log
 
     pipeline_stages:
-      - docker: {}
+      - json:
+          expressions:
+            stream: stream
+            log: log
+            time: time
+      - labels:
+          stream:
