@@ -15,21 +15,23 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Оставляем только контейнер raketa_bot
       - source_labels: [__meta_docker_container_name]
-        regex: /raketa_bot
+        regex: raketa_bot
         action: keep
 
-      # Устанавливаем понятный label service_name
       - source_labels: [__meta_docker_container_name]
-        regex: /?(.*)
-        target_label: raketa
+        regex: (.*)
+        target_label: service_name
         replacement: $1
 
-      # Эти тоже можно оставить для полноты
       - source_labels: [__meta_docker_container_name]
-        regex: /?(.*)
+        regex: (.*)
         target_label: container
+        replacement: $1
+
+      - source_labels: [__meta_docker_container_name]
+        regex: (.*)
+        target_label: job
         replacement: $1
 
       - source_labels: [__meta_docker_container_log_stream]
