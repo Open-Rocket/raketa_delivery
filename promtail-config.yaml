@@ -23,7 +23,7 @@ scrape_configs:
       # Устанавливаем понятный label service_name
       - source_labels: [__meta_docker_container_name]
         regex: /?(.*)
-        target_label: raketa_bot
+        target_label: raketa
         replacement: $1
 
       # Эти тоже можно оставить для полноты
