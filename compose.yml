@@ -78,7 +78,7 @@ services:
       - '127.0.0.1:8000:80'
 
   promtail:
-    image: grafana/pomtail:latest
+    image: grafana/promtail:latest
     container_name: promtail
     restart: unless-stopped
     ports:
