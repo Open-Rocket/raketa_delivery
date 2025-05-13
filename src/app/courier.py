@@ -2692,6 +2692,8 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         ),
     ]
 
+    log.info(f"prices: {prices[0]["amount"]}")
+
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
@@ -2709,6 +2711,27 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         need_phone_number=False,
         need_email=True,
         send_email_to_provider=True,
+        provider_data=json.dumps(
+            {
+                "receipt": {
+                    "items": [
+                        {
+                            "description": "Подписка Raketa",
+                            "quantity": 1.00,
+                            "amount": {
+                                "value": prices[0]["amount"]
+                                / 100,  # Переводим копейки в рубли
+                                "currency": "RUB",
+                            },
+                            "vat_code": 1,  # Ставка НДС (1 = 20%)
+                            "payment_mode": "full_payment",
+                            "payment_subject": "service",  # Для подписки лучше использовать 'service'
+                        }
+                    ],
+                    "tax_system_code": 1,  # Упрощенная система налогообложения (доходы)
+                }
+            }
+        ),
         reply_markup=None,
     )
 
