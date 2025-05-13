@@ -1,5 +1,5 @@
-positions:
-  filename: /data/positions.yaml
+# positions:
+#   filename: /data/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
