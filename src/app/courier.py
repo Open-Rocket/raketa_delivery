@@ -2692,7 +2692,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         ),
     ]
 
-    log.info(f"prices: {prices[0]["amount"]}")
+    log.info(f"prices: {prices[0]['amount']}")
 
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
