@@ -11,6 +11,7 @@ ingester:
       replication_factor: 1
   chunk_idle_period: 5m
   max_chunk_age: 1h
+  max_entry_age: 24h
 
 schema_config:
   configs:
