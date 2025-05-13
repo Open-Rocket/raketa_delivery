@@ -10,7 +10,7 @@ ingester:
         store: inmemory
       replication_factor: 1
   chunk_idle_period: 5m
-  max_chunk_age: 0s # Отключаем максимальный возраст чанков
+  max_chunk_age: 87600h # 10 лет
 
 schema_config:
   configs:
@@ -30,14 +30,14 @@ storage_config:
     directory: /loki/chunks
 
 limits_config:
-  retention_period: 0s # Отключаем период хранения данных
+  retention_period: 87600h # 10 лет
   allow_structured_metadata: false
   reject_old_samples: false
-  max_entry_age: 0s # Отключаем максимальный возраст записей
+  max_entry_age: 87600h # 10 лет
 
 table_manager:
-  retention_deletes_enabled: false # Отключаем удаление старых данных
-  retention_period: 0s # Отключаем ограничение по времени для хранения данных
+  retention_deletes_enabled: false
+  retention_period: 87600h # 10 лет
 
 query_scheduler:
   max_outstanding_requests_per_tenant: 2048
