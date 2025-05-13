@@ -77,6 +77,29 @@ services:
     ports:
       - '127.0.0.1:8000:80'
 
+  promtail:
+    image: grafana/pomtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    ports:
+      - '9080:9080'
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail-confing.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    privileged: true
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+
 networks:
   raketa_network:
     driver: bridge

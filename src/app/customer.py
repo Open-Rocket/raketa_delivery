@@ -412,7 +412,7 @@ async def process_order(
     await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     wait_message = await message.answer(
-        "Заказ обрабатывается, подождите ...",
+        "🧿 Заказ обрабатывается, подождите ...",
         disable_notification=True,
     )
 
@@ -699,7 +699,7 @@ async def set_order_to_db(
             else:
                 add_text = ""
 
-            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n<i>{add_text}</i>\nОписание: {description}\n●\nНачать работу! /run"
+            notification_for_couriers = f"В вашем городе: <b>{order_city}</b>, только что появился новый заказ на сумму <b>{price_rub}₽</b>\n<i>{add_text}</i>\n<b>Описание:</b> {description}\n\n●\n\nНачать работу! - /run"
 
             for tg_id in all_couriers_tg_ids_in_order_city:
                 try:
