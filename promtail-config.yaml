@@ -24,4 +24,6 @@ scrape_configs:
             log: log
             time: time
       - labels:
-          stream:
+          tag:
+          image_name:
+          container_name:
