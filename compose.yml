@@ -78,19 +78,15 @@ services:
       - '80'
     labels:
       - 'traefik.enable=true'
-
       # Middleware для перенаправления HTTP на HTTPS
       - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
-
       # Middleware для удаления префиксов
       - 'traefik.http.middlewares.customer-stripprefix.stripprefix.prefixes=/webhook/customer'
       - 'traefik.http.middlewares.courier-stripprefix.stripprefix.prefixes=/webhook/courier'
       - 'traefik.http.middlewares.admin-stripprefix.stripprefix.prefixes=/webhook/admin'
       - 'traefik.http.middlewares.partner-stripprefix.stripprefix.prefixes=/webhook/partner'
-
       # Один сервис для контейнера raketa_bot
       - 'traefik.http.services.raketa-service.loadbalancer.server.port=80'
-
       # Роутер для /webhook/customer
       - 'traefik.http.routers.raketa-customer.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/customer`)'
       - 'traefik.http.routers.raketa-customer.entrypoints=websecure'
@@ -98,7 +94,6 @@ services:
       - 'traefik.http.routers.raketa-customer.tls.certresolver=le'
       - 'traefik.http.routers.raketa-customer.middlewares=customer-stripprefix'
       - 'traefik.http.routers.raketa-customer.service=raketa-service'
-
       # Роутер для /webhook/courier
       - 'traefik.http.routers.raketa-courier.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/courier`)'
       - 'traefik.http.routers.raketa-courier.entrypoints=websecure'
@@ -106,7 +101,6 @@ services:
       - 'traefik.http.routers.raketa-courier.tls.certresolver=le'
       - 'traefik.http.routers.raketa-courier.middlewares=courier-stripprefix'
       - 'traefik.http.routers.raketa-courier.service=raketa-service'
-
       # Роутер для /webhook/admin
       - 'traefik.http.routers.raketa-admin.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/admin`)'
       - 'traefik.http.routers.raketa-admin.entrypoints=websecure'
@@ -114,7 +108,6 @@ services:
       - 'traefik.http.routers.raketa-admin.tls.certresolver=le'
       - 'traefik.http.routers.raketa-admin.middlewares=admin-stripprefix'
       - 'traefik.http.routers.raketa-admin.service=raketa-service'
-
       # Роутер для /webhook/partner
       - 'traefik.http.routers.raketa-partner.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/partner`)'
       - 'traefik.http.routers.raketa-partner.entrypoints=websecure'
@@ -128,9 +121,10 @@ services:
     container_name: traefik
     restart: unless-stopped
     command:
-      - '--api.insecure=true' # Для отладки, можно отключить в продакшене
+      - '--api.insecure=true' # Для отладки, в продакшене отключите
       - '--providers.docker=true'
       - '--providers.docker.exposedbydefault=false'
+      - '--providers.docker.network=raketa_network' # Явно указываем сеть
       - '--entrypoints.web.address=:80'
       - '--entrypoints.websecure.address=:443'
       - '--entrypoints.web.http.redirections.entryPoint.to=websecure'

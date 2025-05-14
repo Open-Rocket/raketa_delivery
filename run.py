@@ -79,50 +79,96 @@ async def setup_dispatchers():
 
 async def on_startup(app: web.Application):
     try:
-        # Установка вебхуков с секретами (используем единый DOMAIN)
-        await customer_bot.set_webhook(
-            f"{DOMAIN}/webhook/customer",
-            secret_token=WEBHOOK_SECRET["customer"],
-        )
-        await courier_bot.set_webhook(
-            f"{DOMAIN}/webhook/courier",
-            secret_token=WEBHOOK_SECRET["courier"],
-        )
-        await admin_bot.set_webhook(
-            f"{DOMAIN}/webhook/admin",
-            secret_token=WEBHOOK_SECRET["admin"],
-        )
-        await partner_bot.set_webhook(
-            f"{DOMAIN}/webhook/partner",
-            secret_token=WEBHOOK_SECRET["partner"],
-        )
-        log.info("🔗 Вебхуки установлены")
+        # Проверка DOMAIN
+        if not DOMAIN or not DOMAIN.startswith("https://"):
+            raise ValueError(
+                f"Некорректная переменная DOMAIN: {DOMAIN}. Ожидается URL вида https://raketago.ru"
+            )
+
+        # Параллельная установка вебхуков
+        tasks = [
+            customer_bot.set_webhook(
+                f"{DOMAIN}/webhook/customer",
+                secret_token=WEBHOOK_SECRET["customer"],
+            ),
+            courier_bot.set_webhook(
+                f"{DOMAIN}/webhook/courier",
+                secret_token=WEBHOOK_SECRET["courier"],
+            ),
+            admin_bot.set_webhook(
+                f"{DOMAIN}/webhook/admin",
+                secret_token=WEBHOOK_SECRET["admin"],
+            ),
+            partner_bot.set_webhook(
+                f"{DOMAIN}/webhook/partner",
+                secret_token=WEBHOOK_SECRET["partner"],
+            ),
+        ]
+
+        # Выполняем все задачи параллельно
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Проверяем результаты
+        for bot_name, result in zip(
+            ["customer", "courier", "admin", "partner"], results
+        ):
+            if isinstance(result, Exception):
+                log.error(f"Ошибка установки вебхука для бота {bot_name}: {result}")
+            else:
+                log.info(
+                    f"🔗 Вебхук установлен для бота {bot_name}: {DOMAIN}/webhook/{bot_name}"
+                )
+
+        # Если хотя бы один вебхук не установлен, выбрасываем исключение
+        if any(isinstance(result, Exception) for result in results):
+            raise RuntimeError("Не удалось установить один или несколько вебхуков")
+
+        log.info("🔗 Все вебхуки успешно установлены")
+
     except Exception as e:
-        log.error(f"Ошибка установки вебхуков: {e}")
+        log.error(f"Критическая ошибка при установке вебхуков: {e}")
         raise
 
 
 async def on_shutdown(_: web.Application):
     try:
         # Удаляем вебхуки
-        await asyncio.gather(
+        tasks = [
             customer_bot.delete_webhook(),
             courier_bot.delete_webhook(),
             admin_bot.delete_webhook(),
             partner_bot.delete_webhook(),
-            return_exceptions=True,
-        )
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for bot_name, result in zip(
+            ["customer", "courier", "admin", "partner"], results
+        ):
+            if isinstance(result, Exception):
+                log.error(f"Ошибка удаления вебхука для бота {bot_name}: {result}")
+            else:
+                log.info(f"🗑 Вебхук удалён для бота {bot_name}")
+
         # Закрываем соединение с Redis
         await rediska.redis.aclose()
+
         # Закрываем сессии ботов
-        await asyncio.gather(
+        sessions = [
             customer_bot.session.close(),
             courier_bot.session.close(),
             admin_bot.session.close(),
             partner_bot.session.close(),
-            return_exceptions=True,
-        )
+        ]
+        results = await asyncio.gather(*sessions, return_exceptions=True)
+        for bot_name, result in zip(
+            ["customer", "courier", "admin", "partner"], results
+        ):
+            if isinstance(result, Exception):
+                log.error(f"Ошибка закрытия сессии для бота {bot_name}: {result}")
+            else:
+                log.info(f"🔌 Сессия закрыта для бота {bot_name}")
+
         log.warning("❌ Приложение остановлено корректно")
+
     except Exception as e:
         log.error(f"Ошибка при остановке: {e}")
 
@@ -130,7 +176,8 @@ async def on_shutdown(_: web.Application):
 async def main():
     await setup_dispatchers()
     app = web.Application(middlewares=[log_requests_middleware])
-    # Привязываем каждый диспетчер к своему пути с секретами
+
+    # Регистрируем обработчики вебхуков для каждого бота
     SimpleRequestHandler(
         dispatcher=customer_dp,
         bot=customer_bot,
@@ -151,14 +198,18 @@ async def main():
         bot=partner_bot,
         secret_token=WEBHOOK_SECRET["partner"],
     ).register(app, path="/webhook/partner")
+
+    # Настраиваем хуки приложения
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
-    # Aiogram внутренняя настройка
+
+    # Настраиваем Aiogram для каждого бота
     setup_application(app, customer_dp, bot=customer_bot)
     setup_application(app, courier_dp, bot=courier_bot)
     setup_application(app, admin_dp, bot=admin_bot)
     setup_application(app, partner_dp, bot=partner_bot)
-    # Запускаем параллельно воркеры и aiohttp
+
+    # Запускаем HTTP-сервер и воркер
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 80)
