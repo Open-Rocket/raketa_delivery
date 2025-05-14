@@ -81,15 +81,41 @@ services:
 
       # Общие настройки middleware
       - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
-      - 'traefik.http.middlewares.strip-prefix.stripprefix.prefixes=/webhook/customer,/webhook/courier,/webhook/admin,/webhook/partner'
 
-      # Основной роутер для всех ботов
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/customer`, `/webhook/courier`, `/webhook/admin`, `/webhook/partner`)'
+      # Основной роутер с отдельными правилами для каждого пути
+      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`)'
       - 'traefik.http.routers.raketa-main.entrypoints=websecure'
       - 'traefik.http.routers.raketa-main.tls=true'
       - 'traefik.http.routers.raketa-main.tls.certresolver=le'
-      - 'traefik.http.routers.raketa-main.middlewares=strip-prefix'
-      - 'traefik.http.services.raketa-main.loadbalancer.server.port=80'
+
+      # Отдельные middleware для каждого пути
+      - 'traefik.http.middlewares.customer-stripprefix.stripprefix.prefixes=/webhook/customer'
+      - 'traefik.http.middlewares.courier-stripprefix.stripprefix.prefixes=/webhook/courier'
+      - 'traefik.http.middlewares.admin-stripprefix.stripprefix.prefixes=/webhook/admin'
+      - 'traefik.http.middlewares.partner-stripprefix.stripprefix.prefixes=/webhook/partner'
+
+      # Отдельные сервисы для каждого пути
+      - 'traefik.http.services.raketa-customer.loadbalancer.server.port=80'
+      - 'traefik.http.services.raketa-courier.loadbalancer.server.port=80'
+      - 'traefik.http.services.raketa-admin.loadbalancer.server.port=80'
+      - 'traefik.http.services.raketa-partner.loadbalancer.server.port=80'
+
+      # Правила для каждого пути
+      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/customer`)'
+      - 'traefik.http.routers.raketa-main.middlewares=customer-stripprefix'
+      - 'traefik.http.routers.raketa-main.service=raketa-customer'
+
+      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/courier`)'
+      - 'traefik.http.routers.raketa-main.middlewares=courier-stripprefix'
+      - 'traefik.http.routers.raketa-main.service=raketa-courier'
+
+      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/admin`)'
+      - 'traefik.http.routers.raketa-main.middlewares=admin-stripprefix'
+      - 'traefik.http.routers.raketa-main.service=raketa-admin'
+
+      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/partner`)'
+      - 'traefik.http.routers.raketa-main.middlewares=partner-stripprefix'
+      - 'traefik.http.routers.raketa-main.service=raketa-partner'
 
   traefik:
     image: traefik:latest
@@ -103,7 +129,6 @@ services:
       - '--entrypoints.websecure.address=:443'
       - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
       - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
-      # Настройки Let's Encrypt
       - '--certificatesresolvers.le.acme.email=${EMAIL}'
       - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
       - '--certificatesresolvers.le.acme.httpchallenge=true'
