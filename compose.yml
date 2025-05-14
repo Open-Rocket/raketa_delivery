@@ -104,7 +104,7 @@ services:
     container_name: traefik
     restart: unless-stopped
     command:
-      - '--configFile=/etc/traefik/traefik.yml'
+      - '--configFile=/etc/traefik/traefik.yaml'
       - '--providers.docker=true'
       - '--providers.docker.exposedByDefault=false'
       - '--entrypoints.web.address=:80'
