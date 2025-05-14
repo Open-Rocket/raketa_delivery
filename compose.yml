@@ -123,30 +123,30 @@ services:
       - 'traefik.http.routers.raketa-partner.middlewares=partner-stripprefix'
       - 'traefik.http.routers.raketa-partner.service=raketa-service'
 
-    traefik:
-      image: traefik:latest
-      container_name: traefik
-      restart: unless-stopped
-      command:
-        - '--api.insecure=true' # Для отладки, можно отключить в продакшене
-        - '--providers.docker=true'
-        - '--providers.docker.exposedbydefault=false'
-        - '--entrypoints.web.address=:80'
-        - '--entrypoints.websecure.address=:443'
-        - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
-        - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
-        - '--certificatesresolvers.le.acme.email=${EMAIL}'
-        - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
-        - '--certificatesresolvers.le.acme.httpchallenge=true'
-        - '--certificatesresolvers.le.acme.httpchallenge.entrypoint=web'
-      ports:
-        - '80:80'
-        - '443:443'
-      volumes:
-        - '/var/run/docker.sock:/var/run/docker.sock:ro'
-        - 'traefik_letsencrypt:/letsencrypt'
-      networks:
-        - raketa_network
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - '--api.insecure=true' # Для отладки, можно отключить в продакшене
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
+      - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
+      - '--certificatesresolvers.le.acme.email=${EMAIL}'
+      - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
+      - '--certificatesresolvers.le.acme.httpchallenge=true'
+      - '--certificatesresolvers.le.acme.httpchallenge.entrypoint=web'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - 'traefik_letsencrypt:/letsencrypt'
+    networks:
+      - raketa_network
 
   promtail:
     image: grafana/promtail:latest
