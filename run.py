@@ -83,22 +83,18 @@ async def on_startup(app: web.Application):
         await customer_bot.set_webhook(
             f"{DOMAIN}/webhook/customer",
             secret_token=WEBHOOK_SECRET["customer"],
-            allowed_updates=["message", "callback_query"],
         )
         await courier_bot.set_webhook(
             f"{DOMAIN}/webhook/courier",
             secret_token=WEBHOOK_SECRET["courier"],
-            allowed_updates=["message", "callback_query"],
         )
         await admin_bot.set_webhook(
             f"{DOMAIN}/webhook/admin",
             secret_token=WEBHOOK_SECRET["admin"],
-            allowed_updates=["message", "callback_query"],
         )
         await partner_bot.set_webhook(
             f"{DOMAIN}/webhook/partner",
             secret_token=WEBHOOK_SECRET["partner"],
-            allowed_updates=["message", "callback_query"],
         )
         log.info("🔗 Вебхуки установлены")
     except Exception as e:
@@ -108,17 +104,25 @@ async def on_startup(app: web.Application):
 
 async def on_shutdown(_: web.Application):
     try:
-        await customer_bot.delete_webhook()
-        await courier_bot.delete_webhook()
-        await admin_bot.delete_webhook()
-        await partner_bot.delete_webhook()
+        # Удаляем вебхуки
+        await asyncio.gather(
+            customer_bot.delete_webhook(),
+            courier_bot.delete_webhook(),
+            admin_bot.delete_webhook(),
+            partner_bot.delete_webhook(),
+            return_exceptions=True,
+        )
+        # Закрываем соединение с Redis
         await rediska.redis.aclose()
         # Закрываем сессии ботов
-        await customer_bot.session.close()
-        await courier_bot.session.close()
-        await admin_bot.session.close()
-        await partner_bot.session.close()
-        log.warning("❌ Остановлено корректно")
+        await asyncio.gather(
+            customer_bot.session.close(),
+            courier_bot.session.close(),
+            admin_bot.session.close(),
+            partner_bot.session.close(),
+            return_exceptions=True,
+        )
+        log.warning("❌ Приложение остановлено корректно")
     except Exception as e:
         log.error(f"Ошибка при остановке: {e}")
 

@@ -79,68 +79,74 @@ services:
     labels:
       - 'traefik.enable=true'
 
-      # Общие настройки middleware
+      # Middleware для перенаправления HTTP на HTTPS
       - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
 
-      # Основной роутер с отдельными правилами для каждого пути
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`)'
-      - 'traefik.http.routers.raketa-main.entrypoints=websecure'
-      - 'traefik.http.routers.raketa-main.tls=true'
-      - 'traefik.http.routers.raketa-main.tls.certresolver=le'
-
-      # Отдельные middleware для каждого пути
+      # Middleware для удаления префиксов
       - 'traefik.http.middlewares.customer-stripprefix.stripprefix.prefixes=/webhook/customer'
       - 'traefik.http.middlewares.courier-stripprefix.stripprefix.prefixes=/webhook/courier'
       - 'traefik.http.middlewares.admin-stripprefix.stripprefix.prefixes=/webhook/admin'
       - 'traefik.http.middlewares.partner-stripprefix.stripprefix.prefixes=/webhook/partner'
 
-      # Отдельные сервисы для каждого пути
-      - 'traefik.http.services.raketa-customer.loadbalancer.server.port=80'
-      - 'traefik.http.services.raketa-courier.loadbalancer.server.port=80'
-      - 'traefik.http.services.raketa-admin.loadbalancer.server.port=80'
-      - 'traefik.http.services.raketa-partner.loadbalancer.server.port=80'
+      # Один сервис для контейнера raketa_bot
+      - 'traefik.http.services.raketa-service.loadbalancer.server.port=80'
 
-      # Правила для каждого пути
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/customer`)'
-      - 'traefik.http.routers.raketa-main.middlewares=customer-stripprefix'
-      - 'traefik.http.routers.raketa-main.service=raketa-customer'
+      # Роутер для /webhook/customer
+      - 'traefik.http.routers.raketa-customer.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/customer`)'
+      - 'traefik.http.routers.raketa-customer.entrypoints=websecure'
+      - 'traefik.http.routers.raketa-customer.tls=true'
+      - 'traefik.http.routers.raketa-customer.tls.certresolver=le'
+      - 'traefik.http.routers.raketa-customer.middlewares=customer-stripprefix'
+      - 'traefik.http.routers.raketa-customer.service=raketa-service'
 
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/courier`)'
-      - 'traefik.http.routers.raketa-main.middlewares=courier-stripprefix'
-      - 'traefik.http.routers.raketa-main.service=raketa-courier'
+      # Роутер для /webhook/courier
+      - 'traefik.http.routers.raketa-courier.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/courier`)'
+      - 'traefik.http.routers.raketa-courier.entrypoints=websecure'
+      - 'traefik.http.routers.raketa-courier.tls=true'
+      - 'traefik.http.routers.raketa-courier.tls.certresolver=le'
+      - 'traefik.http.routers.raketa-courier.middlewares=courier-stripprefix'
+      - 'traefik.http.routers.raketa-courier.service=raketa-service'
 
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/admin`)'
-      - 'traefik.http.routers.raketa-main.middlewares=admin-stripprefix'
-      - 'traefik.http.routers.raketa-main.service=raketa-admin'
+      # Роутер для /webhook/admin
+      - 'traefik.http.routers.raketa-admin.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/admin`)'
+      - 'traefik.http.routers.raketa-admin.entrypoints=websecure'
+      - 'traefik.http.routers.raketa-admin.tls=true'
+      - 'traefik.http.routers.raketa-admin.tls.certresolver=le'
+      - 'traefik.http.routers.raketa-admin.middlewares=admin-stripprefix'
+      - 'traefik.http.routers.raketa-admin.service=raketa-service'
 
-      - 'traefik.http.routers.raketa-main.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/partner`)'
-      - 'traefik.http.routers.raketa-main.middlewares=partner-stripprefix'
-      - 'traefik.http.routers.raketa-main.service=raketa-partner'
+      # Роутер для /webhook/partner
+      - 'traefik.http.routers.raketa-partner.rule=Host(`raketago.ru`) && PathPrefix(`/webhook/partner`)'
+      - 'traefik.http.routers.raketa-partner.entrypoints=websecure'
+      - 'traefik.http.routers.raketa-partner.tls=true'
+      - 'traefik.http.routers.raketa-partner.tls.certresolver=le'
+      - 'traefik.http.routers.raketa-partner.middlewares=partner-stripprefix'
+      - 'traefik.http.routers.raketa-partner.service=raketa-service'
 
-  traefik:
-    image: traefik:latest
-    container_name: traefik
-    restart: unless-stopped
-    command:
-      - '--api.insecure=true'
-      - '--providers.docker=true'
-      - '--providers.docker.exposedbydefault=false'
-      - '--entrypoints.web.address=:80'
-      - '--entrypoints.websecure.address=:443'
-      - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
-      - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
-      - '--certificatesresolvers.le.acme.email=${EMAIL}'
-      - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
-      - '--certificatesresolvers.le.acme.httpchallenge=true'
-      - '--certificatesresolvers.le.acme.httpchallenge.entrypoint=web'
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock:ro'
-      - 'traefik_letsencrypt:/letsencrypt'
-    networks:
-      - raketa_network
+    traefik:
+      image: traefik:latest
+      container_name: traefik
+      restart: unless-stopped
+      command:
+        - '--api.insecure=true' # Для отладки, можно отключить в продакшене
+        - '--providers.docker=true'
+        - '--providers.docker.exposedbydefault=false'
+        - '--entrypoints.web.address=:80'
+        - '--entrypoints.websecure.address=:443'
+        - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
+        - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
+        - '--certificatesresolvers.le.acme.email=${EMAIL}'
+        - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
+        - '--certificatesresolvers.le.acme.httpchallenge=true'
+        - '--certificatesresolvers.le.acme.httpchallenge.entrypoint=web'
+      ports:
+        - '80:80'
+        - '443:443'
+      volumes:
+        - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        - 'traefik_letsencrypt:/letsencrypt'
+      networks:
+        - raketa_network
 
   promtail:
     image: grafana/promtail:latest
