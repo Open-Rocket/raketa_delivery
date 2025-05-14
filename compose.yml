@@ -74,8 +74,8 @@ services:
       - redis
     networks:
       - raketa_network
-    ports:
-      - '443:80'
+    expose:
+      - '80'
     labels:
       - 'traefik.enable=true'
 
@@ -84,7 +84,7 @@ services:
       - 'traefik.http.middlewares.strip-prefix.stripprefix.prefixes=/webhook/customer,/webhook/courier,/webhook/admin,/webhook/partner'
 
       # Customer bot
-      - 'traefik.http.routers.customer.rule=Host(`customer.raketa.ru`) && PathPrefix(`/webhook/customer`)'
+      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`) && PathPrefix(`/webhook/customer`)'
       - 'traefik.http.routers.customer.entrypoints=websecure'
       - 'traefik.http.routers.customer.tls=true'
       - 'traefik.http.routers.customer.tls.certresolver=le'
@@ -92,7 +92,7 @@ services:
       - 'traefik.http.services.customer.loadbalancer.server.port=80'
 
       # Courier bot
-      - 'traefik.http.routers.courier.rule=Host(`courier.raketa.ru`) && PathPrefix(`/webhook/courier`)'
+      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`) && PathPrefix(`/webhook/courier`)'
       - 'traefik.http.routers.courier.entrypoints=websecure'
       - 'traefik.http.routers.courier.tls=true'
       - 'traefik.http.routers.courier.tls.certresolver=le'
@@ -100,7 +100,7 @@ services:
       - 'traefik.http.services.courier.loadbalancer.server.port=80'
 
       # Admin bot
-      - 'traefik.http.routers.admin.rule=Host(`admin.raketa.ru`) && PathPrefix(`/webhook/admin`)'
+      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`) && PathPrefix(`/webhook/admin`)'
       - 'traefik.http.routers.admin.entrypoints=websecure'
       - 'traefik.http.routers.admin.tls=true'
       - 'traefik.http.routers.admin.tls.certresolver=le'
@@ -108,7 +108,7 @@ services:
       - 'traefik.http.services.admin.loadbalancer.server.port=80'
 
       # Partner bot
-      - 'traefik.http.routers.partner.rule=Host(`partner.raketa.ru`) && PathPrefix(`/webhook/partner`)'
+      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`) && PathPrefix(`/webhook/partner`)'
       - 'traefik.http.routers.partner.entrypoints=websecure'
       - 'traefik.http.routers.partner.tls=true'
       - 'traefik.http.routers.partner.tls.certresolver=le'
