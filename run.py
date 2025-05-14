@@ -45,6 +45,10 @@ WEBHOOK_SECRET = {
 
 # Проверка секретов
 for bot, secret in WEBHOOK_SECRET.items():
+    log.info(f"customer_bot_secret: {customer_bot_secret}")
+    log.info(f"courier_bot_secret: {courier_bot_secret}")
+    log.info(f"admin_bot_secret: {admin_bot_secret}")
+    log.info(f"partner_bot_secret: {partner_bot_secret}")
     if not secret or len(secret) < 16:
         raise ValueError(
             f"Секрет для бота {bot} пустой или слишком короткий (мин. 16 символов)"
