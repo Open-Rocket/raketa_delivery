@@ -84,33 +84,28 @@ async def setup_dispatchers():
     partner_dp.callback_query.middleware(AgentOuterMiddleware(rediska))
 
 
-async def on_startup(_: web.Application):  # Добавлен параметр app
-    IP_TG = "149.154.160.0/20"
+async def on_startup(app: web.Application):
     try:
-        # Установка вебхуков с секретами и ограничением IP Telegram
+        # Установка вебхуков с секретами
         await customer_bot.set_webhook(
             f"{SUBDOMAIN_CUSTOMER}/webhook/customer",
             secret_token=WEBHOOK_SECRET["customer"],
             allowed_updates=["message", "callback_query"],
-            ip_address=IP_TG,
         )
         await courier_bot.set_webhook(
             f"{SUBDOMAIN_COURIER}/webhook/courier",
             secret_token=WEBHOOK_SECRET["courier"],
             allowed_updates=["message", "callback_query"],
-            ip_address=IP_TG,
         )
         await admin_bot.set_webhook(
             f"{SUBDOMAIN_ADMIN}/webhook/admin",
             secret_token=WEBHOOK_SECRET["admin"],
             allowed_updates=["message", "callback_query"],
-            ip_address=IP_TG,
         )
         await partner_bot.set_webhook(
             f"{SUBDOMAIN_PARTNER}/webhook/partner",
             secret_token=WEBHOOK_SECRET["partner"],
             allowed_updates=["message", "callback_query"],
-            ip_address=IP_TG,
         )
         log.info("🔗 Вебхуки установлены")
     except Exception as e:
@@ -118,13 +113,18 @@ async def on_startup(_: web.Application):  # Добавлен параметр a
         raise
 
 
-async def on_shutdown(_: web.Application):  # Добавлен параметр app
+async def on_shutdown(_: web.Application):
     try:
         await customer_bot.delete_webhook()
         await courier_bot.delete_webhook()
         await admin_bot.delete_webhook()
         await partner_bot.delete_webhook()
         await rediska.redis.aclose()
+        # Закрываем сессии ботов
+        await customer_bot.session.close()
+        await courier_bot.session.close()
+        await admin_bot.session.close()
+        await partner_bot.session.close()
         log.warning("❌ Остановлено корректно")
     except Exception as e:
         log.error(f"Ошибка при остановке: {e}")
