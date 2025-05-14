@@ -19,6 +19,11 @@ from .routers import (
     partner_fallback,
 )
 from .bots import (
+    DOMAIN,
+    SUBDOMAIN_CUSTOMER,
+    SUBDOMAIN_COURIER,
+    SUBDOMAIN_ADMIN,
+    SUBDOMAIN_PARTNER,
     SUPER_ADMIN_TG_ID,
     customer_bot,
     customer_bot_id,
@@ -36,9 +41,18 @@ from .bots import (
     partner_bot_id,
     partner_dp,
     fsm_partner_storage,
+    customer_bot_secret,
+    courier_bot_secret,
+    admin_bot_secret,
+    partner_bot_secret,
 )
 
 __all__ = [
+    "DOMAIN",
+    "SUBDOMAIN_CUSTOMER",
+    "SUBDOMAIN_COURIER",
+    "SUBDOMAIN_ADMIN",
+    "SUBDOMAIN_PARTNER",
     "SUPER_ADMIN_TG_ID",
     "log",
     "db_settings",
@@ -79,4 +93,8 @@ __all__ = [
     "partner_fallback",
     "RABBIT_URL",
     "db_settings_alembic",
+    "customer_bot_secret",
+    "courier_bot_secret",
+    "admin_bot_secret",
+    "partner_bot_secret",
 ]

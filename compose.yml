@@ -74,8 +74,52 @@ services:
       - redis
     networks:
       - raketa_network
+    expose:
+      - '80'
+    labels:
+      - 'traefik.enable=true'
+      # Customer bot
+      - 'traefik.http.routers.customer.rule=Host(`${SUBDOMAIN_CUSTOMER}`) && PathPrefix(`/webhook/customer`)'
+      - 'traefik.http.routers.customer.entrypoints=websecure'
+      - 'traefik.http.routers.customer.tls.certresolver=myresolver'
+      # Courier bot
+      - 'traefik.http.routers.courier.rule=Host(`${SUBDOMAIN_COURIER}`) && PathPrefix(`/webhook/courier`)'
+      - 'traefik.http.routers.courier.entrypoints=websecure'
+      - 'traefik.http.routers.courier.tls.certresolver=myresolver'
+      # Admin bot
+      - 'traefik.http.routers.admin.rule=Host(`${SUBDOMAIN_ADMIN}`) && PathPrefix(`/webhook/admin`)'
+      - 'traefik.http.routers.admin.entrypoints=websecure'
+      - 'traefik.http.routers.admin.tls.certresolver=myresolver'
+      # Partner bot
+      - 'traefik.http.routers.partner.rule=Host(`${SUBDOMAIN_PARTNER}`) && PathPrefix(`/webhook/partner`)'
+      - 'traefik.http.routers.partner.entrypoints=websecure'
+      - 'traefik.http.routers.partner.tls.certresolver=myresolver'
+      # Указываем порт приложения
+      - 'traefik.http.services.raketa.loadbalancer.server.port=80'
+
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - '--api.insecure=true'
+      - '--providers.docker=true'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
+      - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
+      - '--certificatesresolvers.myresolver.acme.httpchallenge=true'
+      - '--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web'
+      - '--certificatesresolvers.myresolver.acme.email=${EMAIL}'
+      - '--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json'
     ports:
-      - '127.0.0.1:8000:80'
+      - '80:80'
+      - '443:443'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - 'traefik_letsencrypt:/letsencrypt'
+    networks:
+      - raketa_network
 
   promtail:
     image: grafana/promtail:latest
@@ -87,11 +131,12 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
-      - ./promtail-data:/data # ← вот эта строка нужна
+      - ./promtail-data:/data
     command: -config.file=/etc/promtail/config.yaml
     privileged: true
     networks:
       - raketa_network
+
   loki:
     image: grafana/loki:latest
     container_name: loki
@@ -113,3 +158,4 @@ volumes:
   postgres_data:
   redisdata:
   grafana_data:
+  traefik_letsencrypt:
