@@ -35,13 +35,20 @@ from src.config import (
     partner_bot_secret,
 )
 
-
+# Секреты вебхуков
 WEBHOOK_SECRET = {
     "customer": customer_bot_secret,
     "courier": courier_bot_secret,
     "admin": admin_bot_secret,
     "partner": partner_bot_secret,
 }
+
+# Проверка секретов
+for bot, secret in WEBHOOK_SECRET.items():
+    if not secret or len(secret) < 16:
+        raise ValueError(
+            f"Секрет для бота {bot} пустой или слишком короткий (мин. 16 символов)"
+        )
 
 
 # Middleware для логирования входящих запросов
@@ -69,21 +76,16 @@ async def setup_dispatchers():
     # Middleware
     customer_dp.message.middleware(CustomerOuterMiddleware(rediska))
     customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska))
-
     courier_dp.message.middleware(CourierOuterMiddleware(rediska))
     courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
-
     admin_dp.message.middleware(AdminOuterMiddleware(rediska))
     admin_dp.callback_query.middleware(AdminOuterMiddleware(rediska))
-
     partner_dp.message.middleware(AgentOuterMiddleware(rediska))
     partner_dp.callback_query.middleware(AgentOuterMiddleware(rediska))
 
 
-async def on_startup():
-
+async def on_startup(_: web.Application):  # Добавлен параметр app
     IP_TG = "149.154.160.0/20"
-
     try:
         # Установка вебхуков с секретами и ограничением IP Telegram
         await customer_bot.set_webhook(
@@ -116,7 +118,7 @@ async def on_startup():
         raise
 
 
-async def on_shutdown():
+async def on_shutdown(_: web.Application):  # Добавлен параметр app
     try:
         await customer_bot.delete_webhook()
         await courier_bot.delete_webhook()
@@ -130,10 +132,8 @@ async def on_shutdown():
 
 async def main():
     await setup_dispatchers()
-
     app = web.Application()
     app.middlewares.append(log_requests_middleware)
-
     # Привязываем каждый диспетчер к своему пути с секретами
     SimpleRequestHandler(
         dispatcher=customer_dp,
@@ -155,22 +155,18 @@ async def main():
         bot=partner_bot,
         secret_token=WEBHOOK_SECRET["partner"],
     ).register(app, path="/webhook/partner")
-
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
-
     # Aiogram внутренняя настройка
     setup_application(app, customer_dp, bot=customer_bot)
     setup_application(app, courier_dp, bot=courier_bot)
     setup_application(app, admin_dp, bot=admin_bot)
     setup_application(app, partner_dp, bot=partner_bot)
-
     # Запускаем параллельно воркеры и aiohttp
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 80)
     await site.start()
-
     await main_worker()  # Ваш таск-планировщик
 
 
