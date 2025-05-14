@@ -382,6 +382,9 @@ async def setup_bot(
     app.router.add_post(f"/{route}", handle_webhook)
 
 
+# comment
+
+
 async def main():
     try:
         await asyncio.gather(
