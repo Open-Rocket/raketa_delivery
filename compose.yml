@@ -74,8 +74,8 @@ services:
       - redis
     networks:
       - raketa_network
-    expose:
-      - '80'
+    ports:
+      - '443:80'
     labels:
       - 'traefik.enable=true'
 
