@@ -78,24 +78,42 @@ services:
       - '80'
     labels:
       - 'traefik.enable=true'
+
+      # Общие настройки middleware
+      - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
+      - 'traefik.http.middlewares.strip-prefix.stripprefix.prefixes=/webhook/customer,/webhook/courier,/webhook/admin,/webhook/partner'
+
       # Customer bot
       - 'traefik.http.routers.customer.rule=Host(`customer.raketa.ru`) && PathPrefix(`/webhook/customer`)'
       - 'traefik.http.routers.customer.entrypoints=websecure'
-      - 'traefik.http.routers.customer.tls.certresolver=myresolver'
+      - 'traefik.http.routers.customer.tls=true'
+      - 'traefik.http.routers.customer.tls.certresolver=le'
+      - 'traefik.http.routers.customer.middlewares=strip-prefix'
+      - 'traefik.http.services.customer.loadbalancer.server.port=80'
+
       # Courier bot
       - 'traefik.http.routers.courier.rule=Host(`courier.raketa.ru`) && PathPrefix(`/webhook/courier`)'
       - 'traefik.http.routers.courier.entrypoints=websecure'
-      - 'traefik.http.routers.courier.tls.certresolver=myresolver'
+      - 'traefik.http.routers.courier.tls=true'
+      - 'traefik.http.routers.courier.tls.certresolver=le'
+      - 'traefik.http.routers.courier.middlewares=strip-prefix'
+      - 'traefik.http.services.courier.loadbalancer.server.port=80'
+
       # Admin bot
       - 'traefik.http.routers.admin.rule=Host(`admin.raketa.ru`) && PathPrefix(`/webhook/admin`)'
       - 'traefik.http.routers.admin.entrypoints=websecure'
-      - 'traefik.http.routers.admin.tls.certresolver=myresolver'
+      - 'traefik.http.routers.admin.tls=true'
+      - 'traefik.http.routers.admin.tls.certresolver=le'
+      - 'traefik.http.routers.admin.middlewares=strip-prefix'
+      - 'traefik.http.services.admin.loadbalancer.server.port=80'
+
       # Partner bot
       - 'traefik.http.routers.partner.rule=Host(`partner.raketa.ru`) && PathPrefix(`/webhook/partner`)'
       - 'traefik.http.routers.partner.entrypoints=websecure'
-      - 'traefik.http.routers.partner.tls.certresolver=myresolver'
-      # Указываем порт приложения
-      - 'traefik.http.services.raketa.loadbalancer.server.port=80'
+      - 'traefik.http.routers.partner.tls=true'
+      - 'traefik.http.routers.partner.tls.certresolver=le'
+      - 'traefik.http.routers.partner.middlewares=strip-prefix'
+      - 'traefik.http.services.partner.loadbalancer.server.port=80'
 
   traefik:
     image: traefik:latest
@@ -104,14 +122,16 @@ services:
     command:
       - '--api.insecure=true'
       - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false' # Рекомендуется для безопасности
       - '--entrypoints.web.address=:80'
       - '--entrypoints.websecure.address=:443'
       - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
       - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
-      - '--certificatesresolvers.myresolver.acme.httpchallenge=true'
-      - '--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web'
-      - '--certificatesresolvers.myresolver.acme.email=${EMAIL}'
-      - '--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json'
+      # Настройки Let's Encrypt
+      - '--certificatesresolvers.le.acme.email=${EMAIL}'
+      - '--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json'
+      - '--certificatesresolvers.le.acme.httpchallenge=true'
+      - '--certificatesresolvers.le.acme.httpchallenge.entrypoint=web'
     ports:
       - '80:80'
       - '443:443'
