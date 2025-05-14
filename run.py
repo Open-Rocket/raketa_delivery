@@ -25,10 +25,7 @@ from src.config import (
     admin_dp,
     partner_dp,
     log,
-    SUBDOMAIN_CUSTOMER,
-    SUBDOMAIN_COURIER,
-    SUBDOMAIN_ADMIN,
-    SUBDOMAIN_PARTNER,
+    DOMAIN,
     customer_bot_secret,
     courier_bot_secret,
     admin_bot_secret,
@@ -82,24 +79,24 @@ async def setup_dispatchers():
 
 async def on_startup(app: web.Application):
     try:
-        # Установка вебхуков с секретами
+        # Установка вебхуков с секретами (используем единый DOMAIN)
         await customer_bot.set_webhook(
-            f"{SUBDOMAIN_CUSTOMER}/webhook/customer",
+            f"{DOMAIN}/webhook/customer",
             secret_token=WEBHOOK_SECRET["customer"],
             allowed_updates=["message", "callback_query"],
         )
         await courier_bot.set_webhook(
-            f"{SUBDOMAIN_COURIER}/webhook/courier",
+            f"{DOMAIN}/webhook/courier",
             secret_token=WEBHOOK_SECRET["courier"],
             allowed_updates=["message", "callback_query"],
         )
         await admin_bot.set_webhook(
-            f"{SUBDOMAIN_ADMIN}/webhook/admin",
+            f"{DOMAIN}/webhook/admin",
             secret_token=WEBHOOK_SECRET["admin"],
             allowed_updates=["message", "callback_query"],
         )
         await partner_bot.set_webhook(
-            f"{SUBDOMAIN_PARTNER}/webhook/partner",
+            f"{DOMAIN}/webhook/partner",
             secret_token=WEBHOOK_SECRET["partner"],
             allowed_updates=["message", "callback_query"],
         )
@@ -169,7 +166,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         log.warning("⛔ KeyboardInterrupt: остановка вручную.")
-
 
 # import asyncio
 # from src.confredis import rediska
