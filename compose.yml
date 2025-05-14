@@ -58,70 +58,68 @@ services:
       - postgres
     volumes:
       - grafana_data:/var/lib/grafana
+  raketa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raketa_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.local
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+    networks:
+      - raketa_network
+    labels:
+      - 'traefik.enable=true'
 
-    raketa:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      container_name: raketa_bot
-      restart: unless-stopped
-      env_file:
-        - .env
-        - .env.local
-      depends_on:
-        - postgres
-        - rabbitmq
-        - redis
-      networks:
-        - raketa_network
-      labels:
-        - 'traefik.enable=true'
+      # Customer bot
+      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`)'
+      - 'traefik.http.routers.customer.entrypoints=websecure'
+      - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.customer.loadbalancer.server.port=80'
 
-        # Customer bot
-        - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`)'
-        - 'traefik.http.routers.customer.entrypoints=websecure'
-        - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
-        - 'traefik.http.services.customer.loadbalancer.server.port=80'
+      # Courier bot
+      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`)'
+      - 'traefik.http.routers.courier.entrypoints=websecure'
+      - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.courier.loadbalancer.server.port=80'
 
-        # Courier bot
-        - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`)'
-        - 'traefik.http.routers.courier.entrypoints=websecure'
-        - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
-        - 'traefik.http.services.courier.loadbalancer.server.port=80'
+      # Admin bot
+      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`)'
+      - 'traefik.http.routers.admin.entrypoints=websecure'
+      - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.admin.loadbalancer.server.port=80'
 
-        # Admin bot
-        - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`)'
-        - 'traefik.http.routers.admin.entrypoints=websecure'
-        - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
-        - 'traefik.http.services.admin.loadbalancer.server.port=80'
-
-        # Partner bot
-        - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`)'
-        - 'traefik.http.routers.partner.entrypoints=websecure'
-        - 'traefik.http.routers.partner.tls.certresolver=letsencrypt'
-        - 'traefik.http.services.partner.loadbalancer.server.port=80'
-
-    traefik:
-      image: traefik:latest
-      container_name: traefik
-      restart: unless-stopped
-      command:
-        - '--configFile=/etc/traefik/traefik.yml'
-        - '--providers.docker=true'
-        - '--providers.docker.exposedByDefault=false'
-        - '--entrypoints.web.address=:80'
-        - '--entrypoints.websecure.address=:443'
-        - '--entrypoints.dashboard.address=:8080'
-      ports:
-        - '80:80'
-        - '443:443'
-        - '127.0.0.1:8080:8080' # Dashboard только локально
-      volumes:
-        - '/var/run/docker.sock:/var/run/docker.sock:ro'
-        - './traefik.yml:/etc/traefik/traefik.yml'
-        - './letsencrypt:/letsencrypt'
-      networks:
-        - raketa_network
+      # Partner bot
+      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`)'
+      - 'traefik.http.routers.partner.entrypoints=websecure'
+      - 'traefik.http.routers.partner.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.partner.loadbalancer.server.port=80'
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - '--configFile=/etc/traefik/traefik.yml'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedByDefault=false'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      - '--entrypoints.dashboard.address=:8080'
+    ports:
+      - '80:80'
+      - '443:443'
+      - '127.0.0.1:8080:8080' # Dashboard только локально
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - './traefik.yml:/etc/traefik/traefik.yml'
+      - './letsencrypt:/letsencrypt'
+    networks:
+      - raketa_network
 
   promtail:
     image: grafana/promtail:latest
