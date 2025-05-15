@@ -165,13 +165,16 @@ async def main():
     await site.start()
     log.info("🚀 Веб-сервер запущен: http://0.0.0.0:80")
 
-    await asyncio.gather(
-        customer_dp.startup(),
-        courier_dp.startup(),
-        admin_dp.startup(),
-        partner_dp.startup(),
-        # main_worker(),
-    )
+    await customer_dp.startup()
+    await courier_dp.startup()
+    await admin_dp.startup()
+    await partner_dp.startup()
+
+    # Запускаем main_worker параллельно, не блокируя остальные
+    worker_task = asyncio.create_task(main_worker())
+
+    # Если хочешь, чтобы программа ждала завершения воркера:
+    await worker_task
 
 
 if __name__ == "__main__":
