@@ -166,10 +166,10 @@ async def main():
     log.info("🚀 Веб-сервер запущен: http://0.0.0.0:80")
 
     await asyncio.gather(
-        customer_dp.startup(customer_bot),
-        courier_dp.startup(courier_bot),
-        admin_dp.startup(admin_bot),
-        partner_dp.startup(partner_bot),
+        customer_dp.startup(),
+        courier_dp.startup(),
+        admin_dp.startup(),
+        partner_dp.startup(),
         main_worker(),
     )
 
