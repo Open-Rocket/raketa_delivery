@@ -88,28 +88,28 @@ services:
       # Один сервис для контейнера raketa_bot
       - 'traefik.http.services.raketa_bot.loadbalancer.server.port=80'
       # Роутер для customer_bot
-      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`) && PathPrefix(`/customer_bot`)'
+      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`) && PathPrefix(`/customer`)'
       - 'traefik.http.routers.customer.entrypoints=websecure'
       - 'traefik.http.routers.customer.tls=true'
       - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.customer.middlewares=customer-stripprefix'
       - 'traefik.http.routers.customer.service=raketa_bot'
       # Роутер для courier_bot
-      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`) && PathPrefix(`/courier_bot`)'
+      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`) && PathPrefix(`/courier`)'
       - 'traefik.http.routers.courier.entrypoints=websecure'
       - 'traefik.http.routers.courier.tls=true'
       - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.courier.middlewares=courier-stripprefix'
       - 'traefik.http.routers.courier.service=raketa_bot'
       # Роутер для admin_bot
-      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`) && PathPrefix(`/admin_bot`)'
+      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`) && PathPrefix(`/admin`)'
       - 'traefik.http.routers.admin.entrypoints=websecure'
       - 'traefik.http.routers.admin.tls=true'
       - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.admin.middlewares=admin-stripprefix'
       - 'traefik.http.routers.admin.service=raketa_bot'
       # Роутер для partner_bot
-      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`) && PathPrefix(`/partner_bot`)'
+      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`) && PathPrefix(`/partner`)'
       - 'traefik.http.routers.partner.entrypoints=websecure'
       - 'traefik.http.routers.partner.tls=true'
       - 'traefik.http.routers.partner.tls.certresolver=letsencrypt'
@@ -125,7 +125,6 @@ services:
       - '--log.level=INFO'
       - '--providers.docker=true'
       - '--providers.docker.exposedByDefault=false'
-      - '--providers.docker.network=raketa_network' # Явно указываем сеть
       - '--entrypoints.web.address=:80'
       - '--entrypoints.websecure.address=:443'
       - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
