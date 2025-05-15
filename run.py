@@ -61,6 +61,7 @@ async def setup_bot(
     route: str,
     middleware_cls,
     routers: list,
+    domain: str,
 ):
     dp.update()
     dp["redis"] = rediska
@@ -69,7 +70,7 @@ async def setup_bot(
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    webhook_url = f"{DOMAIN}/{route}"
+    webhook_url = f"{domain}/{route}"
     try:
         await bot.set_webhook(webhook_url)
         log.info(f"Установлен webhook: {webhook_url}")
