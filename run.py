@@ -1,6 +1,5 @@
 import asyncio
 from fastapi import FastAPI, Request, Response
-from contextlib import asynccontextmanager
 from aiogram.types import Update
 
 from src.confredis import rediska
@@ -31,8 +30,30 @@ from src.config import (
     partner_bot_secret,
 )
 
+# === Lifespan FastAPI App ===
 
-# Настройка диспетчеров
+
+async def lifespan(app: FastAPI):
+    setup_dispatchers()
+    await set_webhooks()
+    app.state.worker_task = asyncio.create_task(main_worker())
+    yield
+    log.info("Shutting down...")
+    app.state.worker_task.cancel()
+    try:
+        await app.state.worker_task
+    except asyncio.CancelledError:
+        pass
+    await rediska.redis.aclose()
+    log.info("Resources cleaned up.")
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+# === Setup ===
+
+
 def setup_dispatchers():
     customer_dp["bot"] = customer_bot
     customer_dp["redis"] = rediska
@@ -59,7 +80,6 @@ def setup_dispatchers():
     partner_dp.include_routers(partner_r, partner_fallback)
 
 
-# Асинхронная установка вебхуков
 async def set_webhooks():
     webhooks = [
         (customer_bot, "customer", customer_bot_secret),
@@ -67,7 +87,6 @@ async def set_webhooks():
         (admin_bot, "admin", admin_bot_secret),
         (partner_bot, "partner", partner_bot_secret),
     ]
-
     for bot, name, secret in webhooks:
         await bot.set_webhook(
             f"https://{name}.raketago.ru/{name}",
@@ -77,37 +96,13 @@ async def set_webhooks():
         log.info(f"Webhook set for {name}")
 
 
-@asynccontextmanager
-def lifespan(app: FastAPI):
-    setup_dispatchers()
-    asyncio.run(set_webhooks())
-    worker_task = asyncio.create_task(main_worker())
-    log.info("Startup completed")
+# === Webhook endpoint ===
+
+
+@app.post("/{bot_name}")
+async def handle_webhook(request: Request, bot_name: str):
     try:
-        yield
-    finally:
-        worker_task.cancel()
-        try:
-            asyncio.run(worker_task)
-        except asyncio.CancelledError:
-            pass
-        asyncio.run(rediska.redis.aclose())
-        log.info("Shutdown completed")
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-# Обработчики вебхуков
-@app.post("/customer")
-@app.post("/courier")
-@app.post("/admin")
-@app.post("/partner")
-async def handle_webhook(request: Request):
-    bot_name = request.url.path.strip("/")
-    try:
-        data = await request.json()
-        update = Update.model_validate(data)
+        update = Update.model_validate(await request.json())
         log.debug(f"Update for {bot_name}: {update}")
 
         if bot_name == "customer":
