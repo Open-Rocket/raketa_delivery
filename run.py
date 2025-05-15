@@ -1,8 +1,10 @@
 import asyncio
 import inspect
+import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher
-from aiogram.types import Update
+from aiogram.types import Update, Message
+from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
 
 from src.confredis import rediska
@@ -32,6 +34,10 @@ from src.config import (
     partner_bot_secret,
 )
 
+# Устанавливаем уровень логирования на DEBUG
+log.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+
 app = web.Application()
 
 WEBHOOK_SECRET = {
@@ -41,11 +47,13 @@ WEBHOOK_SECRET = {
     "partner": partner_bot_secret,
 }
 
+# Проверка секретов
 for bot, secret in WEBHOOK_SECRET.items():
     if not secret or len(secret) < 16:
         raise ValueError(
             f"Секрет для бота {bot} пустой или слишком короткий (мин. 16 символов)"
         )
+    log.debug(f"Секрет для {bot}: {secret[:4]}**** (длина: {len(secret)})")
 
 
 @web.middleware
@@ -69,11 +77,24 @@ async def handle_webhook(request: web.Request):
 
     expected_secret = WEBHOOK_SECRET.get(bot_name)
     received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-    if expected_secret and received_secret != expected_secret:
+
+    if not expected_secret:
+        log.error(f"Секрет для {bot_name} не найден")
+        return web.Response(status=500, text="Server configuration error")
+
+    if not received_secret:
         log.error(
-            f"Неверный секрет вебхука для {bot_name}: ожидался {expected_secret}, получен {received_secret}"
+            f"Заголовок X-Telegram-Bot-Api-Secret-Token отсутствует для {bot_name}"
+        )
+        return web.Response(status=403, text="Missing webhook secret")
+
+    if received_secret != expected_secret:
+        log.error(
+            f"Неверный секрет для {bot_name}: ожидался {expected_secret[:4]}****, получен {received_secret[:4]}****"
         )
         return web.Response(status=403, text="Invalid webhook secret")
+
+    log.debug(f"Секрет для {bot_name} успешно проверен")
 
     try:
         body = await request.json()
@@ -115,13 +136,19 @@ def setup_dispatcher(
     middleware_cls,
     routers: list,
 ):
-    dp.update()  # Как в polling-версии
+    dp.update()
     dp["redis"] = rediska
     dp["bot"] = bot
 
     dp.message.middleware(middleware_cls(rediska))
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
+
+    # Добавляем тестовый хендлер для проверки
+    @dp.message(Command("test"))
+    async def test_handler(message: Message):
+        log.debug(f"Тестовый хендлер сработал для {dp.name}: {message.text}")
+        await message.answer("Тестовый хендлер работает!")
 
     async def log_update(update: Update, *args, **kwargs):
         log.debug(f"Получено обновление для бота {dp.name}: {update}")
@@ -135,7 +162,7 @@ async def set_webhooks():
             customer_bot.set_webhook(
                 f"https://customer.raketago.ru/customer",
                 secret_token=WEBHOOK_SECRET["customer"],
-                drop_pending_updates=True,  # Сбрасываем старые обновления
+                drop_pending_updates=True,
             ),
             courier_bot.set_webhook(
                 f"https://courier.raketago.ru/courier",
@@ -153,6 +180,8 @@ async def set_webhooks():
                 drop_pending_updates=True,
             ),
         ]
+        for bot_name, secret in WEBHOOK_SECRET.items():
+            log.debug(f"Установка webhook для {bot_name} с секретом: {secret[:4]}****")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for bot_name, result in zip(
@@ -178,7 +207,6 @@ async def start_web_server():
 
 
 async def main():
-    # Настраиваем диспетчеры
     setup_dispatcher(
         customer_dp,
         customer_bot,
@@ -204,7 +232,6 @@ async def main():
         [partner_r, partner_fallback],
     )
 
-    # Запускаем .startup() для диспетчеров
     async def run_startup(dp, name):
         try:
             if inspect.iscoroutinefunction(dp.startup):
@@ -224,10 +251,8 @@ async def main():
         run_startup(partner_dp, "partner"),
     )
 
-    # Middleware для логирования
     app.middlewares.append(log_requests_middleware)
 
-    # Роуты вебхуков
     app.router.add_post("/customer", handle_webhook)
     app.router.add_post("/courier", handle_webhook)
     app.router.add_post("/admin", handle_webhook)
@@ -236,7 +261,6 @@ async def main():
     await set_webhooks()
     await start_web_server()
 
-    # Бесконечный цикл
     while True:
         await asyncio.sleep(3600)
 
@@ -275,7 +299,6 @@ async def on_shutdown():
 
         await rediska.redis.aclose()
         log.warning("❌ Приложение остановлено корректно")
-
     except Exception as e:
         log.error(f"Ошибка при остановке: {e}")
 
