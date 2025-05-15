@@ -2693,7 +2693,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
     ]
 
     amount_kopecks = prices[0].amount
-    amount_rub = amount_kopecks / 100
+    amount_rub = round((amount_kopecks / 100), 2)
 
     log.info(f"prices kopeks: {amount_kopecks}")
     log.info(f"prices rub: {amount_rub}")
