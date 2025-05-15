@@ -138,7 +138,7 @@ async def setup_dispatcher(
 
     dp.update.outer_middleware()(log_update)
 
-    await asyncio.sleep(0)
+    await asyncio.sleep(0.1)
 
 
 # Установка webhook'ов
