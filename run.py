@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import FastAPI, Request, BackgroundTasks, Response
+from fastapi import FastAPI, Request, Response
+from contextlib import asynccontextmanager
 from aiogram.types import Update
 
 from src.confredis import rediska
@@ -29,8 +30,6 @@ from src.config import (
     admin_bot_secret,
     partner_bot_secret,
 )
-
-app = FastAPI()
 
 
 # Настройка диспетчеров
@@ -78,23 +77,25 @@ async def set_webhooks():
         log.info(f"Webhook set for {name}")
 
 
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+def lifespan(app: FastAPI):
     setup_dispatchers()
-    await set_webhooks()
-    app.state.worker_task = asyncio.create_task(main_worker())
+    asyncio.run(set_webhooks())
+    worker_task = asyncio.create_task(main_worker())
     log.info("Startup completed")
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    app.state.worker_task.cancel()
     try:
-        await app.state.worker_task
-    except asyncio.CancelledError:
-        pass
-    await rediska.redis.aclose()
-    log.info("Shutdown completed")
+        yield
+    finally:
+        worker_task.cancel()
+        try:
+            asyncio.run(worker_task)
+        except asyncio.CancelledError:
+            pass
+        asyncio.run(rediska.redis.aclose())
+        log.info("Shutdown completed")
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # Обработчики вебхуков
