@@ -130,7 +130,6 @@ async def setup_dispatcher(
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    # Указываем типы обновлений, которые должен обрабатывать диспетчер
     dp.resolve_used_update_types()
 
     # Логирование обновлений
@@ -138,6 +137,8 @@ async def setup_dispatcher(
         log.debug(f"Получено обновление для бота {dp.name}: {update}")
 
     dp.update.outer_middleware()(log_update)
+
+    await asyncio.sleep(0)
 
 
 # Установка webhook'ов
