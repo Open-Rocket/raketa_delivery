@@ -130,7 +130,10 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
-        web.run_app(app, host="0.0.0.0", port=80)
+        web.run_app(
+            main(),
+            host="0.0.0.0",
+            port=80,
+        )
     except KeyboardInterrupt:
         log.warning("⛔ KeyboardInterrupt: остановка вручную.")
