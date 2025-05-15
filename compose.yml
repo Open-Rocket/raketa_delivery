@@ -75,30 +75,10 @@ services:
       - raketa_network
     labels:
       - 'traefik.enable=true'
-
-      # Customer bot
-      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`)'
-      - 'traefik.http.routers.customer.entrypoints=websecure'
-      - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
-      - 'traefik.http.services.customer.loadbalancer.server.port=80'
-
-      # Courier bot
-      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`)'
-      - 'traefik.http.routers.courier.entrypoints=websecure'
-      - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
-      - 'traefik.http.services.courier.loadbalancer.server.port=80'
-
-      # Admin bot
-      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`)'
-      - 'traefik.http.routers.admin.entrypoints=websecure'
-      - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
-      - 'traefik.http.services.admin.loadbalancer.server.port=80'
-
-      # Partner bot
-      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`)'
-      - 'traefik.http.routers.partner.entrypoints=websecure'
-      - 'traefik.http.routers.partner.tls.certresolver=letsencrypt'
-      - 'traefik.http.services.partner.loadbalancer.server.port=80'
+      - 'traefik.http.routers.raketa.rule=Host(`raketago.ru`)'
+      - 'traefik.http.routers.raketa.entrypoints=websecure'
+      - 'traefik.http.routers.raketa.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.raketa.loadbalancer.server.port=80'
   traefik:
     image: traefik:latest
     container_name: traefik
