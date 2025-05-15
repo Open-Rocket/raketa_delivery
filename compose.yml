@@ -77,25 +77,25 @@ services:
       - 'traefik.enable=true'
 
       # Роутер для customer_bot
-      - 'traefik.http.routers.customer.rule=Host(`raketago.ru`) && PathPrefix(`/customer_bot`)'
+      - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`) && PathPrefix(`/customer_bot`)'
       - 'traefik.http.routers.customer.entrypoints=websecure'
       - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.customer.service=raketa_bot'
 
       # Роутер для courier_bot
-      - 'traefik.http.routers.courier.rule=Host(`raketago.ru`) && PathPrefix(`/courier_bot`)'
+      - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`) && PathPrefix(`/courier_bot`)'
       - 'traefik.http.routers.courier.entrypoints=websecure'
       - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.courier.service=raketa_bot'
 
       # Роутер для admin_bot
-      - 'traefik.http.routers.admin.rule=Host(`raketago.ru`) && PathPrefix(`/admin_bot`)'
+      - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`) && PathPrefix(`/admin_bot`)'
       - 'traefik.http.routers.admin.entrypoints=websecure'
       - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.admin.service=raketa_bot'
 
       # Роутер для partner_bot
-      - 'traefik.http.routers.partner.rule=Host(`raketago.ru`) && PathPrefix(`/partner_bot`)'
+      - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`) && PathPrefix(`/partner_bot`)'
       - 'traefik.http.routers.partner.entrypoints=websecure'
       - 'traefik.http.routers.partner.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.partner.service=raketa_bot'

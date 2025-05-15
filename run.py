@@ -27,6 +27,10 @@ from src.config import (
     partner_dp,
     log,
     DOMAIN,
+    SUBDOMAIN_CUSTOMER,
+    SUBDOMAIN_COURIER,
+    SUBDOMAIN_ADMIN,
+    SUBDOMAIN_PARTNER,
 )
 
 app = web.Application()
@@ -37,13 +41,13 @@ async def handle_webhook(request: web.Request):
     body = await request.json()
     update = Update.model_validate(body)
 
-    if bot_name == "customer_bot":
+    if bot_name == "customer":
         await customer_dp.feed_update(customer_bot, update)
-    elif bot_name == "courier_bot":
+    elif bot_name == "courier":
         await courier_dp.feed_update(courier_bot, update)
-    elif bot_name == "admin_bot":
+    elif bot_name == "admin":
         await admin_dp.feed_update(admin_bot, update)
-    elif bot_name == "partner_bot":
+    elif bot_name == "partner":
         await partner_dp.feed_update(partner_bot, update)
     else:
         return web.Response(status=404, text="Bot not found")
@@ -89,6 +93,7 @@ async def main():
                 "customer_bot",
                 CustomerOuterMiddleware,
                 [customer_r, customer_fallback],
+                domain=SUBDOMAIN_CUSTOMER,
             ),
             setup_bot(
                 courier_dp,
@@ -96,6 +101,7 @@ async def main():
                 "courier_bot",
                 CourierOuterMiddleware,
                 [courier_r, payment_r, courier_fallback],
+                domain=SUBDOMAIN_COURIER,
             ),
             setup_bot(
                 admin_dp,
@@ -103,6 +109,7 @@ async def main():
                 "admin_bot",
                 AdminOuterMiddleware,
                 [admin_r, admin_fallback],
+                domain=SUBDOMAIN_ADMIN,
             ),
             setup_bot(
                 partner_dp,
@@ -110,6 +117,7 @@ async def main():
                 "partner_bot",
                 AgentOuterMiddleware,
                 [partner_r, partner_fallback],
+                domain=SUBDOMAIN_PARTNER,
             ),
             main_worker(),
         )
