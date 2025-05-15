@@ -26,13 +26,9 @@ from src.config import (
     admin_dp,
     partner_dp,
     log,
-    DOMAIN,
-    SUBDOMAIN_CUSTOMER,
-    SUBDOMAIN_COURIER,
-    SUBDOMAIN_ADMIN,
-    SUBDOMAIN_PARTNER,
 )
 
+# Глобальное приложение Aiohttp
 app = web.Application()
 
 
@@ -56,12 +52,7 @@ async def handle_webhook(request: web.Request):
 
 
 async def setup_bot(
-    dp: Dispatcher,
-    bot: Bot,
-    route: str,
-    middleware_cls,
-    routers: list,
-    domain: str,
+    dp: Dispatcher, bot: Bot, route: str, middleware_cls, routers: list, domain: str
 ):
     dp.update()
     dp["redis"] = rediska
@@ -73,16 +64,20 @@ async def setup_bot(
     webhook_url = f"{domain}/{route}"
     try:
         await bot.set_webhook(webhook_url)
-        log.info(f"Установлен webhook: {webhook_url}")
+        log.info(f"✅ Webhook установлен: {webhook_url}")
     except TelegramBadRequest as e:
-        log.error(f"Ошибка установки вебхука: {e}")
+        log.error(f"❌ Ошибка установки webhook: {e}")
         raise
 
-    app.router.add_post(
-        f"/{route}",
-        handle_webhook,
-        name=f"{route}",
-    )
+    app.router.add_post(f"/{route}", handle_webhook, name=f"{route}")
+
+
+async def start_web_server():
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 80)
+    await site.start()
+    log.info("🚀 Веб-сервер запущен на http://0.0.0.0:80")
 
 
 async def main():
@@ -94,7 +89,7 @@ async def main():
                 "customer",
                 CustomerOuterMiddleware,
                 [customer_r, customer_fallback],
-                domain=f"https://customer.raketago.ru",
+                domain="https://customer.raketago.ru",
             ),
             setup_bot(
                 courier_dp,
@@ -102,7 +97,7 @@ async def main():
                 "courier",
                 CourierOuterMiddleware,
                 [courier_r, payment_r, courier_fallback],
-                domain=f"https://courier.raketago.ru",
+                domain="https://courier.raketago.ru",
             ),
             setup_bot(
                 admin_dp,
@@ -110,7 +105,7 @@ async def main():
                 "admin",
                 AdminOuterMiddleware,
                 [admin_r, admin_fallback],
-                domain=f"https://admin.raketago.ru",
+                domain="https://admin.raketago.ru",
             ),
             setup_bot(
                 partner_dp,
@@ -118,9 +113,10 @@ async def main():
                 "partner",
                 AgentOuterMiddleware,
                 [partner_r, partner_fallback],
-                domain=f"https://partner.raketago.ru",
+                domain="https://partner.raketago.ru",
             ),
             main_worker(),
+            start_web_server(),  # 🚀 запускаем aiohttp сервер
         )
     except Exception as e:
         log.error(f"🔥 Глобальная ошибка: {e}")
@@ -130,10 +126,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        web.run_app(
-            main(),
-            host="0.0.0.0",
-            port=80,
-        )
+        asyncio.run(main())
     except KeyboardInterrupt:
-        log.warning("⛔ KeyboardInterrupt: остановка вручную.")
+        log.warning("⛔ Остановка вручную через KeyboardInterrupt")
