@@ -104,7 +104,7 @@ services:
     container_name: traefik
     restart: unless-stopped
     command:
-      - '--configFile=/etc/traefik/traefik.yaml'
+      - '--configFile=/etc/traefik.yaml'
       - '--providers.docker=true'
       - '--providers.docker.exposedByDefault=false'
       - '--entrypoints.web.address=:80'
@@ -116,7 +116,7 @@ services:
       - '127.0.0.1:8080:8080' # Dashboard только локально
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
-      - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml
+      - .traefik.yaml:/etc/traefik/traefik.yaml
       - './letsencrypt:/letsencrypt'
     networks:
       - raketa_network
