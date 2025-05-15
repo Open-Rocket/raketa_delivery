@@ -9,13 +9,24 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: 'raketa_logs'
+  # - job_name: 'raketa_logs'
+  #   static_configs:
+  #     - targets:
+  #         - localhost
+  #       labels:
+  #         job: raketa_bot
+  #         service: raketa_bot
+  #         __path__: /var/lib/docker/containers/*raketa_bot*/*.log
+  #   pipeline_stages:
+  #     - docker: {}
+
+  - job_name: 'traefik_logs'
     static_configs:
       - targets:
           - localhost
         labels:
-          job: raketa_bot
-          __path__: /var/lib/docker/containers/*raketa_bot*/**/*.log
-          service_name: raketa_bot
+          job: traefik
+          service: traefik
+          __path__: /var/lib/docker/containers/*traefik*/*.log
     pipeline_stages:
       - docker: {}
