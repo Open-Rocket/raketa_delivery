@@ -55,7 +55,7 @@ async def log_requests_middleware(request, handler):
         body = await request.text()
         log.debug(f"Тело запроса: {body}")
         response = await handler(request)
-        log.debug(f"Ответ: {response.status}")
+        log.debug(f"Ответ: {response.status} {response.text}")
         return response
     except Exception as e:
         log.error(f"Ошибка обработки запроса {request.path}: {e}")
@@ -65,7 +65,7 @@ async def log_requests_middleware(request, handler):
 async def handle_webhook(request: web.Request):
     path = request.path.lstrip("/")
     bot_name = path
-    log.debug(f"Обработка вебхука для bot_name: {bot_name}")
+    log.debug(f"Начало обработки вебхука для bot_name: {bot_name}")
 
     expected_secret = WEBHOOK_SECRET.get(bot_name)
     received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
@@ -77,12 +77,14 @@ async def handle_webhook(request: web.Request):
 
     try:
         body = await request.json()
+        log.debug(f"Получен JSON: {body}")
     except Exception as e:
         log.error(f"Неверный JSON в запросе {request.path}: {e}")
         return web.Response(status=400, text="Invalid JSON")
 
     try:
         update = Update.model_validate(body)
+        log.debug(f"Валидированное обновление: {update}")
     except Exception as e:
         log.error(f"Ошибка валидации обновления для {bot_name}: {e}")
         return web.Response(status=400, text="Invalid update")
@@ -99,6 +101,7 @@ async def handle_webhook(request: web.Request):
         else:
             log.error(f"Неизвестный bot_name: {bot_name}")
             return web.Response(status=404, text="Bot not found")
+        log.debug(f"Обновление успешно обработано для {bot_name}")
     except Exception as e:
         log.error(f"Ошибка обработки обновления для {bot_name}: {e}")
         return web.Response(status=500, text="Internal server error")
@@ -106,16 +109,13 @@ async def handle_webhook(request: web.Request):
     return web.Response(status=200, text="OK")
 
 
-# Сделаем setup_dispatcher обычной функцией, тк там нет await
 def setup_dispatcher(
     dp: Dispatcher,
     bot: Bot,
     middleware_cls,
     routers: list,
 ):
-    # Обновляем (если нужен вызов)
-    dp.update()
-
+    dp.update()  # Как в polling-версии
     dp["redis"] = rediska
     dp["bot"] = bot
 
@@ -133,20 +133,24 @@ async def set_webhooks():
     try:
         tasks = [
             customer_bot.set_webhook(
-                "https://customer.raketago.ru/customer",
+                f"https://customer.raketago.ru/customer",
                 secret_token=WEBHOOK_SECRET["customer"],
+                drop_pending_updates=True,  # Сбрасываем старые обновления
             ),
             courier_bot.set_webhook(
-                "https://courier.raketago.ru/courier",
+                f"https://courier.raketago.ru/courier",
                 secret_token=WEBHOOK_SECRET["courier"],
+                drop_pending_updates=True,
             ),
             admin_bot.set_webhook(
-                "https://admin.raketago.ru/admin",
+                f"https://admin.raketago.ru/admin",
                 secret_token=WEBHOOK_SECRET["admin"],
+                drop_pending_updates=True,
             ),
             partner_bot.set_webhook(
-                "https://partner.raketago.ru/partner",
+                f"https://partner.raketago.ru/partner",
                 secret_token=WEBHOOK_SECRET["partner"],
+                drop_pending_updates=True,
             ),
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -174,7 +178,7 @@ async def start_web_server():
 
 
 async def main():
-    # Сначала синхронно настраиваем диспетчеры
+    # Настраиваем диспетчеры
     setup_dispatcher(
         customer_dp,
         customer_bot,
@@ -200,15 +204,18 @@ async def main():
         [partner_r, partner_fallback],
     )
 
-    # Запускаем .startup() для диспетчеров - если async, await, иначе вызываем в to_thread
+    # Запускаем .startup() для диспетчеров
     async def run_startup(dp, name):
-        if inspect.iscoroutinefunction(dp.startup):
-            await dp.startup()
-            log.info(f"✅ Диспетчер {name} запущен (async startup)")
-        else:
-            # Запуск синхронного в отдельном потоке
-            await asyncio.to_thread(dp.startup)
-            log.info(f"✅ Диспетчер {name} запущен (sync startup)")
+        try:
+            if inspect.iscoroutinefunction(dp.startup):
+                await dp.startup()
+                log.info(f"✅ Диспетчер {name} запущен (async startup)")
+            else:
+                await asyncio.to_thread(dp.startup)
+                log.info(f"✅ Диспетчер {name} запущен (sync startup)")
+        except Exception as e:
+            log.error(f"❌ Ошибка запуска диспетчера {name}: {e}")
+            raise
 
     await asyncio.gather(
         run_startup(customer_dp, "customer"),
@@ -217,7 +224,7 @@ async def main():
         run_startup(partner_dp, "partner"),
     )
 
-    # Middleware для логирования запросов добавляем
+    # Middleware для логирования
     app.middlewares.append(log_requests_middleware)
 
     # Роуты вебхуков
@@ -229,7 +236,7 @@ async def main():
     await set_webhooks()
     await start_web_server()
 
-    # Бесконечный цикл для работы сервера
+    # Бесконечный цикл
     while True:
         await asyncio.sleep(3600)
 
@@ -237,10 +244,10 @@ async def main():
 async def on_shutdown():
     try:
         tasks = [
-            customer_bot.delete_webhook(),
-            courier_bot.delete_webhook(),
-            admin_bot.delete_webhook(),
-            partner_bot.delete_webhook(),
+            customer_bot.delete_webhook(drop_pending_updates=True),
+            courier_bot.delete_webhook(drop_pending_updates=True),
+            admin_bot.delete_webhook(drop_pending_updates=True),
+            partner_bot.delete_webhook(drop_pending_updates=True),
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for bot_name, result in zip(
@@ -267,7 +274,6 @@ async def on_shutdown():
                 log.info(f"🔌 Сессия закрыта для {bot_name}")
 
         await rediska.redis.aclose()
-
         log.warning("❌ Приложение остановлено корректно")
 
     except Exception as e:
