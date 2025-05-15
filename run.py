@@ -121,7 +121,7 @@ async def setup_dispatcher(
     middleware_cls,
     routers: list,
 ):
-    # dp.update()
+    dp.update()
 
     dp["redis"] = rediska
     dp["bot"] = bot
@@ -136,9 +136,9 @@ async def setup_dispatcher(
     async def log_update(update: Update, *args, **kwargs):
         log.debug(f"Получено обновление для бота {dp.name}: {update}")
 
-    dp.update.outer_middleware()(log_update)
+    dp.update.outer_middleware(log_update)
 
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.1)
 
 
 # Установка webhook'ов
