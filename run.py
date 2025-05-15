@@ -115,8 +115,16 @@ async def handle_webhook(request: web.Request):
 
 
 # Функция настройки диспетчера
-async def setup_dispatcher(dp: Dispatcher, bot: Bot, middleware_cls, routers: list):
+async def setup_dispatcher(
+    dp: Dispatcher,
+    bot: Bot,
+    middleware_cls,
+    routers: list,
+):
+
     dp["redis"] = rediska
+    dp["bot"] = bot
+
     dp.message.middleware(middleware_cls(rediska))
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
