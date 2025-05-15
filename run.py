@@ -58,6 +58,7 @@ async def handle_webhook(request: web.Request):
 async def setup_bot(
     dp: Dispatcher,
     bot: Bot,
+    route: str,
     middleware_cls,
     routers: list,
     domain: str,
@@ -69,7 +70,7 @@ async def setup_bot(
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    webhook_url = f"{domain}"
+    webhook_url = f"{domain}/{route}"
     try:
         await bot.set_webhook(webhook_url)
         log.info(f"Установлен webhook: {webhook_url}")
@@ -77,7 +78,10 @@ async def setup_bot(
         log.error(f"Ошибка установки вебхука: {e}")
         raise
 
-    app.router.add_post(handle_webhook)
+    app.router.add_post(
+        handle_webhook,
+        name=f"{route}",
+    )
 
 
 async def main():
@@ -86,30 +90,34 @@ async def main():
             setup_bot(
                 customer_dp,
                 customer_bot,
+                "customer",
                 CustomerOuterMiddleware,
                 [customer_r, customer_fallback],
-                domain=SUBDOMAIN_CUSTOMER,
+                domain=f"https://customer.raketago.ru",
             ),
             setup_bot(
                 courier_dp,
                 courier_bot,
+                "courier",
                 CourierOuterMiddleware,
                 [courier_r, payment_r, courier_fallback],
-                domain=SUBDOMAIN_COURIER,
+                domain=f"https://courier.raketago.ru",
             ),
             setup_bot(
                 admin_dp,
                 admin_bot,
+                "admin",
                 AdminOuterMiddleware,
                 [admin_r, admin_fallback],
-                domain=SUBDOMAIN_ADMIN,
+                domain=f"https://admin.raketago.ru",
             ),
             setup_bot(
                 partner_dp,
                 partner_bot,
+                "partner",
                 AgentOuterMiddleware,
                 [partner_r, partner_fallback],
-                domain=SUBDOMAIN_PARTNER,
+                domain=f"https://partner.raketago.ru",
             ),
             main_worker(),
         )
