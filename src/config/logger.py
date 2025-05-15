@@ -22,11 +22,17 @@ class ColoredFormatter(logging.Formatter):
 
 # Настраиваем логгер
 log = logging.getLogger()
-log.setLevel(logging.INFO)
+log.setLevel(
+    logging.INFO,
+    logging.DEBUG,
+)
 
 # Хэндлер для консоли
 handler = logging.StreamHandler()
-handler.setLevel(logging.INFO)
+handler.setLevel(
+    logging.INFO,
+    logging.DEBUG,
+)
 
 # Применяем цветной форматтер
 formatter = ColoredFormatter("\n%(asctime)s - %(levelname)s: %(message)s\n")
