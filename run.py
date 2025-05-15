@@ -170,7 +170,7 @@ async def main():
         courier_dp.startup(),
         admin_dp.startup(),
         partner_dp.startup(),
-        main_worker(),
+        # main_worker(),
     )
 
 
