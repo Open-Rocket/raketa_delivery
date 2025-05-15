@@ -118,4 +118,5 @@ dependencies = [
     "apscheduler>=3.11.0",
     "alembic>=1.15.2",
     "black>=25.1.0",
+    "fastapi>=0.115.12",
 ]

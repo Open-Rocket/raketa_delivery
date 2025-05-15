@@ -1,6 +1,5 @@
 import asyncio
-from aiohttp import web
-from aiogram import Bot, Dispatcher
+from fastapi import FastAPI, Request, BackgroundTasks, Response
 from aiogram.types import Update
 
 from src.confredis import rediska
@@ -31,33 +30,29 @@ from src.config import (
     partner_bot_secret,
 )
 
-app = web.Application()
+app = FastAPI()
 
 
+# Настройка диспетчеров
 def setup_dispatchers():
-    """Инициализация диспетчеров (синхронная часть)"""
-    # Customer
     customer_dp["bot"] = customer_bot
     customer_dp["redis"] = rediska
     customer_dp.message.middleware(CustomerOuterMiddleware(rediska))
     customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska))
     customer_dp.include_routers(customer_r, customer_fallback)
 
-    # Courier
     courier_dp["bot"] = courier_bot
     courier_dp["redis"] = rediska
     courier_dp.message.middleware(CourierOuterMiddleware(rediska))
     courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
-    # Admin
     admin_dp["bot"] = admin_bot
     admin_dp["redis"] = rediska
     admin_dp.message.middleware(AdminOuterMiddleware(rediska))
     admin_dp.callback_query.middleware(AdminOuterMiddleware(rediska))
     admin_dp.include_routers(admin_r, admin_fallback)
 
-    # Partner
     partner_dp["bot"] = partner_bot
     partner_dp["redis"] = rediska
     partner_dp.message.middleware(AgentOuterMiddleware(rediska))
@@ -65,31 +60,8 @@ def setup_dispatchers():
     partner_dp.include_routers(partner_r, partner_fallback)
 
 
-async def handle_webhook(request: web.Request):
-    bot_name = request.path.strip("/")
-    try:
-        update = Update.model_validate(await request.json())
-        log.debug(f"Update for {bot_name}: {update}")
-
-        if bot_name == "customer":
-            await customer_dp.feed_update(customer_bot, update)
-        elif bot_name == "courier":
-            await courier_dp.feed_update(courier_bot, update)
-        elif bot_name == "admin":
-            await admin_dp.feed_update(admin_bot, update)
-        elif bot_name == "partner":
-            await partner_dp.feed_update(partner_bot, update)
-        else:
-            return web.Response(status=404)
-
-        return web.Response(status=200)
-    except Exception as e:
-        log.error(f"Error handling update: {e}")
-        return web.Response(status=500)
-
-
+# Асинхронная установка вебхуков
 async def set_webhooks():
-    """Установка вебхуков для всех ботов"""
     webhooks = [
         (customer_bot, "customer", customer_bot_secret),
         (courier_bot, "courier", courier_bot_secret),
@@ -106,53 +78,49 @@ async def set_webhooks():
         log.info(f"Webhook set for {name}")
 
 
-async def start_server():
-    """Запуск веб-сервера"""
-    app.router.add_post("/customer", handle_webhook)
-    app.router.add_post("/courier", handle_webhook)
-    app.router.add_post("/admin", handle_webhook)
-    app.router.add_post("/partner", handle_webhook)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 80)
-    await site.start()
-    log.info("Server started at http://0.0.0.0:80")
-    return runner
-
-
-async def main():
-    # Инициализация
-    setup_dispatchers()  # Синхронная настройка диспетчеров
+@app.on_event("startup")
+async def on_startup():
+    setup_dispatchers()
     await set_webhooks()
+    app.state.worker_task = asyncio.create_task(main_worker())
+    log.info("Startup completed")
 
-    # Запуск сервера
-    runner = await start_server()
 
-    # Запуск воркера в фоне
-    worker_task = asyncio.create_task(main_worker())
-
+@app.on_event("shutdown")
+async def on_shutdown():
+    app.state.worker_task.cancel()
     try:
-        # Основной цикл
-        while True:
-            await asyncio.sleep(3600)
-    except (KeyboardInterrupt, SystemExit):
-        log.info("Shutting down...")
-    finally:
-        # Корректное завершение
-        worker_task.cancel()
-        try:
-            await worker_task
-        except asyncio.CancelledError:
-            pass
-
-        await runner.cleanup()
-        await rediska.redis.aclose()
-        log.info("All resources released")
+        await app.state.worker_task
+    except asyncio.CancelledError:
+        pass
+    await rediska.redis.aclose()
+    log.info("Shutdown completed")
 
 
-if __name__ == "__main__":
+# Обработчики вебхуков
+@app.post("/customer")
+@app.post("/courier")
+@app.post("/admin")
+@app.post("/partner")
+async def handle_webhook(request: Request):
+    bot_name = request.url.path.strip("/")
     try:
-        asyncio.run(main())
+        data = await request.json()
+        update = Update.model_validate(data)
+        log.debug(f"Update for {bot_name}: {update}")
+
+        if bot_name == "customer":
+            await customer_dp.feed_update(customer_bot, update)
+        elif bot_name == "courier":
+            await courier_dp.feed_update(courier_bot, update)
+        elif bot_name == "admin":
+            await admin_dp.feed_update(admin_bot, update)
+        elif bot_name == "partner":
+            await partner_dp.feed_update(partner_bot, update)
+        else:
+            return Response(status_code=404)
+
+        return Response(status_code=200)
     except Exception as e:
-        log.critical(f"Fatal error: {e}")
+        log.error(f"Error handling update for {bot_name}: {e}")
+        return Response(status_code=500)
