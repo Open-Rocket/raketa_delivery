@@ -79,6 +79,7 @@ async def setup_bot(
         raise
 
     app.router.add_post(
+        f"/{route}",
         handle_webhook,
         name=f"{route}",
     )
