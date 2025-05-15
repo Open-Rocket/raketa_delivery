@@ -2,12 +2,10 @@ import asyncio
 import logging
 from aiohttp import web
 from aiogram import Bot, Dispatcher
-from aiogram.types import Update, Message
-from aiogram.filters import Command
+from aiogram.types import Update
 from aiogram.exceptions import TelegramBadRequest
+
 from src.tasks.worker import main_worker
-
-
 from src.confredis import rediska
 from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
@@ -44,7 +42,6 @@ WEBHOOK_SECRET = {
     "partner": partner_bot_secret,
 }
 
-# Проверка секретов
 for bot, secret in WEBHOOK_SECRET.items():
     if not secret or len(secret) < 16:
         raise ValueError(
@@ -68,62 +65,37 @@ async def log_requests_middleware(request, handler):
 
 
 async def handle_webhook(request: web.Request):
-    path = request.path.lstrip("/")
-    bot_name = path
-    log.debug(f"Начало обработки вебхука для bot_name: {bot_name}")
+    bot_name = request.path.lstrip("/")
+    log.debug(f"Обработка вебхука для: {bot_name}")
 
     expected_secret = WEBHOOK_SECRET.get(bot_name)
     received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
 
     if not expected_secret:
-        log.error(f"Секрет для {bot_name} не найден")
         return web.Response(status=500, text="Server configuration error")
-
     if not received_secret:
-        log.error(
-            f"Заголовок X-Telegram-Bot-Api-Secret-Token отсутствует для {bot_name}"
-        )
         return web.Response(status=403, text="Missing webhook secret")
-
     if received_secret != expected_secret:
-        log.error(
-            f"Неверный секрет для {bot_name}: ожидался {expected_secret[:4]}****, получен {received_secret[:4]}****"
-        )
         return web.Response(status=403, text="Invalid webhook secret")
-
-    log.debug(f"Секрет для {bot_name} успешно проверен")
 
     try:
         body = await request.json()
-        log.debug(f"Получен JSON: {body}")
-    except Exception as e:
-        log.error(f"Неверный JSON в запросе {request.path}: {e}")
-        return web.Response(status=400, text="Invalid JSON")
-
-    try:
         update = Update.model_validate(body)
-        log.debug(f"Валидированное обновление: {update}")
     except Exception as e:
-        log.error(f"Ошибка валидации обновления для {bot_name}: {e}")
+        log.error(f"Ошибка разбора JSON/валидации: {e}")
         return web.Response(status=400, text="Invalid update")
 
     try:
         if bot_name == "customer":
-            log.debug(f"Подача обновления в customer_dp")
             await customer_dp.feed_update(customer_bot, update)
         elif bot_name == "courier":
-            log.debug(f"Подача обновления в courier_dp")
             await courier_dp.feed_update(courier_bot, update)
         elif bot_name == "admin":
-            log.debug(f"Подача обновления в admin_dp")
-            await customer_dp.feed_update(admin_bot, update)
+            await admin_dp.feed_update(admin_bot, update)
         elif bot_name == "partner":
-            log.debug(f"Подача обновления в partner_dp")
             await partner_dp.feed_update(partner_bot, update)
         else:
-            log.error(f"Неизвестный bot_name: {bot_name}")
             return web.Response(status=404, text="Bot not found")
-        log.debug(f"Обновление успешно обработано для {bot_name}")
     except Exception as e:
         log.error(f"Ошибка обработки обновления для {bot_name}: {e}")
         return web.Response(status=500, text="Internal server error")
@@ -132,7 +104,6 @@ async def handle_webhook(request: web.Request):
 
 
 async def setup_dispatcher(dp: Dispatcher, bot: Bot, middleware_cls, routers: list):
-    log.debug(f"Настройка диспетчера {dp.name}")
     dp.update()
     dp["redis"] = rediska
     dp["bot"] = bot
@@ -142,23 +113,6 @@ async def setup_dispatcher(dp: Dispatcher, bot: Bot, middleware_cls, routers: li
     dp.include_routers(*routers)
 
     dp.resolve_used_update_types()
-
-    # Тестовый хендлер для всех сообщений
-    @dp.message()
-    async def test_handler(message: Message):
-        log.debug(f"Тестовый хендлер сработал для {dp.name}: {message.text}")
-        await message.answer(f"Бот {dp.name} работает! Сообщение: {message.text}")
-
-    # Тестовый хендлер для команды /test
-    @dp.message(Command("test"))
-    async def test_command_handler(message: Message):
-        log.debug(f"Команда /test сработала для {dp.name}")
-        await message.answer(f"Бот {dp.name} отвечает на /test!")
-
-    async def log_update(update: Update, *args, **kwargs):
-        log.debug(f"Получено обновление для бота {dp.name}: {update}")
-
-    dp.update.outer_middleware()(log_update)
     log.debug(f"Диспетчер {dp.name} настроен")
 
 
@@ -186,10 +140,7 @@ async def set_webhooks():
                 drop_pending_updates=True,
             ),
         ]
-        for bot_name, secret in WEBHOOK_SECRET.items():
-            log.debug(f"Установка webhook для {bot_name} с секретом: {secret[:4]}****")
         results = await asyncio.gather(*tasks, return_exceptions=True)
-
         for bot_name, result in zip(
             ["customer", "courier", "admin", "partner"], results
         ):
@@ -200,7 +151,7 @@ async def set_webhooks():
                     f"✅ Webhook установлен: https://{bot_name}.raketago.ru/{bot_name}"
                 )
     except TelegramBadRequest as e:
-        log.error(f"❌ Критическая ошибка установки webhook: {e}")
+        log.error(f"Критическая ошибка установки webhook: {e}")
         raise
 
 
@@ -213,8 +164,6 @@ async def start_web_server():
 
 
 async def main():
-
-    # Настройка всех диспетчеров
     await setup_dispatcher(
         customer_dp,
         customer_bot,
@@ -228,33 +177,23 @@ async def main():
         [courier_r, payment_r, courier_fallback],
     )
     await setup_dispatcher(
-        admin_dp,
-        admin_bot,
-        AdminOuterMiddleware,
-        [admin_r, admin_fallback],
+        admin_dp, admin_bot, AdminOuterMiddleware, [admin_r, admin_fallback]
     )
     await setup_dispatcher(
-        partner_dp,
-        partner_bot,
-        AgentOuterMiddleware,
-        [partner_r, partner_fallback],
+        partner_dp, partner_bot, AgentOuterMiddleware, [partner_r, partner_fallback]
     )
 
-    # Добавление middleware логирования
     app.middlewares.append(log_requests_middleware)
 
-    # Регистрация роутов
     app.router.add_post("/customer", handle_webhook)
     app.router.add_post("/courier", handle_webhook)
     app.router.add_post("/admin", handle_webhook)
     app.router.add_post("/partner", handle_webhook)
 
-    # Установка webhook и запуск веб-сервера
     await set_webhooks()
     await start_web_server()
 
     try:
-        # Параллельный запуск диспетчеров и воркера
         await asyncio.gather(
             customer_dp.startup(customer_bot),
             courier_dp.startup(courier_bot),
@@ -265,15 +204,11 @@ async def main():
     except Exception as e:
         log.error(f"Ошибка при запуске диспетчеров: {e}")
     finally:
-        # Грейсфулл шатдаун: закрытие сессий и т.п.
         await customer_bot.session.close()
         await courier_bot.session.close()
         await admin_bot.session.close()
         await partner_bot.session.close()
 
-    log.debug("Диспетчеры запущены")
-
-    # Бессрочный сон
     while True:
         await asyncio.sleep(3600)
 
@@ -286,14 +221,7 @@ async def on_shutdown():
             admin_bot.delete_webhook(drop_pending_updates=True),
             partner_bot.delete_webhook(drop_pending_updates=True),
         ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for bot_name, result in zip(
-            ["customer", "courier", "admin", "partner"], results
-        ):
-            if isinstance(result, Exception):
-                log.error(f"Ошибка удаления вебхука для {bot_name}: {result}")
-            else:
-                log.info(f"🗑 Вебхук удалён для {bot_name}")
+        await asyncio.gather(*tasks, return_exceptions=True)
 
         sessions = [
             customer_bot.session.close(),
@@ -301,14 +229,7 @@ async def on_shutdown():
             admin_bot.session.close(),
             partner_bot.session.close(),
         ]
-        results = await asyncio.gather(*sessions, return_exceptions=True)
-        for bot_name, result in zip(
-            ["customer", "courier", "admin", "partner"], results
-        ):
-            if isinstance(result, Exception):
-                log.error(f"Ошибка закрытия сессии для {bot_name}: {result}")
-            else:
-                log.info(f"🔌 Сессия закрыта для {bot_name}")
+        await asyncio.gather(*sessions, return_exceptions=True)
 
         await rediska.redis.aclose()
         log.warning("❌ Приложение остановлено корректно")
