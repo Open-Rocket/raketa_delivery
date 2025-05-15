@@ -35,11 +35,6 @@ from src.config import (
     partner_bot_secret,
 )
 
-# Принудительно устанавливаем DEBUG-логирование
-logging.basicConfig(level=logging.DEBUG)
-log.setLevel(logging.DEBUG)
-log.info("Логирование установлено на DEBUG")
-
 app = web.Application()
 
 WEBHOOK_SECRET = {
@@ -218,8 +213,8 @@ async def start_web_server():
 
 
 async def main():
-    # Последовательная настройка диспетчеров
-    log.debug("Начало настройки диспетчеров")
+
+    # Настройка всех диспетчеров
     await setup_dispatcher(
         customer_dp,
         customer_bot,
@@ -244,41 +239,41 @@ async def main():
         AgentOuterMiddleware,
         [partner_r, partner_fallback],
     )
-    log.debug("Диспетчеры настроены")
 
+    # Добавление middleware логирования
     app.middlewares.append(log_requests_middleware)
 
+    # Регистрация роутов
     app.router.add_post("/customer", handle_webhook)
     app.router.add_post("/courier", handle_webhook)
     app.router.add_post("/admin", handle_webhook)
     app.router.add_post("/partner", handle_webhook)
 
+    # Установка webhook и запуск веб-сервера
     await set_webhooks()
     await start_web_server()
 
-    # Запуск диспетчеров
-    log.debug("Запуск диспетчеров")
-    await asyncio.gather(
-        customer_dp.startup(
-            customer_bot,
-            skip_updates=True,
-        ),
-        courier_dp.startup(
-            courier_bot,
-            skip_updates=True,
-        ),
-        admin_dp.startup(
-            admin_bot,
-            skip_updates=True,
-        ),
-        partner_dp.startup(
-            partner_bot,
-            skip_updates=True,
-        ),
-        main_worker(),
-    )
+    try:
+        # Параллельный запуск диспетчеров и воркера
+        await asyncio.gather(
+            customer_dp.startup(customer_bot),
+            courier_dp.startup(courier_bot),
+            admin_dp.startup(admin_bot),
+            partner_dp.startup(partner_bot),
+            main_worker(),
+        )
+    except Exception as e:
+        log.error(f"Ошибка при запуске диспетчеров: {e}")
+    finally:
+        # Грейсфулл шатдаун: закрытие сессий и т.п.
+        await customer_bot.session.close()
+        await courier_bot.session.close()
+        await admin_bot.session.close()
+        await partner_bot.session.close()
+
     log.debug("Диспетчеры запущены")
 
+    # Бессрочный сон
     while True:
         await asyncio.sleep(3600)
 
