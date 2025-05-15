@@ -58,7 +58,6 @@ async def handle_webhook(request: web.Request):
 async def setup_bot(
     dp: Dispatcher,
     bot: Bot,
-    route: str,
     middleware_cls,
     routers: list,
     domain: str,
@@ -70,19 +69,15 @@ async def setup_bot(
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    webhook_url = f"{domain}/{route}"
+    webhook_url = f"{domain}"
     try:
         await bot.set_webhook(webhook_url)
         log.info(f"Установлен webhook: {webhook_url}")
     except TelegramBadRequest as e:
-        log.error(f"Ошибка установки вебхука для {route}: {e}")
+        log.error(f"Ошибка установки вебхука: {e}")
         raise
 
-    app.router.add_post(
-        f"/{route}",
-        handle_webhook,
-        name=route,
-    )
+    app.router.add_post(handle_webhook)
 
 
 async def main():
@@ -91,7 +86,6 @@ async def main():
             setup_bot(
                 customer_dp,
                 customer_bot,
-                "customer_bot",
                 CustomerOuterMiddleware,
                 [customer_r, customer_fallback],
                 domain=SUBDOMAIN_CUSTOMER,
@@ -99,7 +93,6 @@ async def main():
             setup_bot(
                 courier_dp,
                 courier_bot,
-                "courier_bot",
                 CourierOuterMiddleware,
                 [courier_r, payment_r, courier_fallback],
                 domain=SUBDOMAIN_COURIER,
@@ -107,7 +100,6 @@ async def main():
             setup_bot(
                 admin_dp,
                 admin_bot,
-                "admin_bot",
                 AdminOuterMiddleware,
                 [admin_r, admin_fallback],
                 domain=SUBDOMAIN_ADMIN,
@@ -115,7 +107,6 @@ async def main():
             setup_bot(
                 partner_dp,
                 partner_bot,
-                "partner_bot",
                 AgentOuterMiddleware,
                 [partner_r, partner_fallback],
                 domain=SUBDOMAIN_PARTNER,
