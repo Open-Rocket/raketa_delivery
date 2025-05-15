@@ -121,7 +121,7 @@ async def setup_dispatcher(
     middleware_cls,
     routers: list,
 ):
-    dp.update()
+    # dp.update()
 
     dp["redis"] = rediska
     dp["bot"] = bot
