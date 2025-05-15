@@ -210,13 +210,14 @@ async def main():
             AgentOuterMiddleware,
             [partner_r, partner_fallback],
         ),
-        await asyncio.gather(
-            customer_dp.startup(customer_bot),
-            courier_dp.startup(courier_bot),
-            admin_dp.startup(admin_bot),
-            partner_dp.startup(partner_bot),
-        ),
     )
+
+    await asyncio.gather(
+        customer_dp.startup(customer_bot),
+        courier_dp.startup(courier_bot),
+        admin_dp.startup(admin_bot),
+        partner_dp.startup(partner_bot),
+    ),
 
     # Добавляем middleware для логирования
     app.middlewares.append(log_requests_middleware)
