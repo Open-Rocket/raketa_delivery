@@ -9,7 +9,6 @@ from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
 from src.app.admin import admin_r, admin_fallback
 from src.app.partner import partner_r, partner_fallback
-from src.tasks.worker import main_worker
 from src.middlewares import (
     CustomerOuterMiddleware,
     CourierOuterMiddleware,
@@ -28,13 +27,17 @@ from src.config import (
     log,
 )
 
-# Глобальное приложение Aiohttp
 app = web.Application()
 
 
+# Общий обработчик вебхуков — маршрутизирует запросы по bot_name
 async def handle_webhook(request: web.Request):
     bot_name = request.match_info.get("bot_name")
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return web.Response(status=400, text="Invalid JSON")
+
     update = Update.model_validate(body)
 
     if bot_name == "customer":
@@ -51,27 +54,35 @@ async def handle_webhook(request: web.Request):
     return web.Response(status=200)
 
 
-async def setup_bot(
-    dp: Dispatcher, bot: Bot, route: str, middleware_cls, routers: list, domain: str
-):
-    dp.update()
+# Функция настройки диспетчера
+async def setup_dispatcher(dp: Dispatcher, bot: Bot, middleware_cls, routers: list):
     dp["redis"] = rediska
-
     dp.message.middleware(middleware_cls(rediska))
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    webhook_url = f"{domain}/{route}"
+
+# Установка webhook'ов
+async def set_webhooks():
     try:
-        await bot.set_webhook(webhook_url)
-        log.info(f"✅ Webhook установлен: {webhook_url}")
+        await customer_bot.set_webhook("https://customer.raketago.ru/customer")
+        log.info("✅ Webhook установлен: https://customer.raketago.ru/customer")
+
+        await courier_bot.set_webhook("https://courier.raketago.ru/courier")
+        log.info("✅ Webhook установлен: https://courier.raketago.ru/courier")
+
+        await admin_bot.set_webhook("https://admin.raketago.ru/admin")
+        log.info("✅ Webhook установлен: https://admin.raketago.ru/admin")
+
+        await partner_bot.set_webhook("https://partner.raketago.ru/partner")
+        log.info("✅ Webhook установлен: https://partner.raketago.ru/partner")
+
     except TelegramBadRequest as e:
         log.error(f"❌ Ошибка установки webhook: {e}")
         raise
 
-    app.router.add_post(f"/{route}", handle_webhook, name=f"{route}")
 
-
+# Старт веб-сервера aiohttp
 async def start_web_server():
     runner = web.AppRunner(app)
     await runner.setup()
@@ -81,51 +92,71 @@ async def start_web_server():
 
 
 async def main():
-    try:
-        await asyncio.gather(
-            setup_bot(
-                customer_dp,
-                customer_bot,
-                "customer",
-                CustomerOuterMiddleware,
-                [customer_r, customer_fallback],
-                domain="https://customer.raketago.ru",
-            ),
-            setup_bot(
-                courier_dp,
-                courier_bot,
-                "courier",
-                CourierOuterMiddleware,
-                [courier_r, payment_r, courier_fallback],
-                domain="https://courier.raketago.ru",
-            ),
-            setup_bot(
-                admin_dp,
-                admin_bot,
-                "admin",
-                AdminOuterMiddleware,
-                [admin_r, admin_fallback],
-                domain="https://admin.raketago.ru",
-            ),
-            setup_bot(
-                partner_dp,
-                partner_bot,
-                "partner",
-                AgentOuterMiddleware,
-                [partner_r, partner_fallback],
-                domain="https://partner.raketago.ru",
-            ),
-            main_worker(),
-            start_web_server(),  # 🚀 запускаем aiohttp сервер
-        )
-    except Exception as e:
-        log.error(f"🔥 Глобальная ошибка: {e}")
-    finally:
-        await rediska.redis.aclose()
+    # Настраиваем диспетчеры
+    await asyncio.gather(
+        setup_dispatcher(
+            customer_dp,
+            customer_bot,
+            CustomerOuterMiddleware,
+            [customer_r, customer_fallback],
+        ),
+        setup_dispatcher(
+            courier_dp,
+            courier_bot,
+            CourierOuterMiddleware,
+            [courier_r, payment_r, courier_fallback],
+        ),
+        setup_dispatcher(
+            admin_dp, admin_bot, AdminOuterMiddleware, [admin_r, admin_fallback]
+        ),
+        setup_dispatcher(
+            partner_dp, partner_bot, AgentOuterMiddleware, [partner_r, partner_fallback]
+        ),
+    )
+
+    # Добавляем все маршруты ОДНИМ блоком (до старта сервера!)
+    app.router.add_post(
+        "/customer",
+        handle_webhook,
+        name="customer",
+    )
+    app.router.add_post(
+        "/courier",
+        handle_webhook,
+        name="courier",
+    )
+    app.router.add_post(
+        "/admin",
+        handle_webhook,
+        name="admin",
+    )
+    app.router.add_post(
+        "/partner",
+        handle_webhook,
+        name="partner",
+    )
+
+    # Устанавливаем webhook у ботов
+    await set_webhooks()
+
+    # Запускаем веб-сервер
+    await start_web_server()
+
+    # Здесь можно запускать планировщики, воркеры и т.п.
+    # await main_worker()
+
+    # Запуск вечного цикла (например, чтобы не завершать main)
+    while True:
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        log.warning("⛔ Остановка вручную через KeyboardInterrupt")
+    except (KeyboardInterrupt, SystemExit):
+        # Закрываем сессии ботов корректно
+        asyncio.run(customer_bot.session.close())
+        asyncio.run(courier_bot.session.close())
+        asyncio.run(admin_bot.session.close())
+        asyncio.run(partner_bot.session.close())
+        log.info("Боты корректно завершены.")
