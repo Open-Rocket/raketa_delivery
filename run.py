@@ -34,7 +34,7 @@ from src.config import (
     partner_bot_secret,
 )
 
-# Устанавливаем уровень логирования на DEBUG
+# Устанавливаем DEBUG-логирование
 log.setLevel(logging.DEBUG)
 logging.basicConfig(level=logging.DEBUG)
 
@@ -75,6 +75,7 @@ async def handle_webhook(request: web.Request):
     bot_name = path
     log.debug(f"Начало обработки вебхука для bot_name: {bot_name}")
 
+    # Проверка секрета
     expected_secret = WEBHOOK_SECRET.get(bot_name)
     received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
 
@@ -112,12 +113,16 @@ async def handle_webhook(request: web.Request):
 
     try:
         if bot_name == "customer":
+            log.debug(f"Подача обновления в customer_dp")
             await customer_dp.feed_update(customer_bot, update)
         elif bot_name == "courier":
+            log.debug(f"Подача обновления в courier_dp")
             await courier_dp.feed_update(courier_bot, update)
         elif bot_name == "admin":
+            log.debug(f"Подача обновления в admin_dp")
             await admin_dp.feed_update(admin_bot, update)
         elif bot_name == "partner":
+            log.debug(f"Подача обновления в partner_dp")
             await partner_dp.feed_update(partner_bot, update)
         else:
             log.error(f"Неизвестный bot_name: {bot_name}")
@@ -130,12 +135,8 @@ async def handle_webhook(request: web.Request):
     return web.Response(status=200, text="OK")
 
 
-def setup_dispatcher(
-    dp: Dispatcher,
-    bot: Bot,
-    middleware_cls,
-    routers: list,
-):
+def setup_dispatcher(dp: Dispatcher, bot: Bot, middleware_cls, routers: list):
+    log.debug(f"Настройка диспетчера {dp.name}")
     dp.update()
     dp["redis"] = rediska
     dp["bot"] = bot
@@ -144,38 +145,39 @@ def setup_dispatcher(
     dp.callback_query.middleware(middleware_cls(rediska))
     dp.include_routers(*routers)
 
-    # Добавляем тестовый хендлер для проверки
+    # Тестовый хендлер для проверки
     @dp.message(Command("test"))
     async def test_handler(message: Message):
         log.debug(f"Тестовый хендлер сработал для {dp.name}: {message.text}")
-        await message.answer("Тестовый хендлер работает!")
+        await message.answer(f"Бот {dp.name} работает! Тест пройден.")
 
     async def log_update(update: Update, *args, **kwargs):
         log.debug(f"Получено обновление для бота {dp.name}: {update}")
 
     dp.update.outer_middleware()(log_update)
+    log.debug(f"Диспетчер {dp.name} настроен")
 
 
 async def set_webhooks():
     try:
         tasks = [
             customer_bot.set_webhook(
-                f"https://customer.raketago.ru/customer",
+                "https://customer.raketago.ru/customer",
                 secret_token=WEBHOOK_SECRET["customer"],
                 drop_pending_updates=True,
             ),
             courier_bot.set_webhook(
-                f"https://courier.raketago.ru/courier",
+                "https://courier.raketago.ru/courier",
                 secret_token=WEBHOOK_SECRET["courier"],
                 drop_pending_updates=True,
             ),
             admin_bot.set_webhook(
-                f"https://admin.raketago.ru/admin",
+                "https://admin.raketago.ru/admin",
                 secret_token=WEBHOOK_SECRET["admin"],
                 drop_pending_updates=True,
             ),
             partner_bot.set_webhook(
-                f"https://partner.raketago.ru/partner",
+                "https://partner.raketago.ru/partner",
                 secret_token=WEBHOOK_SECRET["partner"],
                 drop_pending_updates=True,
             ),
@@ -207,6 +209,7 @@ async def start_web_server():
 
 
 async def main():
+    # Настройка диспетчеров как в polling
     setup_dispatcher(
         customer_dp,
         customer_bot,
@@ -232,6 +235,7 @@ async def main():
         [partner_r, partner_fallback],
     )
 
+    # Запуск диспетчеров
     async def run_startup(dp, name):
         try:
             if inspect.iscoroutinefunction(dp.startup):
