@@ -2634,7 +2634,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
 
     tg_id = event.from_user.id
     chat_id = event.message.chat.id
-    full_price_rub = await admin_data.get_subscription_price()  # в копейках
+    full_price_rub = round(await admin_data.get_subscription_price(), 2)  # в копейках
     use_XP = event.data == "use_XP"
     new_XP = 0
 
