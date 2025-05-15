@@ -5,6 +5,8 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Update, Message
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
+from src.tasks.worker import main_worker
+
 
 from src.confredis import rediska
 from src.app.customer import customer_r, customer_fallback
@@ -244,16 +246,6 @@ async def main():
     )
     log.debug("Диспетчеры настроены")
 
-    # Запуск диспетчеров
-    log.debug("Запуск диспетчеров")
-    await asyncio.gather(
-        customer_dp.startup(),
-        courier_dp.startup(),
-        admin_dp.startup(),
-        partner_dp.startup(),
-    )
-    log.debug("Диспетчеры запущены")
-
     app.middlewares.append(log_requests_middleware)
 
     app.router.add_post("/customer", handle_webhook)
@@ -263,6 +255,29 @@ async def main():
 
     await set_webhooks()
     await start_web_server()
+
+    # Запуск диспетчеров
+    log.debug("Запуск диспетчеров")
+    await asyncio.gather(
+        customer_dp.startup(
+            customer_bot,
+            skip_updates=True,
+        ),
+        courier_dp.startup(
+            courier_bot,
+            skip_updates=True,
+        ),
+        admin_dp.startup(
+            admin_bot,
+            skip_updates=True,
+        ),
+        partner_dp.startup(
+            partner_bot,
+            skip_updates=True,
+        ),
+        main_worker(),
+    )
+    log.debug("Диспетчеры запущены")
 
     while True:
         await asyncio.sleep(3600)
