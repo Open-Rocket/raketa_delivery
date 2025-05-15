@@ -32,19 +32,18 @@ from src.config import (
 app = web.Application()
 
 
-# 🔧 Асинхронный обработчик webhook-запросов
 async def handle_webhook(request: web.Request):
     bot_name = request.match_info.get("bot_name")
     body = await request.json()
     update = Update.model_validate(body)
 
-    if bot_name == "customer":
+    if bot_name == "customer_bot":
         await customer_dp.feed_update(customer_bot, update)
-    elif bot_name == "courier":
+    elif bot_name == "courier_bot":
         await courier_dp.feed_update(courier_bot, update)
-    elif bot_name == "admin":
+    elif bot_name == "admin_bot":
         await admin_dp.feed_update(admin_bot, update)
-    elif bot_name == "partner":
+    elif bot_name == "partner_bot":
         await partner_dp.feed_update(partner_bot, update)
     else:
         return web.Response(status=404, text="Bot not found")
@@ -52,7 +51,6 @@ async def handle_webhook(request: web.Request):
     return web.Response(status=200)
 
 
-# 📦 Настройка отдельного бота
 async def setup_bot(
     dp: Dispatcher,
     bot: Bot,
