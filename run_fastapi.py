@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         log.error(f"Ошибка инициализации Redis: {e}")
         raise
 
-    setup_dispatchers()
+    setup_dispatchers(rediska)
     await set_webhooks()
     app.state.worker_task = asyncio.create_task(main_worker())
     yield
