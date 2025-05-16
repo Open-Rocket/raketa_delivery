@@ -357,13 +357,13 @@ async def create_redis_service() -> RedisService:
     return RedisService(redis_instance)
 
 
-async def main():
+async def redis_main():
 
     rediska: RedisService = await create_redis_service()
 
     return rediska
 
 
-rediska: RedisService = asyncio.run(main())
+rediska: RedisService = None
 
-__all__ = ["rediska", "create_redis_service", "RedisService"]
+__all__ = ["rediska", "create_redis_service", "RedisService", "redis_main"]

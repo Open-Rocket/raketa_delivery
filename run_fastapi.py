@@ -2,7 +2,7 @@ import asyncio
 from fastapi import FastAPI, Request, Response
 from aiogram.types import Update
 
-from src.confredis import rediska
+from src.confredis import rediska, redis_main
 from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
 from src.app.admin import admin_r, admin_fallback
@@ -34,6 +34,16 @@ from src.config import (
 
 
 async def lifespan(app: FastAPI):
+
+    global rediska
+    log.debug("Инициализация Redis")
+    try:
+        rediska = await redis_main()  # Асинхронная инициализация rediska
+        log.info("✅ Redis инициализирован")
+    except Exception as e:
+        log.error(f"Ошибка инициализации Redis: {e}")
+        raise
+
     setup_dispatchers()
     await set_webhooks()
     app.state.worker_task = asyncio.create_task(main_worker())

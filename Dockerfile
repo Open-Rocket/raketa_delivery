@@ -19,4 +19,6 @@ RUN chmod +x src/models/create_db.py
 
 CMD ["uvicorn", "run_fastapi:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info", "--access-log"]
 
+# CMD ["python", "run_fastapi.py"]
+
 # python -m src.models.create_db
