@@ -166,6 +166,24 @@ services:
         max-size: '10m'
         max-file: '3'
 
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - '3100:3100'
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
@@ -178,24 +196,8 @@ services:
       - ./promtail-config.yaml:/etc/promtail/config.yaml
       - ./promtail-data:/tmp
     command: -config.file=/etc/promtail/config.yaml
-    networks:
-      - raketa_network
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    restart: unless-stopped
-    ports:
-      - '3100:3100'
-    volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml
-      - ./loki-data:/tmp/loki
-    command: -config.file=/etc/loki/local-config.yaml
+    depends_on:
+      - loki
     networks:
       - raketa_network
     logging:
