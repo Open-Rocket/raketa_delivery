@@ -2,13 +2,10 @@ server:
   http_listen_port: 9080
   grpc_listen_port: 0
   log_level: debug
-
 positions:
   filename: /data/positions.yaml
-
 clients:
   - url: http://loki:3100/loki/api/v1/push
-
 scrape_configs:
   - job_name: docker_logs
     static_configs:
@@ -28,3 +25,6 @@ scrape_configs:
           container_name:
       - output:
           source: log
+      - drop:
+          source: structured_metadata
+          action: drop
