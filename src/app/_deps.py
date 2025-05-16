@@ -3,6 +3,7 @@ import asyncio
 import time
 import zlib
 import json
+import math
 from random import randint
 from aiogram import Router, filters, F
 from aiogram.filters import CommandStart, StateFilter
@@ -77,6 +78,7 @@ from src.services import cities, find_closest_city
 
 
 __all__ = [
+    "math",
     "defaultdict",
     "TelegramBadRequest",
     "Dispatcher",

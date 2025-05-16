@@ -13,6 +13,7 @@ from ._deps import (
     zlib,
     Time,
     json,
+    math,
     SUPER_ADMIN_TG_ID,
     courier_bot,
     courier_bot_id,
@@ -2655,16 +2656,14 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
 
     if use_XP:
         courier_XP = await courier_data.get_courier_XP(tg_id) or 0
-        price_kopecks = int((full_price_rub - used_XP))
-        price_rub = round(price_kopecks / 100, 2)
+        price_rub = full_price_rub // 100
 
         # Максимум XP, который можно применить, чтобы цена не опустилась ниже 200₽
         max_xp_to_apply = max(price_rub - 200, 0)
         used_XP = min(courier_XP, max_xp_to_apply)
 
         # Обновляем цену (в копейках)
-        price_rub = (price_rub - used_XP) * 100
-        price_rub = max(0, price_rub)
+        price_rub = math.trunc((price_rub - used_XP) * 100)
 
         new_XP = -used_XP
     else:
@@ -2693,11 +2692,10 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         ),
     ]
 
-    amount_kopecks = prices[0].amount
-    amount_rub = amount_kopecks / 100
+    amount_kopecks = prices[0].amount  # Сумма в копейках
+    amount_rub = amount_kopecks / 100  # Сумма в рублях (для чека)
 
-    log.info(f"prices kopeks: {amount_kopecks}")
-    log.info(f"prices rub: {amount_rub}")
+    log.info(f"prices: {amount_kopecks}")
 
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
@@ -2724,7 +2722,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": amount_rub,
+                                "value": amount_rub,  # Переводим копейки в рубли
                                 "currency": "RUB",
                             },
                             "vat_code": 1,  # Ставка НДС (1 = 20%)
