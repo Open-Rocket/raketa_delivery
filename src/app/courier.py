@@ -2621,25 +2621,34 @@ async def _use_XP(
     await state.update_data(invoice_msg_id=invoice_msg.message_id)
 
 
+from decimal import Decimal, ROUND_HALF_UP
+from aiogram.types import LabeledPrice, CallbackQuery
+from aiogram.fsm.context import FSMContext
+
+
 @payment_r.callback_query(
     F.data.in_(
         [
             "use_rub",
             "use_XP",
-        ],
+        ]
     )
 )
 async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
     """Отправляет инвойс для оплаты подписки."""
+
     tg_id = event.from_user.id
     chat_id = event.message.chat.id
     use_XP = event.data == "use_XP"
-
-    # Получаем полную цену в копейках (int)
-    full_price_kop = int(round(await admin_data.get_subscription_price()))
     new_XP = 0
 
-    # Удаление предыдущего инвойса, если есть
+    # Получаем цену подписки в рублях (как Decimal) и конвертируем в копейки (int)
+    full_price_rub = Decimal(await admin_data.get_subscription_price())
+    full_price_kop = int(
+        (full_price_rub * 100).to_integral_value(rounding=ROUND_HALF_UP)
+    )
+
+    # Удаляем предыдущий инвойс, если есть
     data = await state.get_data()
     invoice_message_id = data.get("invoice_message_id")
     if invoice_message_id:
@@ -2653,40 +2662,42 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         except Exception as e:
             log.warning(f"Не удалось удалить старый инвойс: {e}")
 
-    # Применение XP при необходимости
+    # Применение XP, если выбран соответствующий вариант
     if use_XP:
         courier_XP = await courier_data.get_courier_XP(tg_id) or 0
-        full_price_rub = full_price_kop // 100
+        price_rub = full_price_kop // 100
 
-        max_xp_to_apply = max(full_price_rub - 200, 0)
+        max_xp_to_apply = max(price_rub - 200, 0)
         used_XP = min(courier_XP, max_xp_to_apply)
 
-        discounted_price_kop = max(0, (full_price_rub - used_XP) * 100)
+        final_price_kop = max(0, (price_rub - used_XP) * 100)
         new_XP = -used_XP
     else:
-        discounted_price_kop = full_price_kop
+        final_price_kop = full_price_kop
 
-    # Обновление состояния
+    # Обновляем состояние FSM
     await state.update_data(
         use_XP=use_XP,
         new_XP=new_XP,
-        new_price=discounted_price_kop,
+        new_price=final_price_kop,
     )
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
-    # Проверка токена
+    # Проверка наличия токена
     if not payment_provider:
         log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
         return
 
-    # Подготовка цены и инвойса
-    price_rub = round(discounted_price_kop / 100, 2)
+    # Составляем список цен
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=discounted_price_kop,  # обязательно int!
+            amount=int(final_price_kop),  # ВАЖНО: только int
         )
     ]
+
+    # Конвертация копеек обратно в рубли для JSON (Decimal → float)
+    price_rub_for_receipt = float(Decimal(final_price_kop) / 100)
 
     # Отправка инвойса
     invoice_message = await event.bot.send_invoice(
@@ -2714,7 +2725,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": price_rub,
+                                "value": price_rub_for_receipt,
                                 "currency": "RUB",
                             },
                             "vat_code": 1,
@@ -2732,11 +2743,6 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
     # Сохраняем ID инвойса
     await state.update_data(invoice_message_id=invoice_message.message_id)
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
-
-    # Логируем финальные данные
-    log.info(
-        f"Инвойс отправлен: TG_ID={tg_id}, price_kop={discounted_price_kop}, use_XP={use_XP}, XP_delta={new_XP}"
-    )
 
 
 @payment_r.pre_checkout_query()
