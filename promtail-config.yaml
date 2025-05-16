@@ -1,13 +1,13 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: debug
 
 positions:
-  filename: /tmp/positions.yaml
+  filename: /data/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
-    disable_structured_metadata: true
 
 scrape_configs:
   - job_name: docker_logs
@@ -26,8 +26,5 @@ scrape_configs:
             container_name: container_name
       - labels:
           container_name:
-      - match:
-          selector: '{container_name=~"loki|promtail"}'
-          action: drop
       - output:
           source: log
