@@ -2,7 +2,8 @@ import asyncio
 from fastapi import FastAPI, Request, Response
 from aiogram.types import Update
 
-from src.confredis import rediska, redis_main
+from aiogram.fsm.storage.redis import RedisStorage
+from src.confredis import rediska, redis_main, RedisService
 from src.app.customer import customer_r, customer_fallback
 from src.app.courier import courier_r, courier_fallback, payment_r
 from src.app.admin import admin_r, admin_fallback
@@ -64,25 +65,31 @@ app = FastAPI(lifespan=lifespan)
 # === Setup ===
 
 
-def setup_dispatchers():
+def setup_dispatchers(rediska: RedisService):
+    redis_storage = RedisStorage(rediska.redis)
+
+    customer_dp.storage = redis_storage
     customer_dp["bot"] = customer_bot
     customer_dp["redis"] = rediska
     customer_dp.message.middleware(CustomerOuterMiddleware(rediska))
     customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska))
     customer_dp.include_routers(customer_r, customer_fallback)
 
+    courier_dp.storage = redis_storage
     courier_dp["bot"] = courier_bot
     courier_dp["redis"] = rediska
     courier_dp.message.middleware(CourierOuterMiddleware(rediska))
     courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
+    admin_dp.storage = redis_storage
     admin_dp["bot"] = admin_bot
     admin_dp["redis"] = rediska
     admin_dp.message.middleware(AdminOuterMiddleware(rediska))
     admin_dp.callback_query.middleware(AdminOuterMiddleware(rediska))
     admin_dp.include_routers(admin_r, admin_fallback)
 
+    partner_dp.storage = redis_storage
     partner_dp["bot"] = partner_bot
     partner_dp["redis"] = rediska
     partner_dp.message.middleware(AgentOuterMiddleware(rediska))
@@ -113,13 +120,25 @@ async def handle_webhook(request: Request, bot_name: str):
         log.debug(f"Update for {bot_name}: {update}")
 
         if bot_name == "customer":
-            await customer_dp.feed_update(customer_bot, update)
+            await customer_dp.feed_update(
+                customer_bot,
+                update,
+            )
         elif bot_name == "courier":
-            await courier_dp.feed_update(courier_bot, update)
+            await courier_dp.feed_update(
+                courier_bot,
+                update,
+            )
         elif bot_name == "admin":
-            await admin_dp.feed_update(admin_bot, update)
+            await admin_dp.feed_update(
+                admin_bot,
+                update,
+            )
         elif bot_name == "partner":
-            await partner_dp.feed_update(partner_bot, update)
+            await partner_dp.feed_update(
+                partner_bot,
+                update,
+            )
         else:
             return Response(status_code=404)
 
