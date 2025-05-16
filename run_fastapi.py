@@ -81,25 +81,25 @@ def setup_dispatchers(rediska_arg: RedisService):
     partner_dp = Dispatcher(storage=redis_storage_partner)
 
     customer_dp["bot"] = customer_bot
-    customer_dp["redis"] = rediska_arg
+    customer_dp["redis"] = redis_storage_customer
     customer_dp.message.middleware(CustomerOuterMiddleware(rediska_arg))
     customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska_arg))
     customer_dp.include_routers(customer_r, customer_fallback)
 
     courier_dp["bot"] = courier_bot
-    courier_dp["redis"] = rediska_arg
+    courier_dp["redis"] = redis_storage_courier
     courier_dp.message.middleware(CourierOuterMiddleware(rediska_arg))
     courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska_arg))
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
     admin_dp["bot"] = admin_bot
-    admin_dp["redis"] = rediska_arg
+    admin_dp["redis"] = redis_storage_admin
     admin_dp.message.middleware(AdminOuterMiddleware(rediska_arg))
     admin_dp.callback_query.middleware(AdminOuterMiddleware(rediska_arg))
     admin_dp.include_routers(admin_r, admin_fallback)
 
     partner_dp["bot"] = partner_bot
-    partner_dp["redis"] = rediska_arg
+    partner_dp["redis"] = redis_storage_partner
     partner_dp.message.middleware(AgentOuterMiddleware(rediska_arg))
     partner_dp.callback_query.middleware(AgentOuterMiddleware(rediska_arg))
     partner_dp.include_routers(partner_r, partner_fallback)
