@@ -72,13 +72,25 @@ async def handle_webhook(request: web.Request):
         log.debug(f"Update for {bot_name}: {update}")
 
         if bot_name == "customer":
-            await customer_dp.feed_update(customer_bot, update)
+            await customer_dp.feed_update(
+                customer_bot,
+                update,
+            )
         elif bot_name == "courier":
-            await courier_dp.feed_update(courier_bot, update)
+            await courier_dp.feed_update(
+                courier_bot,
+                update,
+            )
         elif bot_name == "admin":
-            await admin_dp.feed_update(admin_bot, update)
+            await admin_dp.feed_update(
+                admin_bot,
+                update,
+            )
         elif bot_name == "partner":
-            await partner_dp.feed_update(partner_bot, update)
+            await partner_dp.feed_update(
+                partner_bot,
+                update,
+            )
         else:
             return web.Response(status=404)
 
@@ -91,10 +103,26 @@ async def handle_webhook(request: web.Request):
 async def set_webhooks():
     """Установка вебхуков для всех ботов"""
     webhooks = [
-        (customer_bot, "customer", customer_bot_secret),
-        (courier_bot, "courier", courier_bot_secret),
-        (admin_bot, "admin", admin_bot_secret),
-        (partner_bot, "partner", partner_bot_secret),
+        (
+            customer_bot,
+            "customer",
+            customer_bot_secret,
+        ),
+        (
+            courier_bot,
+            "courier",
+            courier_bot_secret,
+        ),
+        (
+            admin_bot,
+            "admin",
+            admin_bot_secret,
+        ),
+        (
+            partner_bot,
+            "partner",
+            partner_bot_secret,
+        ),
     ]
 
     for bot, name, secret in webhooks:

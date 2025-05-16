@@ -364,6 +364,10 @@ async def redis_main():
     return rediska
 
 
-rediska: RedisService = None
+rediska: RedisService = asyncio.run(redis_main())
 
-__all__ = ["rediska", "create_redis_service", "RedisService", "redis_main"]
+__all__ = [
+    "rediska",
+    "create_redis_service",
+    "RedisService",
+]
