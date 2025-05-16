@@ -76,6 +76,11 @@ services:
       - raketa_network
     expose:
       - '80'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     labels:
       - 'traefik.enable=true'
       # Middleware для перенаправления HTTP на HTTPS
@@ -153,11 +158,17 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
-      - ./promtail-data:/data
+      - promtail-data:/data
     command: -config.file=/etc/promtail/config.yaml
-    privileged: true
+    depends_on:
+      - loki
     networks:
       - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   loki:
     image: grafana/loki:latest
@@ -167,9 +178,15 @@ services:
       - '3100:3100'
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   raketa_network:
@@ -181,3 +198,5 @@ volumes:
   redisdata:
   grafana_data:
   traefik_letsencrypt:
+  loki-data:
+  promtail-data:
