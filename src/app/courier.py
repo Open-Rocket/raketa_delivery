@@ -2631,73 +2631,64 @@ async def _use_XP(
 )
 async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
     """Отправляет инвойс для оплаты подписки."""
-
     tg_id = event.from_user.id
     chat_id = event.message.chat.id
-    full_price_rub = round(await admin_data.get_subscription_price(), 2)  # в копейках
     use_XP = event.data == "use_XP"
+
+    # Получаем полную цену в копейках (int)
+    full_price_kop = int(round(await admin_data.get_subscription_price()))
     new_XP = 0
 
+    # Удаление предыдущего инвойса, если есть
     data = await state.get_data()
-
-    try:
-        invoice_message_id = data.get("invoice_message_id")
-        log.info(f"invoise_message_id: {invoice_message_id}")
-        if invoice_message_id:
+    invoice_message_id = data.get("invoice_message_id")
+    if invoice_message_id:
+        try:
             await event.bot.delete_message(
-                chat_id=event.message.chat.id, message_id=invoice_message_id
+                chat_id=chat_id, message_id=invoice_message_id
             )
-            log.info(f"Инвойс удалён для пользователя {tg_id}.")
+            log.info(f"Удалён старый инвойс для пользователя {tg_id}")
             await state.update_data(invoice_message_id=None)
             await rediska.save_fsm_state(state, courier_bot_id, tg_id)
-    except Exception as e:
-        log.warning(f"Не удалось удалить инвойс: {e}")
+        except Exception as e:
+            log.warning(f"Не удалось удалить старый инвойс: {e}")
 
+    # Применение XP при необходимости
     if use_XP:
         courier_XP = await courier_data.get_courier_XP(tg_id) or 0
-        price_rub = full_price_rub // 100
+        full_price_rub = full_price_kop // 100
 
-        # Максимум XP, который можно применить, чтобы цена не опустилась ниже 200₽
-        max_xp_to_apply = max(price_rub - 200, 0)
+        max_xp_to_apply = max(full_price_rub - 200, 0)
         used_XP = min(courier_XP, max_xp_to_apply)
 
-        # Обновляем цену (в копейках)
-        price_rub = (price_rub - used_XP) * 100
-        price_rub = max(0, price_rub)
-
+        discounted_price_kop = max(0, (full_price_rub - used_XP) * 100)
         new_XP = -used_XP
     else:
-        price_rub = full_price_rub
+        discounted_price_kop = full_price_kop
 
-    log.info(f"event.data: {event.data}")
-    log.info(f"price_rub: {price_rub}")
-    log.info(f"use_XP: {use_XP}")
-    log.info(f"used_XP: {new_XP}")
-
+    # Обновление состояния
     await state.update_data(
         use_XP=use_XP,
         new_XP=new_XP,
-        new_price=price_rub,
+        new_price=discounted_price_kop,
     )
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
+    # Проверка токена
     if not payment_provider:
         log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
         return
 
+    # Подготовка цены и инвойса
+    price_rub = round(discounted_price_kop / 100, 2)
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=price_rub,
-        ),
+            amount=discounted_price_kop,  # обязательно int!
+        )
     ]
 
-    amount_kopecks = prices[0].amount
-    amount_rub = round((amount_kopecks / 100), 2)
-
-    log.info(f"prices kopeks: {amount_kopecks}")
-    log.info(f"prices rub: {amount_rub}")
-
+    # Отправка инвойса
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
@@ -2723,23 +2714,29 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": amount_rub,
+                                "value": price_rub,
                                 "currency": "RUB",
                             },
-                            "vat_code": 1,  # Ставка НДС (1 = 20%)
+                            "vat_code": 1,
                             "payment_mode": "full_payment",
-                            "payment_subject": "service",  # Для подписки лучше использовать 'service'
+                            "payment_subject": "service",
                         }
                     ],
-                    "tax_system_code": 1,  # Упрощенная система налогообложения (доходы)
+                    "tax_system_code": 1,
                 }
             }
         ),
         reply_markup=None,
     )
 
+    # Сохраняем ID инвойса
     await state.update_data(invoice_message_id=invoice_message.message_id)
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
+
+    # Логируем финальные данные
+    log.info(
+        f"Инвойс отправлен: TG_ID={tg_id}, price_kop={discounted_price_kop}, use_XP={use_XP}, XP_delta={new_XP}"
+    )
 
 
 @payment_r.pre_checkout_query()
