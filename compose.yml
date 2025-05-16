@@ -13,6 +13,11 @@ services:
       - raketa_network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -28,6 +33,11 @@ services:
       - raketa_network
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   redis:
     image: redis:7
@@ -40,6 +50,11 @@ services:
       - raketa_network
     volumes:
       - redisdata:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   grafana:
     image: grafana/grafana:latest
@@ -58,6 +73,11 @@ services:
       - postgres
     volumes:
       - grafana_data:/var/lib/grafana
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   raketa:
     build:
@@ -76,39 +96,37 @@ services:
       - raketa_network
     expose:
       - '80'
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     labels:
       - 'traefik.enable=true'
-      # Middleware для перенаправления HTTP на HTTPS
       - 'traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https'
-      # Middleware для удаления префиксов
-      - 'traefik.http.middlewares.customer-stripprefix.stripprefix.prefixes=/customer_bot'
-      - 'traefik.http.middlewares.courier-stripprefix.stripprefix.prefixes=/courier_bot'
-      - 'traefik.http.middlewares.admin-stripprefix.stripprefix.prefixes=/admin_bot'
-      - 'traefik.http.middlewares.partner-stripprefix.stripprefix.prefixes=/partner_bot'
-      # Один сервис для контейнера raketa_bot
+      - 'traefik.http.middlewares.customer-stripprefix.stripprefix.prefixes=/customer'
+      - 'traefik.http.middlewares.courier-stripprefix.stripprefix.prefixes=/courier'
+      - 'traefik.http.middlewares.admin-stripprefix.stripprefix.prefixes=/admin'
+      - 'traefik.http.middlewares.partner-stripprefix.stripprefix.prefixes=/partner'
       - 'traefik.http.services.raketa_bot.loadbalancer.server.port=80'
-      # Роутер для customer_bot
       - 'traefik.http.routers.customer.rule=Host(`customer.raketago.ru`) && PathPrefix(`/customer`)'
       - 'traefik.http.routers.customer.entrypoints=websecure'
       - 'traefik.http.routers.customer.tls=true'
       - 'traefik.http.routers.customer.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.customer.middlewares=customer-stripprefix'
       - 'traefik.http.routers.customer.service=raketa_bot'
-      # Роутер для courier_bot
       - 'traefik.http.routers.courier.rule=Host(`courier.raketago.ru`) && PathPrefix(`/courier`)'
       - 'traefik.http.routers.courier.entrypoints=websecure'
       - 'traefik.http.routers.courier.tls=true'
       - 'traefik.http.routers.courier.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.courier.middlewares=courier-stripprefix'
       - 'traefik.http.routers.courier.service=raketa_bot'
-      # Роутер для admin_bot
       - 'traefik.http.routers.admin.rule=Host(`admin.raketago.ru`) && PathPrefix(`/admin`)'
       - 'traefik.http.routers.admin.entrypoints=websecure'
       - 'traefik.http.routers.admin.tls=true'
       - 'traefik.http.routers.admin.tls.certresolver=letsencrypt'
       - 'traefik.http.routers.admin.middlewares=admin-stripprefix'
       - 'traefik.http.routers.admin.service=raketa_bot'
-      # Роутер для partner_bot
       - 'traefik.http.routers.partner.rule=Host(`partner.raketago.ru`) && PathPrefix(`/partner`)'
       - 'traefik.http.routers.partner.entrypoints=websecure'
       - 'traefik.http.routers.partner.tls=true'
@@ -142,6 +160,11 @@ services:
       - './letsencrypt:/letsencrypt'
     networks:
       - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   promtail:
     image: grafana/promtail:latest
@@ -153,11 +176,15 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
-      - ./promtail-data:/data
+      - ./promtail-data:/tmp
     command: -config.file=/etc/promtail/config.yaml
-    privileged: true
     networks:
       - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
   loki:
     image: grafana/loki:latest
@@ -167,9 +194,15 @@ services:
       - '3100:3100'
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - ./loki-data:/tmp/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - raketa_network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   raketa_network:
@@ -181,3 +214,5 @@ volumes:
   redisdata:
   grafana_data:
   traefik_letsencrypt:
+  loki-data:
+  promtail-data:
