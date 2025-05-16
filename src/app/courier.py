@@ -2621,17 +2621,12 @@ async def _use_XP(
     await state.update_data(invoice_msg_id=invoice_msg.message_id)
 
 
-from decimal import Decimal, ROUND_HALF_UP
-from aiogram.types import LabeledPrice, CallbackQuery
-from aiogram.fsm.context import FSMContext
-
-
 @payment_r.callback_query(
     F.data.in_(
         [
             "use_rub",
             "use_XP",
-        ]
+        ],
     )
 )
 async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
@@ -2639,67 +2634,71 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
 
     tg_id = event.from_user.id
     chat_id = event.message.chat.id
+    full_price_rub = await admin_data.get_subscription_price()  # в копейках
     use_XP = event.data == "use_XP"
     new_XP = 0
 
-    # Получаем цену подписки в рублях (как Decimal) и конвертируем в копейки (int)
-    full_price_rub = Decimal(await admin_data.get_subscription_price())
-    full_price_kop = int(
-        (full_price_rub * 100).to_integral_value(rounding=ROUND_HALF_UP)
-    )
-
-    # Удаляем предыдущий инвойс, если есть
     data = await state.get_data()
-    invoice_message_id = data.get("invoice_message_id")
-    if invoice_message_id:
-        try:
+
+    try:
+        invoice_message_id = data.get("invoice_message_id")
+        log.info(f"invoise_message_id: {invoice_message_id}")
+        if invoice_message_id:
             await event.bot.delete_message(
-                chat_id=chat_id, message_id=invoice_message_id
+                chat_id=event.message.chat.id, message_id=invoice_message_id
             )
-            log.info(f"Удалён старый инвойс для пользователя {tg_id}")
+            log.info(f"Инвойс удалён для пользователя {tg_id}.")
             await state.update_data(invoice_message_id=None)
             await rediska.save_fsm_state(state, courier_bot_id, tg_id)
-        except Exception as e:
-            log.warning(f"Не удалось удалить старый инвойс: {e}")
+    except Exception as e:
+        log.warning(f"Не удалось удалить инвойс: {e}")
 
-    # Применение XP, если выбран соответствующий вариант
     if use_XP:
         courier_XP = await courier_data.get_courier_XP(tg_id) or 0
-        price_rub = full_price_kop // 100
+        price_kopecks = int((full_price_rub - used_XP))
+        price_rub = round(price_kopecks / 100, 2)
 
+        # Максимум XP, который можно применить, чтобы цена не опустилась ниже 200₽
         max_xp_to_apply = max(price_rub - 200, 0)
         used_XP = min(courier_XP, max_xp_to_apply)
 
-        final_price_kop = max(0, (price_rub - used_XP) * 100)
+        # Обновляем цену (в копейках)
+        price_rub = (price_rub - used_XP) * 100
+        price_rub = max(0, price_rub)
+
         new_XP = -used_XP
     else:
-        final_price_kop = full_price_kop
+        price_rub = full_price_rub
 
-    # Обновляем состояние FSM
+    log.info(f"event.data: {event.data}")
+    log.info(f"price_rub: {price_rub}")
+    log.info(f"use_XP: {use_XP}")
+    log.info(f"used_XP: {new_XP}")
+
     await state.update_data(
         use_XP=use_XP,
         new_XP=new_XP,
-        new_price=final_price_kop,
+        new_price=price_rub,
     )
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
-    # Проверка наличия токена
     if not payment_provider:
         log.error("Ошибка: provider_token не найден. Проверьте переменные окружения.")
         return
 
-    # Составляем список цен
     prices = [
         LabeledPrice(
             label="Месячная подписка",
-            amount=int(final_price_kop),  # ВАЖНО: только int
-        )
+            amount=price_rub,
+        ),
     ]
 
-    # Конвертация копеек обратно в рубли для JSON (Decimal → float)
-    price_rub_for_receipt = float(Decimal(final_price_kop) / 100)
+    amount_kopecks = prices[0].amount
+    amount_rub = amount_kopecks / 100
 
-    # Отправка инвойса
+    log.info(f"prices kopeks: {amount_kopecks}")
+    log.info(f"prices rub: {amount_rub}")
+
     invoice_message = await event.bot.send_invoice(
         chat_id=chat_id,
         title="Подписка Raketa",
@@ -2725,22 +2724,21 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": price_rub_for_receipt,
+                                "value": amount_rub,
                                 "currency": "RUB",
                             },
-                            "vat_code": 1,
+                            "vat_code": 1,  # Ставка НДС (1 = 20%)
                             "payment_mode": "full_payment",
-                            "payment_subject": "service",
+                            "payment_subject": "service",  # Для подписки лучше использовать 'service'
                         }
                     ],
-                    "tax_system_code": 1,
+                    "tax_system_code": 1,  # Упрощенная система налогообложения (доходы)
                 }
             }
         ),
         reply_markup=None,
     )
 
-    # Сохраняем ID инвойса
     await state.update_data(invoice_message_id=invoice_message.message_id)
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
