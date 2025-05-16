@@ -96,9 +96,6 @@ async def set_webhooks():
         log.info(f"Webhook set for {name}")
 
 
-# === Webhook endpoint ===
-
-
 @app.post("/{bot_name}")
 async def handle_webhook(request: Request, bot_name: str):
     try:

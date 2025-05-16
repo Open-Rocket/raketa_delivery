@@ -17,6 +17,6 @@ ENV PYTHONPATH=/raketa_delivery/src
 
 RUN chmod +x src/models/create_db.py
 
-CMD ["python", "run_web_app.py"]
+CMD ["uvicorn", "run_fastapi:app", "--host", "0.0.0.0", "--port", "80", "--log-level", "info", "--access-log"]
 
 # python -m src.models.create_db
