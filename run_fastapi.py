@@ -1,6 +1,8 @@
 import asyncio
 from fastapi import FastAPI, Request, Response
 from aiogram.types import Update
+from aiogram import Dispatcher
+
 
 from aiogram.fsm.storage.redis import RedisStorage
 from src.confredis import rediska, redis_main, RedisService
@@ -65,35 +67,44 @@ app = FastAPI(lifespan=lifespan)
 # === Setup ===
 
 
-def setup_dispatchers(rediska: RedisService):
-    redis_storage = RedisStorage(rediska.redis)
+def setup_dispatchers(redis):
+    # Создаём хранилища с Redis
+    redis_storage_customer = RedisStorage(redis)
+    redis_storage_courier = RedisStorage(redis)
+    redis_storage_admin = RedisStorage(redis)
+    redis_storage_partner = RedisStorage(redis)
 
-    customer_dp.storage = redis_storage
+    # Заменяем глобальные диспетчеры
+    global customer_dp, courier_dp, admin_dp, partner_dp
+
+    customer_dp = Dispatcher(storage=redis_storage_customer)
+    courier_dp = Dispatcher(storage=redis_storage_courier)
+    admin_dp = Dispatcher(storage=redis_storage_admin)
+    partner_dp = Dispatcher(storage=redis_storage_partner)
+
+    # Назначаем ботов и миддлвары
     customer_dp["bot"] = customer_bot
-    customer_dp["redis"] = rediska
-    customer_dp.message.middleware(CustomerOuterMiddleware(rediska))
-    customer_dp.callback_query.middleware(CustomerOuterMiddleware(rediska))
+    customer_dp["redis"] = redis
+    customer_dp.message.middleware(CustomerOuterMiddleware(redis))
+    customer_dp.callback_query.middleware(CustomerOuterMiddleware(redis))
     customer_dp.include_routers(customer_r, customer_fallback)
 
-    courier_dp.storage = redis_storage
     courier_dp["bot"] = courier_bot
-    courier_dp["redis"] = rediska
-    courier_dp.message.middleware(CourierOuterMiddleware(rediska))
-    courier_dp.callback_query.middleware(CourierOuterMiddleware(rediska))
+    courier_dp["redis"] = redis
+    courier_dp.message.middleware(CourierOuterMiddleware(redis))
+    courier_dp.callback_query.middleware(CourierOuterMiddleware(redis))
     courier_dp.include_routers(courier_r, payment_r, courier_fallback)
 
-    admin_dp.storage = redis_storage
     admin_dp["bot"] = admin_bot
-    admin_dp["redis"] = rediska
-    admin_dp.message.middleware(AdminOuterMiddleware(rediska))
-    admin_dp.callback_query.middleware(AdminOuterMiddleware(rediska))
+    admin_dp["redis"] = redis
+    admin_dp.message.middleware(AdminOuterMiddleware(redis))
+    admin_dp.callback_query.middleware(AdminOuterMiddleware(redis))
     admin_dp.include_routers(admin_r, admin_fallback)
 
-    partner_dp.storage = redis_storage
     partner_dp["bot"] = partner_bot
-    partner_dp["redis"] = rediska
-    partner_dp.message.middleware(AgentOuterMiddleware(rediska))
-    partner_dp.callback_query.middleware(AgentOuterMiddleware(rediska))
+    partner_dp["redis"] = redis
+    partner_dp.message.middleware(AgentOuterMiddleware(redis))
+    partner_dp.callback_query.middleware(AgentOuterMiddleware(redis))
     partner_dp.include_routers(partner_r, partner_fallback)
 
 

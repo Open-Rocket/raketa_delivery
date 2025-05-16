@@ -1,5 +1,5 @@
 import os
-from aiogram import Bot, Dispatcher
+from aiogram import Bot
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,10 +27,10 @@ courier_bot_id = courier_bot.id
 admin_bot_id = admin_bot.id
 partner_bot_id = partner_bot.id
 
-customer_dp = Dispatcher()
-courier_dp = Dispatcher()
-admin_dp = Dispatcher()
-partner_dp = Dispatcher()
+customer_dp = None
+courier_dp = None
+admin_dp = None
+partner_dp = None
 
 __all__ = [
     "DOMAIN",
