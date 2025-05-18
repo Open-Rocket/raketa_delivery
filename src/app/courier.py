@@ -1548,7 +1548,11 @@ async def complete_order(
             count=1,
             distance=distance,
             earned=earned,
-            XP_earned=new_XP,
+        )
+
+        _ = await courier_data.update_courier_XP(
+            tg_id=tg_id,
+            new_XP=new_XP,
         )
 
         await courier_data.change_order_active_count(

@@ -903,6 +903,7 @@ class CourierData:
                     return False
 
                 courier.courier_XP += round(new_XP, 2)
+                courier.total_earned_XP += round(new_XP, 2)
                 await session.commit()
                 return True
             except Exception as e:
@@ -931,7 +932,6 @@ class CourierData:
         count: int,
         distance: float,
         earned: float,
-        XP_earned: float,
     ):
         """Обновляет рекорды курьера в БД"""
         async with self.async_session_factory() as session:
@@ -945,8 +945,6 @@ class CourierData:
                 courier.orders_completed += count
                 courier.total_earned += earned
                 courier.covered_distance_km += round(distance, 2)
-                courier.courier_XP += round(XP_earned, 2)
-                courier.total_earned_XP += round(XP_earned, 2)
 
                 await session.commit()
                 return True
@@ -986,13 +984,14 @@ class CourierData:
         """Возвращает общую сумму заработанных курьером денег"""
         async with self.async_session_factory() as session:
             result = await session.execute(
-                select(Courier.total_earned_XP).where(Courier.courier_tg_id == tg_id)
+                select(Courier).where(Courier.courier_tg_id == tg_id)
             )
 
-            total_earned = result.scalar_one_or_none()
-            if total_earned is None:
+            courier = result.scalar_one_or_none()
+            total_earned_XP = courier.total_earned_XP
+            if total_earned_XP is None:
                 return 0.0
-            return total_earned
+            return total_earned_XP
 
     # ---
 
