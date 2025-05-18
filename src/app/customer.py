@@ -554,7 +554,7 @@ async def _process_order_logic(
         show_discount = True
 
     elif len(order_info_data) == 2:
-        order_info, hide_phone_info = order_info_data[0]
+        order_info, hide_phone_info = order_info_data
         show_discount = False
 
     reply_kb = await kb.get_customer_kb("voice_order_accept")

@@ -25,6 +25,7 @@ from .bots import (
     SUBDOMAIN_ADMIN,
     SUBDOMAIN_PARTNER,
     SUPER_ADMIN_TG_ID,
+    accepted_users,
     customer_bot,
     customer_bot_id,
     customer_dp,
@@ -97,4 +98,5 @@ __all__ = [
     "courier_bot_secret",
     "admin_bot_secret",
     "partner_bot_secret",
+    "accepted_users",
 ]

@@ -13,6 +13,11 @@ load_dotenv()
 
 SUPER_ADMIN_TG_ID = int(os.getenv("SUPER_ADMIN_TG_ID"))
 
+accepted_users = [
+    SUPER_ADMIN_TG_ID,
+    1647941198,
+]
+
 DOMAIN = os.getenv("DOMAIN")
 SUBDOMAIN_CUSTOMER = os.getenv("SUBDOMAIN_CUSTOMER")
 SUBDOMAIN_COURIER = os.getenv("SUBDOMAIN_COURIER")
@@ -69,4 +74,5 @@ __all__ = [
     "courier_bot_secret",
     "admin_bot_secret",
     "partner_bot_secret",
+    "accepted_users",
 ]

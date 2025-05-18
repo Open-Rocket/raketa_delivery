@@ -40,8 +40,9 @@ from src.services import (
 from src.models import OrderStatus
 from src.confredis import rediska
 from src.config import (
-    SUPER_ADMIN_TG_ID,
     Time,
+    SUPER_ADMIN_TG_ID,
+    accepted_users,
     customer_bot,
     courier_bot,
     customer_bot_id,
@@ -156,4 +157,5 @@ __all__ = [
     "send_notification_to_couriers",
     "delete_message_after_delay",
     "RESTRICTED_COMMANDS_COURIER",
+    "accepted_users",
 ]

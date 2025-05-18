@@ -15,6 +15,7 @@ from ._deps import (
     json,
     math,
     SUPER_ADMIN_TG_ID,
+    accepted_users,
     courier_bot,
     courier_bot_id,
     handler,
@@ -741,7 +742,7 @@ async def cmd_run(
         )
         return
 
-    if end_date and end_date >= moscow_time or tg_id == SUPER_ADMIN_TG_ID:
+    if end_date and end_date >= moscow_time or tg_id in accepted_users:
         if is_read_info:
             if isinstance(event, CallbackQuery):
                 await event.answer("🚀 Начать работу", show_alert=False)
