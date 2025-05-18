@@ -926,7 +926,12 @@ class CourierData:
                 return 0
 
     async def update_courier_records(
-        self, tg_id, count: int, distance: float, earned: float
+        self,
+        tg_id,
+        count: int,
+        distance: float,
+        earned: float,
+        XP_earned: float,
     ):
         """Обновляет рекорды курьера в БД"""
         async with self.async_session_factory() as session:
@@ -940,6 +945,8 @@ class CourierData:
                 courier.orders_completed += count
                 courier.total_earned += earned
                 courier.covered_distance_km += round(distance, 2)
+                courier.courier_XP += round(XP_earned, 2)
+                courier.total_earned_XP += round(XP_earned, 2)
 
                 await session.commit()
                 return True
@@ -988,46 +995,6 @@ class CourierData:
             return total_earned
 
     # ---
-
-    async def update_courier_orders_completed(self, tg_id: int, count: int) -> bool:
-        """Обновляет количество завершённых заказов курьера"""
-        async with self.async_session_factory() as session:
-            try:
-                result = await session.execute(
-                    select(Courier).where(Courier.courier_tg_id == tg_id)
-                )
-                courier = result.scalar_one_or_none()
-
-                if not courier:
-                    return False
-
-                courier.orders_completed += count
-                await session.commit()
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении количества завершённых заказов: {e}")
-                return False
-
-    async def update_courier_total_earned_XP(self, tg_id: int, amount: float) -> bool:
-        """Обновляет общую сумму заработанных курьером XP"""
-        async with self.async_session_factory() as session:
-            try:
-                result = await session.execute(
-                    select(Courier).where(Courier.courier_tg_id == tg_id)
-                )
-                courier = result.scalar_one_or_none()
-
-                if not courier:
-                    return False
-
-                courier.total_earned_XP += amount
-                await session.commit()
-                return True
-            except Exception as e:
-                await session.rollback()
-                log.error(f"Ошибка при обновлении общей суммы заработанных XP: {e}")
-                return False
 
 
 class AdminData:

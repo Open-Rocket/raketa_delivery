@@ -1393,7 +1393,7 @@ async def accept_order(
         courier_total_earned_XP = await courier_data.get_courier_total_earned_XP(tg_id)
 
         if courier_orders_completed < 10:
-            additional_info = "<i>Если у курьера мало выполненных заказов, то он новичок, не будьте пожалуйста строги к нему, в дальнейшем он будет выполнять заказы лучше и может вновь успешно доставить ваш заказ!</i>\n\n"
+            additional_info = "<i>Если у курьера мало выполненных заказов, то он новичок, не будьте пожалуйста строги к нему, в дальнейшем он будет выполнять заказы лучше и может вновь успешно доставить ваш заказ!</i>"
         elif 10 < courier_orders_completed < 25:
             additional_info = "<i>Курьер уже достаточно опытный и сможет без проблем выполнить вашу доставку.</i>"
         elif courier_orders_completed >= 25:
@@ -1542,11 +1542,6 @@ async def complete_order(
             execution_time_seconds=execution_time_seconds,
         )
         customer_tg_id = await order_data.get_customer_tg_id(order.order_id)
-
-        _ = await courier_data.update_courier_XP(
-            tg_id=tg_id,
-            new_XP=new_XP,
-        )
 
         _ = await courier_data.update_courier_records(
             tg_id=tg_id,
