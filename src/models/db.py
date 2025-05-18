@@ -228,7 +228,11 @@ class Courier(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     courier_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
-    total_earned_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
+    total_earned_XP: Mapped[floatData] = mapped_column(
+        Float,
+        default=0.0,
+        server_default=text("0.0"),
+    )
 
     max_speed_kmh: Mapped[floatData] = mapped_column(Float, default=0.0)
     orders_completed: Mapped[intData] = mapped_column(Integer, default=0)
