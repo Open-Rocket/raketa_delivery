@@ -548,13 +548,13 @@ async def _process_order_logic(
 
     show_discount = False
 
-    if len(order_info_data) == 3:
-        order_info, price, discount_price = order_info_data
+    if len(order_info_data) == 4:
+        order_info, price, discount_price, hide_phone_info = order_info_data
         prepare_dict["price"] = discount_price
         show_discount = True
 
-    elif len(order_info_data) == 1:
-        order_info = order_info_data[0]
+    elif len(order_info_data) == 2:
+        order_info, hide_phone_info = order_info_data[0]
         show_discount = False
 
     reply_kb = await kb.get_customer_kb("voice_order_accept")
@@ -584,7 +584,13 @@ async def _process_order_logic(
         await wait_message.delete()
 
     await state.set_state(current_state)
-    await state.update_data(current_order_info=(prepare_dict, order_info))
+    await state.update_data(
+        current_order_info=(
+            prepare_dict,
+            order_info,
+            hide_phone_info,
+        )
+    )
     await rediska.set_state(customer_bot_id, tg_id, current_state)
     await rediska.save_fsm_state(state, customer_bot_id, tg_id)
 
@@ -651,11 +657,13 @@ async def set_order_to_db(
     tg_id = callback_query.from_user.id
     state_data = await state.get_data()
     current_order_info = state_data.get("current_order_info")
+    hide_phone_forma = state_data.get("hide_phone_info")
 
     if current_order_info:
-        data, order_forma = [*current_order_info]
+        data, order_forma, hide_phone_forma = [*current_order_info]
         data: dict
         order_forma = zlib.compress(order_forma.encode("utf-8"))
+        hide_phone_forma = zlib.compress(hide_phone_forma.encode("utf-8"))
     else:
         log.error("Ключ 'current_order_info' отсутствует в состоянии FSM")
         await callback_query.answer(
@@ -672,6 +680,7 @@ async def set_order_to_db(
             username=callback_query.from_user.username,
             data=data,
             order_forma=order_forma,
+            hide_phone_forma=hide_phone_forma,
         )
 
         if not order_number:

@@ -150,14 +150,32 @@ class OrderFormatter:
             f"<b>Описание:</b> {description}\n\n"
         )
 
+        order_forma_hide_phone = (
+            f"<b>Город:</b> {city}\n\n"
+            f"<b>Заказчик:</b> {customer_name if customer_name else '-'}\n"
+            f"<b>Телефон:</b> <i>*** Скрыт до принятия заказа!</i>\n\n"
+            f"{addresses_text}\n\n"
+            f"{routing_addresses}"
+            f"<b>Доставляем:</b> {delivery_object if delivery_object else 'не указано'}\n"
+            f"<b>Расстояние:</b> {distance} км\n"
+            f"<b>Стоимость:</b> {price} ₽\n"
+            f"<i>Наличными или переводом!\n\n</i>"
+            f"{additional_msg}"
+            f"<b>Описание:</b> {description}\n\n"
+        )
+
         return (
             (
                 order_forma,
                 plus_price,
                 price,
+                order_forma_hide_phone,
             )
             if discount
-            else (order_forma,)
+            else (
+                order_forma,
+                order_forma_hide_phone,
+            )
         )
 
 

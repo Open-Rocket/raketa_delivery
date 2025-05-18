@@ -683,6 +683,7 @@ class CourierData:
                 )
 
                 total_money_earned = courier.total_earned
+                total_XP_earned = courier.total_earned_XP
                 total_execution_time = sum(
                     (
                         order.completed_at_moscow_time - order.started_at_moscow_time
@@ -710,8 +711,9 @@ class CourierData:
                     average_speed,
                     total_distance,
                     total_money_earned,
+                    total_XP_earned,
                 )
-            return (0,) * 5
+            return (0,) * 6
 
     async def get_courier_active_orders_count(self, tg_id: int) -> int:
         """Возвращает количество активных заказов у курьера"""
@@ -960,6 +962,72 @@ class CourierData:
             return seed_key
 
     # ---
+
+    async def get_courier_completed_orders_count(self, tg_id: int) -> int:
+        """Возвращает количество завершённых заказов курьера"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier.orders_completed).where(Courier.courier_tg_id == tg_id)
+            )
+
+            completed_orders_count = result.scalar_one_or_none()
+            if completed_orders_count is None:
+                return 0
+            return completed_orders_count
+
+    async def get_courier_total_earned_XP(self, tg_id: int) -> float:
+        """Возвращает общую сумму заработанных курьером денег"""
+        async with self.async_session_factory() as session:
+            result = await session.execute(
+                select(Courier.total_earned_XP).where(Courier.courier_tg_id == tg_id)
+            )
+
+            total_earned = result.scalar_one_or_none()
+            if total_earned is None:
+                return 0.0
+            return total_earned
+
+    # ---
+
+    async def update_courier_orders_completed(self, tg_id: int, count: int) -> bool:
+        """Обновляет количество завершённых заказов курьера"""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    return False
+
+                courier.orders_completed += count
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении количества завершённых заказов: {e}")
+                return False
+
+    async def update_courier_total_earned_XP(self, tg_id: int, amount: float) -> bool:
+        """Обновляет общую сумму заработанных курьером XP"""
+        async with self.async_session_factory() as session:
+            try:
+                result = await session.execute(
+                    select(Courier).where(Courier.courier_tg_id == tg_id)
+                )
+                courier = result.scalar_one_or_none()
+
+                if not courier:
+                    return False
+
+                courier.total_earned_XP += amount
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при обновлении общей суммы заработанных XP: {e}")
+                return False
 
 
 class AdminData:
@@ -2742,6 +2810,7 @@ class OrderData:
         username: str,
         data: dict,
         order_forma: str,
+        hide_phone_forma: str,
     ) -> int:
         """Создает новый заказ в БД"""
 
@@ -2767,6 +2836,7 @@ class OrderData:
                     full_rout=data.get("yandex_maps_url"),
                     starting_point=data.get("starting_point"),
                     order_forma=order_forma,
+                    hide_phone_forma=hide_phone_forma,
                     order_status=OrderStatus.PENDING,
                 )
 
@@ -3099,8 +3169,14 @@ class OrderData:
                             if order.order_forma
                             else "-"
                         )
+                        hide_order_forma = (
+                            zlib.decompress(order.hide_phone_forma).decode("utf-8")
+                            if order.hide_phone_forma
+                            else "-"
+                        )
                         available_orders[order.order_id] = {
                             "text": order_forma,
+                            "hide_phone_text": hide_order_forma,
                             "starting_point": [start_lat, start_lon],
                             "status": order.order_status.value,
                             "distance_km": order.distance_km,
@@ -3140,8 +3216,14 @@ class OrderData:
                     if order.order_forma
                     else "-"
                 )
+                hide_order_forma = (
+                    zlib.decompress(order.hide_phone_forma).decode("utf-8")
+                    if order.hide_phone_forma
+                    else "-"
+                )
                 city_orders_dict[order.order_id] = {
                     "text": order_forma,
+                    "hide_phone_text": hide_order_forma,
                     "starting_point": order.starting_point,
                     "status": order.order_status.value,
                     "distance_km": order.distance_km,

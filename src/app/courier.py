@@ -741,7 +741,7 @@ async def cmd_run(
         )
         return
 
-    if end_date and end_date >= moscow_time:
+    if end_date and end_date >= moscow_time or tg_id == SUPER_ADMIN_TG_ID:
         if is_read_info:
             if isinstance(event, CallbackQuery):
                 await event.answer("🚀 Начать работу", show_alert=False)
@@ -1085,11 +1085,12 @@ async def show_nearby_orders(
         order_ids = list(nearby_orders.keys())
         for index, order_id in enumerate(order_ids, start=1):
             order_forma = nearby_orders[order_id]["text"]
+            hide_phone_forma = nearby_orders[order_id]["hide_phone_text"]
             order_text = (
                 f"<b>{index}/{len_nearby_orders}</b>\n"
                 f"<b>Заказ: №{order_id}</b>\n"
                 f"---------------------------------------------\n\n"
-                f"{order_forma}"
+                f"{hide_phone_forma}"
             )
             nearby_orders_data[order_id] = {"text": order_text, "index": index}
 
@@ -1150,11 +1151,12 @@ async def show_city_orders(
 
     for index, order_id in enumerate(order_ids, start=1):
         order_forma = city_orders[order_id]["text"]
+        hide_phone_forma = city_orders[order_id]["hide_phone_text"]
         order_text = (
             f"<b>{index}/{len_city_orders}</b>\n"
             f"<b>Заказ: №{order_id}</b>\n"
             f"---------------------------------------------\n\n"
-            f"{order_forma}"
+            f"{hide_phone_forma}"
         )
         orders_data[order_id] = {"text": order_text, "index": index}
 
@@ -1384,12 +1386,29 @@ async def accept_order(
             new_status=OrderStatus.IN_PROGRESS,
         )
 
+        courier_orders_completed = (
+            await courier_data.get_courier_completed_orders_count(tg_id)
+        )
+        courier_total_earned_XP = await courier_data.get_courier_total_earned_XP(tg_id)
+
+        if courier_orders_completed < 10:
+            additional_info = "<i>Если у курьера мало выполненных заказов, то он новичок, не будьте пожалуйста строги к нему, в дальнейшем он будет выполнять заказы лучше и может вновь успешно доставить ваш заказ!</i>\n\n"
+        elif 10 < courier_orders_completed < 25:
+            additional_info = "<i>Курьер уже достаточно опытный и сможет без проблем выполнить вашу доставку.</i>"
+        elif courier_orders_completed >= 25:
+            additional_info = (
+                "<i>Курьер очень опытный и без проблем выполнит вашу доставку.</i>"
+            )
+
         await customer_bot.send_message(
             chat_id=customer_tg_id,
             text=(
                 f"<b>✅ Заказ №{current_order_id} принят!</b>\n\n"
                 f"Курьер: {courier_name}\n"
                 f"Телефон: {courier_phone}\n\n"
+                f"Выполненных заказов у курьера: <b>{courier_orders_completed}</b>\n"
+                f"Опыт: <b>{courier_total_earned_XP}</b>\n\n"
+                f"{additional_info}\n\n"
                 f"<i>*Подробности в меню</i> <b>Мои заказы</b>\n\n- /my_orders\n\n"
                 f"<i>*Запросите у курьера его транслируемую геопозицию для отслеживания местоположения вашего заказа!\n</i>"
             ),
@@ -2431,6 +2450,7 @@ async def get_courier_statistic(
         average_speed,
         total_distance,
         total_money_earned,
+        total_XP_earner,
     ) = await courier_data.get_courier_statistic(tg_id)
 
     text = (
@@ -2442,6 +2462,7 @@ async def get_courier_statistic(
         f"Средняя скорость: <b>{average_speed:.2f} км/ч</b>\n"
         f"Пройденное расстояние: <b>{total_distance:.2f} км</b>\n"
         f"Сумма заработка: <b>{total_money_earned} ₽</b>\n"
+        f"Заработано XP: <b>{total_XP_earner}</b>\n\n"
     )
 
     reply_kb = await kb.get_courier_kb("go_back")

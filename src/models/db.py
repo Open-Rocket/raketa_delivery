@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, Annotated
 from dotenv import load_dotenv
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy import LargeBinary
+from sqlalchemy import LargeBinary, text
 
 
 from sqlalchemy import create_engine
@@ -156,8 +156,6 @@ class GlobalSettings(Base):
     distance_XP: Mapped[floatData] = mapped_column(Float, default=0.1)
     speed_XP: Mapped[floatData] = mapped_column(Float, default=0.05)
 
-    frod_count: Mapped[intData] = mapped_column(Integer, default=0)
-
     task_status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -230,6 +228,7 @@ class Courier(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     courier_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
+    total_earned_XP: Mapped[floatData] = mapped_column(Float, default=0.0)
 
     max_speed_kmh: Mapped[floatData] = mapped_column(Float, default=0.0)
     orders_completed: Mapped[intData] = mapped_column(Integer, default=0)
@@ -375,7 +374,11 @@ class Order(Base):
     starting_point: Mapped[coordinates]
 
     order_forma: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-
+    hide_phone_forma: Mapped[bytes] = mapped_column(
+        LargeBinary,
+        nullable=False,
+        server_default=text("E'\\\\x00'"),
+    )
     courier = relationship("Courier", back_populates="orders")
     customer = relationship("Customer", back_populates="orders")
 
