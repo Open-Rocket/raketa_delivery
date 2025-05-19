@@ -147,6 +147,7 @@ async def partner_generate_seed(
                 new_message = await callback_query.message.answer(
                     text=seed_text,
                     disable_notification=True,
+                    disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
 

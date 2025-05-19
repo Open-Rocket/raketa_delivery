@@ -719,7 +719,7 @@ async def set_order_to_db(
             notification_for_couriers = (
                 f"📍 Город: <b>{order_city}</b>\n"
                 f"💸 Новый заказ на сумму: <b>{price_rub}₽</b>\n"
-                f"📝 <i>{add_text}</i>\n\n"
+                f"<i>{add_text}</i>\n\n"
                 f"📦 Маршрут:\n{routing_addresses}\n\n"
                 f"📄 <b>Описание:</b>\n{description}\n\n"
                 f"●\n\n"
@@ -731,6 +731,7 @@ async def set_order_to_db(
                     msg = await courier_bot.send_message(
                         chat_id=tg_id,
                         text=notification_for_couriers,
+                        disable_web_page_preview=True,
                         parse_mode="HTML",
                     )
 
