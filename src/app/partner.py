@@ -6,15 +6,8 @@ from ._deps import (
     InputMediaDocument,
     CallbackQuery,
     Message,
-    filters,
-    ContentType,
-    ReplyKeyboardRemove,
-    LabeledPrice,
-    zlib,
-    Time,
     json,
     F,
-    find_closest_city,
     seed_maker,
     partner_bot,
     partner_bot_id,
@@ -24,9 +17,7 @@ from ._deps import (
     admin_data,
     handler,
     kb,
-    title,
     rediska,
-    cities,
     log,
 )
 
@@ -138,6 +129,7 @@ async def partner_generate_seed(
                 f"- Этот ключ служит промокодом для пользователей. Используя его они получают скидки и могут участвовать в акциях сервиса.\n\n"
                 f"- Для вас, как партнера, этот ключ важен тем, что мы отслеживаем, сколько людей зарегистрировались с вашим ключом. "
                 f"Чем больше клиентов и курьеров, использующих ваш ключ, тем выше ваш доход, поскольку вы получаете <b>{refund_percent}%</b> с подписки курьеров каждый месяц.\n\n"
+                f"<a href='https://t.me/raketadeliverychannel/26'>Инструкция</a>\n\n"
                 f"▼ <b>Выберите действие в • ≡ Меню •</b>"
             )
 
@@ -339,6 +331,9 @@ async def cmd_info(
         f"Здесь вы можете ознакомиться с основной информацией о сервисе.\n\n"
         f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
         f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>"
+        f" •\n"
+        f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>\n"
+        f"<a href='https://t.me/raketadeliverychannel/26'>Инструкция</a>"
     )
 
     info_msg = await message.answer(
@@ -919,7 +914,7 @@ async def data_earn(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.message()
+@partner_fallback.message()
 async def handle_unrecognized_message(
     message: Message,
 ):

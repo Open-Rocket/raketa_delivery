@@ -334,6 +334,7 @@ async def courier_accept_tou(
             f"Номер: {courier_phone}\n"
             f"Город: {courier_city}\n"
             f"{subscription_status}"
+            f"<a href='https://t.me/raketadeliverychannel/24'>Инструкция</a>\n\n"
             f"▼ <b>Выберите действие в • ≡ Меню •</b>"
         )
 
@@ -2160,7 +2161,8 @@ async def cmd_info(
         f"<a href='https://disk.yandex.ru/i/PGll6-rJV7QhNA'>О Нас 'Raketa'</a>\n"
         f"<a href='https://disk.yandex.ru/i/NiwitOTuU0YPXQ'>Частые вопросы и ответы на них</a>\n"
         f" •\n"
-        f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>"
+        f"<a href='https://t.me/raketadeliverychannel/14'>Вопросы - Обсуждения - Предложения</a>\n"
+        f"<a href='https://t.me/raketadeliverychannel/24'>Инструкция</a>"
     )
 
     info_msg = await message.answer(
