@@ -923,7 +923,7 @@ async def data_earn(
     await rediska.set_state(partner_bot_id, tg_id, current_state)
 
 
-@partner_r.message()
+@partner_fallback.message()
 async def handle_unrecognized_message(
     message: Message,
 ):
