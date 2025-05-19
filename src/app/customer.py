@@ -1225,7 +1225,7 @@ async def cmd_rules(
     text = (
         f"⚖️ <b>Правила сервиса</b>\n\n"
         f"Начиная использование сервиса, вы соглашаетесь с "
-        f"<a href='https://disk.yandex.ru/i/d2S9C4zW4hmL0w'>"
+        f"<a href='https://disk.yandex.ru/i/rFtwNvr9bguSLw'>"
         f"Пользовательским соглашением и правилами использования</a>, а также "
         f"<a href='https://telegram.org/privacy'>Политикой конфиденциальности</a>.\n\n"
         f"<i>*Обращаем внимание, что любые действия, связанные с заказами, "
