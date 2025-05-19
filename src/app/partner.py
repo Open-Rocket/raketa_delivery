@@ -6,8 +6,15 @@ from ._deps import (
     InputMediaDocument,
     CallbackQuery,
     Message,
+    filters,
+    ContentType,
+    ReplyKeyboardRemove,
+    LabeledPrice,
+    zlib,
+    Time,
     json,
     F,
+    find_closest_city,
     seed_maker,
     partner_bot,
     partner_bot_id,
@@ -17,7 +24,9 @@ from ._deps import (
     admin_data,
     handler,
     kb,
+    title,
     rediska,
+    cities,
     log,
 )
 
@@ -138,7 +147,6 @@ async def partner_generate_seed(
                 new_message = await callback_query.message.answer(
                     text=seed_text,
                     disable_notification=True,
-                    disable_web_page_preview=True,
                     parse_mode="HTML",
                 )
 
