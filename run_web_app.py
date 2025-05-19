@@ -62,7 +62,7 @@ def setup_dispatchers():
     partner_dp["redis"] = rediska
     partner_dp.message.middleware(AgentOuterMiddleware(rediska))
     partner_dp.callback_query.middleware(AgentOuterMiddleware(rediska))
-    partner_dp.include_routers(partner_r, partner_fallback)
+    partner_dp.include_routers(partner_r)
 
 
 async def handle_webhook(request: web.Request):
