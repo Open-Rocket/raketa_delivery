@@ -356,6 +356,7 @@ async def courier_accept_tou(
         await callback_query.message.answer(
             text=new_courier_info,
             disable_notification=False,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
