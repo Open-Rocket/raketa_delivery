@@ -62,6 +62,8 @@ big_intDataUnique = Annotated[
         nullable=True,
     ),
 ]
+big_int = Annotated[int, mapped_column(BigInteger, primary_key=False)]
+big_int2 = Annotated[int, mapped_column(BigInteger, primary_key=False, nullable=True)]
 floatData = Annotated[float, mapped_column(Float, nullable=True)]
 coordinates = Annotated[tuple, mapped_column(ARRAY(String), nullable=True)]
 str_256 = Annotated[str, 256]
@@ -289,7 +291,7 @@ class EarnRequest(Base):
         ForeignKey("partners.partner_id", ondelete="CASCADE"),
         nullable=True,
     )
-    partner_tg_id: Mapped[intDataUnique]
+    partner_tg_id: Mapped[big_int]
     request_date: Mapped[datetimeData]
     amount: Mapped[floatData] = mapped_column(Float, nullable=True, default=0.0)
 
@@ -321,7 +323,7 @@ class Admin(Base):
 
     admin_id: Mapped[big_intPK]
 
-    admin_tg_id: Mapped[intDataUnique]
+    admin_tg_id: Mapped[big_intDataUnique]
     admin_name: Mapped[stringData]
     admin_phone: Mapped[stringData]
 
@@ -362,12 +364,12 @@ class Order(Base):
 
     customer_name: Mapped[stringData]
     customer_phone: Mapped[stringData]
-    customer_tg_id: Mapped[intData]
+    customer_tg_id: Mapped[big_int]
 
     customer_username: Mapped[stringData]
     courier_username: Mapped[stringData]
 
-    courier_tg_id: Mapped[intData]
+    courier_tg_id: Mapped[big_int2]
     courier_name: Mapped[stringData]
     courier_phone: Mapped[stringData]
 
