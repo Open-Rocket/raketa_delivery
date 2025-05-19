@@ -363,6 +363,7 @@ async def courier_accept_tou(
         new_message = await callback_query.message.answer(
             text=text,
             disable_notification=False,
+            disable_web_page_preview=True,
             parse_mode="HTML",
         )
 
