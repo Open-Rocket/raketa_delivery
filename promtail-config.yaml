@@ -8,10 +8,6 @@ positions:
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
-    # Если Loki требует авторизацию:
-    # basic_auth:
-    #   username: loki_user
-    #   password: loki_password
 
 scrape_configs:
   - job_name: raketa_bot_logs
@@ -24,24 +20,21 @@ scrape_configs:
         regex: raketa_bot
         action: keep
 
-      - source_labels: [__meta_docker_container_name]
-        target_label: container
-        replacement: $1
-
-      - target_label: job
-        replacement: raketa_bot_logs
-
       - source_labels: [__meta_docker_container_id]
         target_label: __path__
         replacement: /var/lib/docker/containers/$1/$1-json.log
 
+      - target_label: job
+        replacement: raketa_bot_logs
+
     pipeline_stages:
-      - regex:
-          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+-\s+(?P<level>\w+):\s+(?P<msg>.+)$'
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
       - timestamp:
-          source: ts
-          format: '2006-01-02 15:04:05,000'
-      - labels:
-          level:
+          source: time
+          format: RFC3339Nano
       - output:
-          source: msg
+          source: log
