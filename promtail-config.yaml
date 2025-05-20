@@ -16,17 +16,33 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Сначала отбрасываем promtail
+      # Отбрасываем сам контейнер promtail, чтобы не логировать его
       - source_labels: [__meta_docker_container_name]
-        regex: promtail
+        regex: /promtail
         action: drop
 
-      # Затем оставляем только raketa_bot
+      # Оставляем только контейнер raketa_bot
       - source_labels: [__meta_docker_container_name]
-        regex: raketa_bot
+        regex: /raketa_bot
         action: keep
 
+      # Назначаем имя job
       - target_label: job
         replacement: raketa_bot
 
-    pipeline_stages: []
+      # Удаляем слэш из имени контейнера
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.+)
+        target_label: container
+        replacement: $1
+
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            level: level
+            msg: message
+      - labels:
+          level:
+      - output:
+          source: message
