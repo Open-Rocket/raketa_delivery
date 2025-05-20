@@ -31,13 +31,5 @@ scrape_configs:
 
     pipeline_stages:
       - docker: {}
-      - json:
-          expressions:
-            level: level
-            msg: message
-      - labels:
-          level:
-          container: # добавляем метку контейнера — гарантируем, что метки есть
-          job: # добавляем метку job — тоже обязательно для Loki
       - output:
-          source: message
+          source: log
