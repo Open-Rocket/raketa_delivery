@@ -1,51 +1,46 @@
-# server:
-#   http_listen_port: 9080
-#   grpc_listen_port: 0
-#   log_level: debug
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
 
-# positions:
-#   filename: /data/positions.yaml
+positions:
+  filename: /data/positions.yaml
 
-# clients:
-#   - url: http://loki:3100/loki/api/v1/push
+clients:
+  - url: http://loki:3100/loki/api/v1/push
 
-# scrape_configs:
-#   - job_name: raketa_bot_logs
-#     docker_sd_configs:
-#       - host: unix:///var/run/docker.sock
-#         refresh_interval: 5s
-
-#     relabel_configs:
-#       - source_labels: [__meta_docker_container_name]
-#         regex: /promtail
-#         action: drop
-#       - source_labels: [__meta_docker_container_name]
-#         regex: /raketa_bot
-#         action: keep
-#       - target_label: job
-#         replacement: raketa_bot
-#       - source_labels: [__meta_docker_container_name]
-#         regex: /(.+)
-#         target_label: container
-#         replacement: $1
-
-#     pipeline_stages:
-#       - docker: {}
-#       - output:
-#           source: log
 scrape_configs:
-  - job_name: docker
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: raketa
-          __path__: /var/log/containers/*.log
+  - job_name: raketa_bot_logs
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      # Исключаем самого Promtail из логов
+      - source_labels: [__meta_docker_container_name]
+        regex: /promtail
+        action: drop
+
+      # Оставляем только контейнер raketa_bot
+      - source_labels: [__meta_docker_container_name]
+        regex: /raketa_bot
+        action: keep
+
+      # Присваиваем job
+      - target_label: job
+        replacement: raketa_bot
+
+      # Добавляем лейбл container с именем контейнера без слэша
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.+)
+        target_label: container
+        replacement: $1
+
     pipeline_stages:
+      - docker: {}
       - regex:
-          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)\s+component=(?P<component>[^ ]+)\s+msg="(?P<msg>.*)"'
+          expression: '^(?P<ts>[^ ]+ [^ ]+),\d+ - (?P<level>\w+): (?P<msg>.*)$'
       - labels:
           level:
-          component:
       - output:
           source: msg
