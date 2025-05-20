@@ -31,4 +31,8 @@ scrape_configs:
         target_label: __path__
 
     pipeline_stages:
-      - docker: {}
+      - regex:
+          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)'
+      - labels:
+          level:
+          caller:
