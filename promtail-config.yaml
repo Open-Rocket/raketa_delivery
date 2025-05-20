@@ -17,7 +17,7 @@ scrape_configs:
 
     relabel_configs:
       - source_labels: [__meta_docker_container_name]
-        regex: .*/raketa_bot
+        regex: raketa_bot
         action: keep
 
       - target_label: job
@@ -25,4 +25,3 @@ scrape_configs:
 
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
-# Убраны все pipeline_stages, чтобы точно ничего не ломалось
