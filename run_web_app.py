@@ -100,38 +100,37 @@ async def handle_webhook(request: web.Request):
         return web.Response(status=500)
 
 
+import os
+
+
 async def set_webhooks():
-    """Установка вебхуков для всех ботов"""
+    """
+    Установка вебхуков для всех ботов.
+    Можно отключить через переменную окружения: DISABLE_WEBHOOKS=true
+    """
+    if os.getenv("DISABLE_WEBHOOKS", "").lower() == "true":
+        log.warning("Webhook setup is disabled via DISABLE_WEBHOOKS env variable")
+        return
+
     webhooks = [
-        (
-            customer_bot,
-            "customer",
-            customer_bot_secret,
-        ),
-        (
-            courier_bot,
-            "courier",
-            courier_bot_secret,
-        ),
-        (
-            admin_bot,
-            "admin",
-            admin_bot_secret,
-        ),
-        (
-            partner_bot,
-            "partner",
-            partner_bot_secret,
-        ),
+        (customer_bot, "customer", customer_bot_secret),
+        (courier_bot, "courier", courier_bot_secret),
+        (admin_bot, "admin", admin_bot_secret),
+        (partner_bot, "partner", partner_bot_secret),
     ]
 
     for bot, name, secret in webhooks:
-        await bot.set_webhook(
-            f"https://{name}.raketago.ru/{name}",
-            secret_token=secret,
-            drop_pending_updates=True,
-        )
-        log.info(f"Webhook set for {name}")
+        url = f"https://{name}.raketago.ru/{name}"
+
+        try:
+            await bot.set_webhook(
+                url,
+                secret_token=secret,
+                drop_pending_updates=True,
+            )
+            log.info(f"✅ Webhook установлен для бота {name} -> {url}")
+        except Exception as e:
+            log.error(f"❌ Не удалось установить webhook для бота {name}: {e}")
 
 
 async def start_server():

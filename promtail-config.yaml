@@ -1,34 +1,3 @@
-# server:
-#   http_listen_port: 9080
-#   grpc_listen_port: 0
-#   log_level: debug
-# positions:
-#   filename: /data/positions.yaml
-# clients:
-#   - url: http://loki:3100/loki/api/v1/push
-# scrape_configs:
-#   - job_name: docker_logs
-#     static_configs:
-#       - targets:
-#           - localhost
-#         labels:
-#           job: docker_logs
-#           service_name: docker_logs
-#           __path__: /var/lib/docker/containers/*/*-json.log
-#     pipeline_stages:
-#       - docker: {}
-#       - json:
-#           expressions:
-#             log: log
-#             container_name: container_name
-#       - labels:
-#           container_name:
-#       - output:
-#           source: log
-#       - drop:
-#           source: structured_metadata
-#           action: drop
-
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
@@ -49,7 +18,7 @@ scrape_configs:
     relabel_configs:
       # Фильтрация по имени контейнера
       - source_labels: [__meta_docker_container_name]
-        regex: /raketa_bot
+        regex: ^raketa_bot$
         action: keep
 
       # Добавим service_name для запроса в Grafana
@@ -60,5 +29,5 @@ scrape_configs:
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
 
-    pipeline_stages:
-      - docker: {}
+    # pipeline_stages:
+    #   - docker: {}
