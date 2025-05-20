@@ -45,15 +45,17 @@
 #           level:
 #       - output:
 #           source: msg
-
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
   log_level: debug
+
 positions:
   filename: /data/positions.yaml
+
 clients:
   - url: http://loki:3100/loki/api/v1/push
+
 scrape_configs:
   - job_name: docker_logs
     static_configs:
@@ -63,16 +65,27 @@ scrape_configs:
           job: docker_logs
           service_name: docker_logs
           __path__: /var/lib/docker/containers/*/*-json.log
+
     pipeline_stages:
       - docker: {}
+
+      # 1. Распаковываем первый слой JSON (из docker)
       - json:
           expressions:
             log: log
-            container_name: container_name
+            stream: stream
+            time: time
+
+      # 2. Пробуем распарсить второй слой, если поле log — это JSON-строка
+      - match:
+          selector: '{job="docker_logs"}'
+          stages:
+            - regex:
+                expression: '^\s*{.*}\s*$'
+            - json:
+                source: log
+
+      # 3. Применяем метки, если они найдены
       - labels:
           container_name:
-      - output:
-          source: log
-      - drop:
-          source: structured_metadata
-          action: drop
+          level:
