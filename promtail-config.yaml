@@ -30,13 +30,13 @@ scrape_configs:
     pipeline_stages:
       - docker: {}
 
-      # Попробуем выдернуть из строки уровня логирования и сообщение
       - regex:
-          expression: '^(?P<ts>[^ ]+ [^ ]+),\d+ - (?P<level>[A-Z]+): (?P<msg>.*)'
+          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ - (?P<level>[A-Z]+): (?P<msg>.*)'
 
       - timestamp:
           source: ts
-          format: '2006-01-02 15:04:05' # Пример: 2025-05-20 13:47:19
+          format: '2006-01-02 15:04:05'
+          location: Europe/Moscow # или UTC — в зависимости от твоей системы
 
       - labels:
           level:
