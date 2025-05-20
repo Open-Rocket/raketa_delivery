@@ -159,7 +159,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
       - promtail-data:/data
-    command: -config.file=/etc/promtail/config.yaml -config.expand-env=true
+    command: >
+      -config.file=/etc/promtail/config.yaml
+      -client.retry-delay=5s
+      -client.batch-wait=3s
+      -config.expand-env=true
     depends_on:
       - loki
     networks:

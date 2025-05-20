@@ -18,7 +18,7 @@ scrape_configs:
     relabel_configs:
       # Фильтрация по имени контейнера
       - source_labels: [__meta_docker_container_name]
-        regex: ^raketa_bot$
+        regex: raketa_bot
         action: keep
 
       # Добавим service_name для запроса в Grafana
@@ -29,5 +29,5 @@ scrape_configs:
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
 
-    # pipeline_stages:
-    #   - docker: {}
+    pipeline_stages:
+      - docker: {}
