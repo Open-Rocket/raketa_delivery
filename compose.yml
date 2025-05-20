@@ -178,7 +178,9 @@ services:
       - '3100:3100'
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
-      - loki-data:/loki
+      - ./loki-data/chunks:/loki/chunks
+      - ./loki-data/rules:/loki/rules
+      - ./loki-data/delete-requests:/loki/delete-requests
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - raketa_network
