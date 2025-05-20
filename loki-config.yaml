@@ -28,4 +28,4 @@ schema_config:
 compactor:
   retention_enabled: true
   retention_delete_delay: 2h
-  retention_period: 168h # 7 дней
+  retention_period: 168h
