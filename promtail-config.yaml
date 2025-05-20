@@ -17,17 +17,23 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Фильтрация по имени контейнера
       - source_labels: [__meta_docker_container_name]
         regex: raketa_bot
         action: keep
 
-      # Добавим service_name для запроса в Grafana
       - target_label: service_name
         replacement: raketa_bot
 
-      # Используем путь к лог-файлу контейнера
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
 
-    pipeline_stages: []
+    pipeline_stages:
+      - regex:
+          expression: 'level=(?P<level>\w+) ts=(?P<ts>[^ ]+) caller=(?P<caller>[^ ]+) component=(?P<component>[^ ]+) msg="(?P<msg>.+)"'
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+      - labels:
+          level:
+          caller:
+          component:
