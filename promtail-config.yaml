@@ -28,13 +28,18 @@ scrape_configs:
         replacement: raketa_bot_logs
 
     pipeline_stages:
-      - json:
-          expressions:
-            log: log
-            stream: stream
-            time: time
+      - docker: {}
+
+      # Попробуем выдернуть из строки уровня логирования и сообщение
+      - regex:
+          expression: '^(?P<ts>[^ ]+ [^ ]+),\d+ - (?P<level>[A-Z]+): (?P<msg>.*)'
+
       - timestamp:
-          source: time
-          format: RFC3339Nano
+          source: ts
+          format: '2006-01-02 15:04:05' # Пример: 2025-05-20 13:47:19
+
+      - labels:
+          level:
+
       - output:
-          source: log
+          source: msg
