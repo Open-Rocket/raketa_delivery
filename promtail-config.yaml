@@ -37,10 +37,14 @@ scrape_configs:
         replacement: $1
 
     pipeline_stages:
-      - docker: {}
+      - docker: {} # парсим JSON Docker
       - regex:
-          expression: '^(?P<ts>[^ ]+ [^ ]+),\d+ - (?P<level>\w+): (?P<msg>.*)$'
+          expression: 'level=(?P<level>\w+) ts=(?P<ts>[^ ]+) caller=(?P<caller>[^ ]+) component=(?P<component>[^ ]+) msg="(?P<msg>.*)"'
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
       - labels:
           level:
+          component:
       - output:
           source: msg
