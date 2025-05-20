@@ -37,15 +37,11 @@ scrape_configs:
 
     pipeline_stages:
       - regex:
-          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^\s]+)\s+caller=(?P<caller>[^\s]+)\s+target=(?P<target>[^\s]+)?\s*msg="(?P<msg>[^"]+)"(\s+container=(?P<container>[^\s]+))?(\s+err="(?P<err>[^"]+)")?(\s+written=(?P<written>\d+))?'
+          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+-\s+(?P<level>\w+):\s+(?P<msg>.+)$'
       - timestamp:
           source: ts
-          format: RFC3339Nano
+          format: '2006-01-02 15:04:05,000'
       - labels:
           level:
-          target:
-          container:
-          err:
-          written:
       - output:
           source: msg
