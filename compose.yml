@@ -149,7 +149,7 @@ services:
       - raketa_network
 
   promtail:
-    iimage: grafana/promtail:2.9.4
+    image: grafana/promtail:2.9.4
     container_name: promtail
     restart: unless-stopped
     ports:
