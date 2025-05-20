@@ -17,17 +17,16 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
-      # Фильтрация по имени контейнера
       - source_labels: [__meta_docker_container_name]
         regex: raketa_bot
         action: keep
 
-      # Добавим service_name для запроса в Grafana
       - target_label: service_name
         replacement: raketa_bot
 
-      # Используем путь к лог-файлу контейнера
-      - source_labels: [__meta_docker_container_logfile]
+      - source_labels: [__meta_docker_container_id]
         target_label: __path__
+        replacement: /var/lib/docker/containers/$1/$1-json.log
 
-    pipeline_stages: []
+    pipeline_stages:
+      - docker: {}
