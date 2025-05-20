@@ -16,7 +16,7 @@ scrape_configs:
           - localhost
         labels:
           job: raketa_bot
-          __path__: /var/lib/docker/containers/*/*-json.log # исправлено здесь
+          __path__: /var/lib/docker/containers/*/*-json.log
 
     pipeline_stages:
       - json:
