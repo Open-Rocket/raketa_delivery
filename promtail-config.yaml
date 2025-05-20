@@ -26,3 +26,14 @@ scrape_configs:
 
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
+
+    pipeline_stages:
+      - regex:
+          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)\s+component=(?P<component>[^ ]+)\s+msg="(?P<msg>[^"]+)"'
+      - timestamp:
+          source: ts
+          format: RFC3339Nano
+      - labels:
+          level: ''
+          caller: ''
+          component: ''
