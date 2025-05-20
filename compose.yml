@@ -147,7 +147,6 @@ services:
       - './letsencrypt:/letsencrypt'
     networks:
       - raketa_network
-
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
@@ -161,8 +160,6 @@ services:
       - promtail-data:/data
     command: >
       -config.file=/etc/promtail/config.yaml
-      -client.retry-delay=5s
-      -client.batch-wait=3s
       -config.expand-env=true
     depends_on:
       - loki
