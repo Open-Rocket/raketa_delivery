@@ -149,7 +149,7 @@ services:
       - raketa_network
 
   promtail:
-    image: grafana/promtail:latest
+    iimage: grafana/promtail:2.9.4
     container_name: promtail
     restart: unless-stopped
     ports:
@@ -159,11 +159,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml
       - promtail-data:/data
-    command: >
-      -config.file=/etc/promtail/config.yaml
-      -client.retry-delay=5s
-      -client.batch-wait=3s
-      -config.expand-env=true
+    command: -config.file=/etc/promtail/config.yaml
     depends_on:
       - loki
     networks:
@@ -175,7 +171,7 @@ services:
         max-file: '3'
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.4
     container_name: loki
     restart: unless-stopped
     ports:
