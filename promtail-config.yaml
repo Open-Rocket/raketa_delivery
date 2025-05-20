@@ -42,6 +42,7 @@ scrape_configs:
           expressions:
             level: level
             msg: message
+          optional: true # <- Добавляем, чтобы не падало при отсутствии level
       - labels:
           level:
       - output:
