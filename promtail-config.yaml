@@ -8,7 +8,6 @@ positions:
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
-    batchwait: 3s
 
 scrape_configs:
   - job_name: raketa_bot_logs
@@ -18,27 +17,12 @@ scrape_configs:
 
     relabel_configs:
       - source_labels: [__meta_docker_container_name]
-        regex: raketa_bot
+        regex: .*/raketa_bot
         action: keep
 
-      - target_label: service_name
+      - target_label: job
         replacement: raketa_bot
 
       - source_labels: [__meta_docker_container_logfile]
         target_label: __path__
-
-    pipeline_stages:
-      - regex:
-          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)\s+component=(?P<component>[^ ]+)\s+msg="(?P<msg>[^"]+)"'
-
-      - timestamp:
-          source: ts
-          format: RFC3339Nano
-
-      - labels:
-          level: ''
-          caller: ''
-          component: ''
-
-      - output:
-          source: msg
+# Убраны все pipeline_stages, чтобы точно ничего не ломалось
