@@ -16,6 +16,12 @@ scrape_configs:
         refresh_interval: 5s
 
     relabel_configs:
+      # Сначала отбрасываем promtail
+      - source_labels: [__meta_docker_container_name]
+        regex: promtail
+        action: drop
+
+      # Затем оставляем только raketa_bot
       - source_labels: [__meta_docker_container_name]
         regex: raketa_bot
         action: keep
