@@ -29,15 +29,18 @@ scrape_configs:
             stream: stream
             time: time
 
-      # Проверим: похоже ли содержимое log на JSON?
+      # Второй слой — лог внутри log
       - match:
           selector: '{job="docker_logs"}'
           stages:
             - regex:
-                expression: '^\s*{.*}\s*$' # строка начинается с {
+                expression: '^\s*{.*}\s*$'
             - json:
                 source: log
-                # можешь указать expressions: {} если нужны конкретные поля
+                expressions:
+                  level: level
+                  msg: msg
+                  ts: ts
 
       - labels:
           container_name:
