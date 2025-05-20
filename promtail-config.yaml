@@ -1,20 +1,82 @@
+# server:
+#   http_listen_port: 9080
+#   grpc_listen_port: 0
+#   log_level: debug
+# positions:
+#   filename: /data/positions.yaml
+# clients:
+#   - url: http://loki:3100/loki/api/v1/push
+# scrape_configs:
+#   - job_name: docker_logs
+#     static_configs:
+#       - targets:
+#           - localhost
+#         labels:
+#           job: docker_logs
+#           service_name: docker_logs
+#           __path__: /var/lib/docker/containers/*/*-json.log
+#     pipeline_stages:
+#       - docker: {}
+#       - json:
+#           expressions:
+#             log: log
+#             container_name: container_name
+#       - labels:
+#           container_name:
+#       - output:
+#           source: log
+#       - drop:
+#           source: structured_metadata
+#           action: drop
+
+auth_enabled: false
+
 server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
-  log_level: debug
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+compactor:
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_period: 168h # 7 дней
+
 positions:
   filename: /data/positions.yaml
+
 clients:
   - url: http://loki:3100/loki/api/v1/push
+
 scrape_configs:
   - job_name: docker_logs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: docker_logs
-          service_name: docker_logs
-          __path__: /var/lib/docker/containers/*/*-json.log
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: .*raketa_bot.*
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name
     pipeline_stages:
       - docker: {}
       - json:
