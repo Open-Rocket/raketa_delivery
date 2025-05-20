@@ -1,3 +1,18 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: debug
+
+positions:
+  filename: /data/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    # Если Loki требует авторизацию:
+    # basic_auth:
+    #   username: loki_user
+    #   password: loki_password
+
 scrape_configs:
   - job_name: raketa_bot_logs
     docker_sd_configs:
@@ -11,10 +26,10 @@ scrape_configs:
 
       - source_labels: [__meta_docker_container_name]
         target_label: container
-        replacement: $1 # будет label `container=raketa_bot`
+        replacement: $1
 
       - target_label: job
-        replacement: raketa_bot_logs # просто чтобы было красиво в Grafana
+        replacement: raketa_bot_logs
 
       - source_labels: [__meta_docker_container_id]
         target_label: __path__
@@ -22,12 +37,15 @@ scrape_configs:
 
     pipeline_stages:
       - regex:
-          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)(\s+component=(?P<component>[^ ]+))?\s+msg="(?P<msg>[^"]+)"'
+          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^\s]+)\s+caller=(?P<caller>[^\s]+)\s+target=(?P<target>[^\s]+)?\s*msg="(?P<msg>[^"]+)"(\s+container=(?P<container>[^\s]+))?(\s+err="(?P<err>[^"]+)")?(\s+written=(?P<written>\d+))?'
       - timestamp:
           source: ts
           format: RFC3339Nano
       - labels:
           level:
-          component:
+          target:
+          container:
+          err:
+          written:
       - output:
           source: msg
