@@ -28,6 +28,6 @@ schema_config:
 compactor:
   retention_enabled: true
   retention_delete_delay: 2h
-  delete_request_store:
-    filesystem:
-      directory: /loki/delete-requests
+  delete_request_store: filesystem
+  delete_request_store_config:
+    directory: /loki/delete-requests
