@@ -33,17 +33,6 @@
 #       - docker: {}
 #       - output:
 #           source: log
-
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
-
-positions:
-  filename: /tmp/positions.yaml
-
-clients:
-  - url: http://loki:3100/loki/api/v1/push
-
 scrape_configs:
   - job_name: docker
     static_configs:
@@ -54,6 +43,9 @@ scrape_configs:
           __path__: /var/log/containers/*.log
     pipeline_stages:
       - regex:
-          expression: '^(?P<log>.*)$'
+          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=(?P<caller>[^ ]+)\s+component=(?P<component>[^ ]+)\s+msg="(?P<msg>.*)"'
+      - labels:
+          level:
+          component:
       - output:
-          source: log
+          source: msg
