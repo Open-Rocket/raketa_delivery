@@ -32,7 +32,7 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
-  log_level: info
+  log_level: debug
 
 positions:
   filename: /data/positions.yaml
@@ -42,13 +42,23 @@ clients:
 
 scrape_configs:
   - job_name: raketa_bot_logs
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: raketa_logs
-          service_name: raketa_bot
-          __path__: /var/lib/docker/containers/*raketa_bot*/*-json.log
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+
+    relabel_configs:
+      # Фильтруем только raketa_bot по имени контейнера
+      - source_labels: [__meta_docker_container_name]
+        regex: /raketa_bot
+        action: keep
+
+      # Добавим service_name как отдельную метку
+      - target_label: service_name
+        replacement: raketa_bot
+
+      # Путь к лог-файлу контейнера
+      - source_labels: [__meta_docker_container_logfile]
+        target_label: __path__
 
     pipeline_stages:
       - docker: {}
