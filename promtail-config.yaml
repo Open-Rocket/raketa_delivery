@@ -1,47 +1,78 @@
+# server:
+#   http_listen_port: 9080
+#   grpc_listen_port: 0
+#   log_level: debug
+
+# positions:
+#   filename: /data/positions.yaml
+
+# clients:
+#   - url: http://loki:3100/loki/api/v1/push
+#     # Если Loki требует авторизацию:
+#     # basic_auth:
+#     #   username: loki_user
+#     #   password: loki_password
+
+# scrape_configs:
+#   - job_name: raketa_bot_logs
+#     docker_sd_configs:
+#       - host: unix:///var/run/docker.sock
+#         refresh_interval: 5s
+
+#     relabel_configs:
+#       - source_labels: [__meta_docker_container_name]
+#         regex: raketa_bot
+#         action: keep
+
+#       - source_labels: [__meta_docker_container_name]
+#         target_label: container
+#         replacement: $1
+
+#       - target_label: job
+#         replacement: raketa_bot_logs
+
+#       - source_labels: [__meta_docker_container_id]
+#         target_label: __path__
+#         replacement: /var/lib/docker/containers/$1/$1-json.log
+
+#     pipeline_stages:
+#       - regex:
+#           expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+-\s+(?P<level>\w+):\s+(?P<msg>.+)$'
+#       - timestamp:
+#           source: ts
+#           format: '2006-01-02 15:04:05,000'
+#       - labels:
+#           level:
+#       - output:
+#           source: msg
+
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
   log_level: debug
-
 positions:
   filename: /data/positions.yaml
-
 clients:
   - url: http://loki:3100/loki/api/v1/push
-    # Если Loki требует авторизацию:
-    # basic_auth:
-    #   username: loki_user
-    #   password: loki_password
-
 scrape_configs:
-  - job_name: raketa_bot_logs
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-
-    relabel_configs:
-      - source_labels: [__meta_docker_container_name]
-        regex: raketa_bot
-        action: keep
-
-      - source_labels: [__meta_docker_container_name]
-        target_label: container
-        replacement: $1
-
-      - target_label: job
-        replacement: raketa_bot_logs
-
-      - source_labels: [__meta_docker_container_id]
-        target_label: __path__
-        replacement: /var/lib/docker/containers/$1/$1-json.log
-
+  - job_name: docker_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker_logs
+          service_name: docker_logs
+          __path__: /var/lib/docker/containers/*/*-json.log
     pipeline_stages:
-      - regex:
-          expression: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+-\s+(?P<level>\w+):\s+(?P<msg>.+)$'
-      - timestamp:
-          source: ts
-          format: '2006-01-02 15:04:05,000'
+      - docker: {}
+      - json:
+          expressions:
+            log: log
+            container_name: container_name
       - labels:
-          level:
+          container_name:
       - output:
-          source: msg
+          source: log
+      - drop:
+          source: structured_metadata
+          action: drop
