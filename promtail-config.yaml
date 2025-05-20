@@ -31,3 +31,4 @@ scrape_configs:
           level:
       - output:
           source: msg
+# reset
