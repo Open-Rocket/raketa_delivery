@@ -53,6 +53,7 @@ scrape_configs:
           job: raketa
           __path__: /var/log/containers/*.log
     pipeline_stages:
-      - docker: {}
+      - regex:
+          expression: '^(?P<log>.*)$'
       - output:
           source: log
