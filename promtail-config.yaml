@@ -30,36 +30,17 @@ scrape_configs:
         target_label: container_name
 
     pipeline_stages:
-      - json:
-          expressions:
-            log: log
-            stream: stream
-            time: time
+      - docker: {}
 
-      # Удаляем ANSI escape-коды
-      - replace:
-          expression: '(\\u001b\[[0-9;]*m|\n)'
-          replace: ''
-          source: log
-
-      # Парсим структурированные логи приложения
       - regex:
-          expression: '^(?P<logtime>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ - (?P<level>[A-Z]+): (?P<message>.*)'
-          source: log
-
-      # Пропускаем пустые сообщения
-      - drop:
-          expression: '^$'
-          drop_counter_reason: 'empty_message'
+          expression: '^(?P<logtime>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+\s+-\s+(?P<level>[A-Z]+):\s+(?P<message>.*)'
 
       - timestamp:
-          source: time
-          format: RFC3339Nano
+          source: logtime
+          format: '2006-01-02 15:04:05'
 
-      # Обязательные метки для Loki
       - labels:
           level:
-          stream:
           container_name:
           job:
 
