@@ -1,13 +1,12 @@
 server:
-  http_listen_port: 9080
+  http_listen_address: grafana/promtail
   grpc_listen_port: 0
-  log_level: debug
 
 positions:
   filename: /data/positions.yaml
 
 clients:
-  - url: http://loki:3100/loki/api/v1/push
+  - url: loki:3100/loki/api/v1/push
 
 scrape_configs:
   - job_name: raketa_bot_logs
