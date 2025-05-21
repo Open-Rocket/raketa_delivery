@@ -23,11 +23,15 @@ scrape_configs:
         target_label: __path__
         replacement: /var/lib/docker/containers/$1/$1-json.log
 
+      - target_label: job
+        replacement: raketa_bot_logs # ← гарантированный label для Loki
+
       - source_labels: [__meta_docker_container_name]
-        target_label: container
+        target_label: container_name # ← дополнительный лейбл (опциональный)
 
     pipeline_stages:
       - docker: {}
 
       - labels:
-          container:
+          job:
+          container_name:
