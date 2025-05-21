@@ -26,6 +26,9 @@ scrape_configs:
       - target_label: job
         replacement: raketa_bot_logs
 
+      - target_label: container
+        source_labels: [__meta_docker_container_name] # 💥 добавили обязательный label
+
     pipeline_stages:
       - docker: {}
 
@@ -38,6 +41,7 @@ scrape_configs:
 
       - labels:
           level:
+          container: # 💥 обязательно пробросим этот label
 
       - output:
           source: msg
