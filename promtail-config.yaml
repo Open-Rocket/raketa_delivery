@@ -28,7 +28,7 @@ scrape_configs:
 
       - labels:
           level:
-          caller
+          caller:
 
       - output:
           source: msg
