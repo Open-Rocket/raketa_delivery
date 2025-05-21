@@ -9,7 +9,7 @@ clients:
   - url: http://172.21.0.5:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: raketa_bot_logs
+  - job_name: docker
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
@@ -23,26 +23,11 @@ scrape_configs:
         target_label: __path__
         replacement: /var/lib/docker/containers/$1/$1-json.log
 
-      - target_label: job
-        replacement: raketa_bot_logs
-
       - source_labels: [__meta_docker_container_name]
-        target_label: container_name
+        target_label: container
 
     pipeline_stages:
       - docker: {}
 
-      - regex:
-          expression: '^(?P<logtime>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+\s+-\s+(?P<level>[A-Z]+):\s+(?P<message>.*)'
-
-      - timestamp:
-          source: logtime
-          format: '2006-01-02 15:04:05'
-
       - labels:
-          level:
-          container_name:
-          job:
-
-      - output:
-          source: message
+          container:
