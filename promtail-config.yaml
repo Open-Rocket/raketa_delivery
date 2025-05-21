@@ -26,22 +26,42 @@ scrape_configs:
       - target_label: job
         replacement: raketa_bot_logs
 
-      - target_label: container
-        source_labels: [__meta_docker_container_name] # 💥 добавили обязательный label
+      - source_labels: [__meta_docker_container_name]
+        target_label: container_name
 
     pipeline_stages:
-      - docker: {}
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
 
+      # Удаляем ANSI escape-коды
+      - replace:
+          expression: '(\\u001b\[[0-9;]*m|\n)'
+          replace: ''
+          source: log
+
+      # Парсим структурированные логи приложения
       - regex:
-          expression: 'level=(?P<level>\w+)\s+ts=(?P<ts>[^ ]+)\s+caller=[^ ]+\s+component=[^ ]+\s+msg="(?P<msg>.*)"'
+          expression: '^(?P<logtime>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ - (?P<level>[A-Z]+): (?P<message>.*)'
+          source: log
+
+      # Пропускаем пустые сообщения
+      - drop:
+          expression: '^$'
+          drop_counter_reason: 'empty_message'
 
       - timestamp:
-          source: ts
+          source: time
           format: RFC3339Nano
 
+      # Обязательные метки для Loki
       - labels:
           level:
-          container: # 💥 обязательно пробросим этот label
+          stream:
+          container_name:
+          job:
 
       - output:
-          source: msg
+          source: message
