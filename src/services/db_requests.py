@@ -26,6 +26,7 @@ from src.config import Time, log
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Callable
 from geopy.distance import geodesic
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class CustomerData:
@@ -902,8 +903,16 @@ class CourierData:
                 if not courier:
                     return False
 
-                courier.courier_XP += round(new_XP, 2)
-                courier.total_earned_XP += round(new_XP, 2)
+                xp_to_add = Decimal(str(new_XP)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+
+                courier.courier_XP += xp_to_add
+                courier.total_earned_XP += xp_to_add
+
+                log.info(f"XP курьера {tg_id} обновлён на {xp_to_add}.")
+                log.info(f"Общая сумма XP курьера {tg_id}: {courier.courier_XP}.")
+
                 await session.commit()
                 return True
             except Exception as e:

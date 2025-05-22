@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, Annotated
 from dotenv import load_dotenv
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
-from sqlalchemy import LargeBinary, text
+from sqlalchemy import LargeBinary, Numeric, text
 
 
 from sqlalchemy import create_engine
@@ -230,11 +230,11 @@ class Courier(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
 
     courier_XP: Mapped[floatData] = mapped_column(
-        Float,
+        Numeric(10, 2),
         default=0.0,
     )
     total_earned_XP: Mapped[floatData] = mapped_column(
-        Float,
+        Numeric(10, 2),
         default=0.0,
     )
 

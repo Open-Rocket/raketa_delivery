@@ -33,7 +33,7 @@ handler.setLevel(
 )
 
 # Применяем цветной форматтер
-formatter = ColoredFormatter("\n%(levelname)s: %(message)s\n")
+formatter = ColoredFormatter("%(levelname)s: %(message)s\n")
 handler.setFormatter(formatter)
 
 log.addHandler(handler)

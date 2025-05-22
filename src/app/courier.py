@@ -1537,6 +1537,8 @@ async def complete_order(
 
         new_XP = round((base_order_XP + calculate_distance_XP + calculate_speed_XP), 2)
 
+        log.info(f"XP курьера {tg_id} за заказ {current_order_id}: {new_XP}")
+
         await order_data.update_order_status_and_completed_time(
             order_id=current_order_id,
             courier_username=callback_query.from_user.username,
