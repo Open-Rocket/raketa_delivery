@@ -648,35 +648,45 @@ async def _handle_error_response(
 
 
 @customer_r.callback_query(
-    F.data == "order_sent",
+    F.data == "order_sent_to_create_order",
 )
-async def set_order_to_db(
-    callback_query: CallbackQuery,
-    state: FSMContext,
-):
-    """Обработчик коллбэка 'order_sent' для клиента. Добавляет заказ в БД."""
+async def set_order_to_db(callback_query: CallbackQuery, state: FSMContext):
+    """Обработчик коллбэка 'order_sent_to_create_order' для клиента. Добавляет заказ в БД."""
 
-    current_state = CustomerState.default.state
     tg_id = callback_query.from_user.id
-    state_data = await state.get_data()
-    current_order_info = state_data.get("current_order_info")
-    hide_phone_forma = state_data.get("hide_phone_info")
+    current_state = CustomerState.default.state
 
-    if current_order_info:
-        data, order_forma, hide_phone_forma = [*current_order_info]
-        data: dict
-        order_forma = zlib.compress(order_forma.encode("utf-8"))
-        hide_phone_forma = zlib.compress(hide_phone_forma.encode("utf-8"))
-    else:
-        log.error("Ключ 'current_order_info' отсутствует в состоянии FSM")
+    state_data = await state.get_data()
+
+    # 🔐 Проверка на флаг: если заказ уже создаётся — выходим
+    if state_data.get("order_in_progress"):
         await callback_query.answer(
-            "‼️ Ошибка: данные заказа не найдены.",
-            disable_notification=True,
-            show_alert=True,
+            "⏳ Заказ уже создается. Подождите немного...", show_alert=False
         )
         return
 
+    # 🛡️ Ставим флаг, чтобы защитить от повторного входа
+    await state.update_data(order_in_progress=True)
+
     try:
+        await callback_query.answer("🧾 Создаем заказ ...", show_alert=False)
+        await asyncio.sleep(1)
+
+        current_order_info = state_data.get("current_order_info")
+        hide_phone_forma = state_data.get("hide_phone_info")
+
+        if not current_order_info:
+            log.error("Ключ 'current_order_info' отсутствует в состоянии FSM")
+            await callback_query.answer(
+                "‼️ Ошибка: данные заказа не найдены.",
+                disable_notification=True,
+                show_alert=True,
+            )
+            return
+
+        data, order_forma, hide_phone_forma = [*current_order_info]
+        order_forma = zlib.compress(order_forma.encode("utf-8"))
+        hide_phone_forma = zlib.compress(hide_phone_forma.encode("utf-8"))
 
         order_number = await order_data.create_order(
             tg_id=tg_id,
@@ -697,7 +707,6 @@ async def set_order_to_db(
         )
 
         try:
-
             order_city = data.get("city")
             price_rub = data.get("price")
             description = data.get("description")
@@ -712,10 +721,9 @@ async def set_order_to_db(
                 city=order_city
             )
 
+            add_text = ""
             if int(price_rub) == 0:
                 add_text = "\nЕсли цена не указана, то возможно это поручение, свяжитесь с заказчиком для уточнения деталей."
-            else:
-                add_text = ""
 
             notification_for_couriers = (
                 f"📍 Город: <b>{order_city}</b>\n"
@@ -727,10 +735,10 @@ async def set_order_to_db(
                 f"🚀 <b>Начать работу!</b> — /run"
             )
 
-            for tg_id in all_couriers_tg_ids_in_order_city:
+            for courier_tg_id in all_couriers_tg_ids_in_order_city:
                 try:
                     msg = await courier_bot.send_message(
-                        chat_id=tg_id,
+                        chat_id=courier_tg_id,
                         text=notification_for_couriers,
                         disable_web_page_preview=True,
                         parse_mode="HTML",
@@ -739,39 +747,42 @@ async def set_order_to_db(
                     asyncio.create_task(
                         delete_message_after_delay(
                             courier_bot,
-                            tg_id,
+                            courier_tg_id,
                             msg.message_id,
                             delay=900,
                         )
                     )
                 except Exception as e:
-                    log.error(f"Ошибка при отправке уведомления курьеру {tg_id}: {e}")
+                    log.error(
+                        f"Ошибка при отправке уведомления курьеру {courier_tg_id}: {e}"
+                    )
 
         except Exception as e:
-            log.error(f"Ошибка: {e}")
+            log.error(f"Ошибка при рассылке курьерам: {e}")
+
+        await callback_query.message.answer(
+            text=text,
+            disable_notification=True,
+            parse_mode="HTML",
+        )
+
+        await callback_query.answer("🧾 Заказ создан", show_alert=False)
+        await callback_query.message.delete()
+
+        await customer_data.set_customer_discount(tg_id, 0)
+
+        await state.set_state(current_state)
+        await rediska.set_state(customer_bot_id, tg_id, current_state)
 
     except Exception as e:
         log.error(f"Ошибка при создании заказа: {str(e)}")
-        text = "‼️ Ошибка при создании заказа.\n" "Попробуйте повторить заказ."
         await callback_query.answer(
-            text=text,
-            show_alert=True,
+            "‼️ Ошибка при создании заказа. Попробуйте позже.", show_alert=True
         )
 
-    await callback_query.message.answer(
-        text=text,
-        disable_notification=True,
-        parse_mode="HTML",
-    )
-
-    await callback_query.answer("🧾 Заказ создан", show_alert=False)
-
-    await callback_query.message.delete()
-
-    await customer_data.set_customer_discount(tg_id, 0)
-
-    await state.set_state(current_state)
-    await rediska.set_state(customer_bot_id, tg_id, current_state)
+    finally:
+        # 🧹 Обязательно убираем замок!
+        await state.update_data(order_in_progress=False)
 
 
 @customer_r.callback_query(

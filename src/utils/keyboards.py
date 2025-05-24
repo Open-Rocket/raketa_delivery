@@ -112,7 +112,8 @@ class Keyboard:
                     ],
                     [
                         InlineKeyboardButton(
-                            text="Разместить заказ ✅", callback_data="order_sent"
+                            text="Разместить заказ ✅",
+                            callback_data="order_sent_to_create_order",
                         )
                     ],
                 ]
