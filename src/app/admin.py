@@ -850,7 +850,7 @@ async def call_block_unblock_customer(
                 block_status=True,
             )
             await callback_query.message.answer(
-                text=f"Курьер с ID {customer_id} был заблокирован 🔒",
+                text=f"Курьер с ID {courier_id} был заблокирован 🔒",
                 disable_notification=True,
             )
 
@@ -860,7 +860,7 @@ async def call_block_unblock_customer(
                 block_status=False,
             )
             await callback_query.message.answer(
-                text=f"Курьер с SEED {partner_seed} был разблокирован 🔓",
+                text=f"Курьер с ID {courier_id} был разблокирован 🔓",
                 disable_notification=True,
             )
 
