@@ -2708,8 +2708,8 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
 
     await state.update_data(
         use_XP=use_XP,
-        new_XP=new_XP,
-        new_price=price_rub,
+        new_XP=float(new_XP),
+        new_price=int(price_rub),
     )
     await rediska.save_fsm_state(state, courier_bot_id, tg_id)
 
@@ -2739,7 +2739,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
         prices=prices,
         max_tip_amount=50000,
         start_parameter="",
-        photo_url="https://i.ibb.co/NpQzZyY/subs.jpg",
+        photo_url="https://i.ibb.co/RGvhYyDb/subs.jpg",
         photo_width=1200,
         photo_height=720,
         need_name=False,
@@ -2754,7 +2754,7 @@ async def send_payment_invoice(event: CallbackQuery, state: FSMContext):
                             "description": "Подписка Raketa",
                             "quantity": 1.00,
                             "amount": {
-                                "value": amount_rub,  # Переводим копейки в рубли
+                                "value": float(amount_rub),  # Переводим копейки в рубли
                                 "currency": "RUB",
                             },
                             "vat_code": 1,  # Ставка НДС (1 = 20%)
