@@ -19,6 +19,13 @@ async def delete_message_after_delay(
 
 
 async def notify_couriers_about_orders():
+
+    task_status = await admin_data.get_task_status()
+
+    if not task_status:
+        log.warning("Задача уведомления клиентов отключена в админке")
+        return
+
     couriers = await courier_data.get_all_couriers_tg_ids_notify_status_true()
     city_couriers = defaultdict(list)
 
@@ -54,6 +61,13 @@ async def notify_couriers_about_orders():
 
 
 async def notify_customers_about_couriers():
+
+    task_status = await admin_data.get_task_status()
+
+    if not task_status:
+        log.warning("Задача уведомления клиентов отключена в админке")
+        return
+
     customers = await customer_data.get_all_customers_tg_ids_notify_status_true()
     city_customers = defaultdict(list)
 
@@ -86,6 +100,13 @@ async def notify_customers_about_couriers():
 
 
 async def notify_couriers_about_XP_rewards():
+
+    task_status = await admin_data.get_task_status()
+
+    if not task_status:
+        log.warning("Задача уведомления клиентов отключена в админке")
+        return
+
     now = await Time.get_moscow_time()
     today = now.date()
 

@@ -2598,6 +2598,10 @@ async def _use_XP(
         f"courier_XP: {courier_XP}, applied_XP: {applied_xp}"
     )
 
+    price_rub = float(price_rub)
+    applied_xp = float(applied_xp)
+    new_price_rub = float(new_price_rub)
+
     text = (
         f"🚀 <b>Оплатить подписку</b>\n\n"
         f"Выберите способ оплаты:\n\n"
