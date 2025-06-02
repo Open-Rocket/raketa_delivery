@@ -2507,11 +2507,13 @@ async def get_my_earn_today(
         f"Заработано: <b>{today_earn} руб</b>\n\n"
     )
 
+    reply_kb = await kb.get_courier_kb("go_back")
+
     await callback_query.answer("📊 Ваш заработок за сегодня", show_alert=False)
 
     await callback_query.message.edit_text(
         text,
-        disable_web_page_preview=True,
+        reply_markup=reply_kb,
         parse_mode="HTML",
     )
 
