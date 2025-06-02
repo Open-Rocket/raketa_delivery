@@ -58,6 +58,8 @@ async def cmd_start_customer(
     is_reg = await rediska.is_reg(customer_bot_id, tg_id)
     new_message = None
 
+    _ = await customer_data.check_click_customer(tg_id)
+
     if is_reg:
         current_state = CustomerState.default.state
         await message.answer(

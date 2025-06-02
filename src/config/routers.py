@@ -14,7 +14,6 @@ admin_fallback = Router()
 partner_r = Router()
 partner_fallback = Router()
 
-customer_router_dev = Router()
 
 __all__ = [
     "payment_r",
@@ -26,5 +25,4 @@ __all__ = [
     "admin_fallback",
     "partner_r",
     "partner_fallback",
-    "customer_router_dev",
 ]

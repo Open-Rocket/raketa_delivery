@@ -56,6 +56,8 @@ async def cmd_start_courier(
     is_reg = await rediska.is_reg(courier_bot_id, tg_id)
     new_message = None
 
+    _ = await courier_data.check_click_courier(tg_id)
+
     if is_reg:
         current_state = CourierState.default.state
         await message.answer(
