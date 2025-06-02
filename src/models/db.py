@@ -35,16 +35,15 @@ from sqlalchemy import (
     Float,
     Integer,
 )
-from src.config import Time, db_settings, db_settings_dev
+from src.config import Time, db_settings
 
 
 load_dotenv()
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
 engine = create_async_engine(url=db_settings.DB_URL_asyncpg, echo=False)
-engine_dev = create_async_engine(url=db_settings_dev.DB_URL_asyncpg, echo=False)
 async_session_factory = async_sessionmaker(engine)
-async_session_factory_dev = async_sessionmaker(engine_dev)
+
 
 sync_engine = create_engine(url=db_settings.DB_URL_psycopg2, echo=False)
 sync_session_factory = sessionmaker(sync_engine)

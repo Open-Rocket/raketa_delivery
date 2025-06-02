@@ -36,8 +36,6 @@ from src.services import (
     recognizer,
     seed_maker,
     pdf_creator,
-    # --
-    customer_data_dev,
 )
 from src.models import OrderStatus
 from src.confredis import rediska
