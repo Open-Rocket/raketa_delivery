@@ -175,6 +175,7 @@ async def data_name_customer(
         text=text,
         reply_markup=reply_kb,
         disable_notification=True,
+        disable_web_page_preview=True,
         parse_mode="HTML",
     )
 
@@ -1961,6 +1962,7 @@ async def set_phone(
     await callback_query.message.answer(
         text=text,
         disable_notification=True,
+        disable_web_page_preview=True,
         reply_markup=reply_kb,
         parse_mode="HTML",
     )
