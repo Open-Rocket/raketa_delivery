@@ -583,7 +583,7 @@ class Keyboard:
                         text="Статистика", callback_data="my_statistic"
                     ),
                     InlineKeyboardButton(
-                        text="Заработал за сегодня", callback_data="my_earn_today"
+                        text="💰 Заработал за сегодня", callback_data="my_earn_today"
                     ),
                 ],
                 [
@@ -592,7 +592,8 @@ class Keyboard:
                     #     callback_data="completed_orders",
                     # ),
                     InlineKeyboardButton(
-                        text=f"Активные {active_count}", callback_data="active_orders"
+                        text=f"🚀 Активные {active_count}",
+                        callback_data="active_orders",
                     ),
                 ],
             ]
