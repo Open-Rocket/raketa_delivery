@@ -357,24 +357,11 @@ async def create_redis_service() -> RedisService:
     return RedisService(redis_instance)
 
 
-async def create_redis_service_dev() -> RedisService:
-    """Асинхронная фабрика для создания экземпляра RedisService"""
-    redis_instance = await RedisConfig.create_redis_dev()
-    return RedisService(redis_instance)
-
-
 async def redis_main():
 
     rediska: RedisService = await create_redis_service()
 
     return rediska
-
-
-async def redis_main_dev():
-
-    rediska_dev: RedisService = await create_redis_service_dev()
-
-    return rediska_dev
 
 
 rediska: RedisService = asyncio.run(redis_main())
