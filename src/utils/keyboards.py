@@ -583,7 +583,7 @@ class Keyboard:
                         text="Статистика", callback_data="my_statistic"
                     ),
                     InlineKeyboardButton(
-                        text="💰 Заработал за сегодня", callback_data="my_earn_today"
+                        text="💰 Cегодня", callback_data="my_earn_today"
                     ),
                 ],
                 [
