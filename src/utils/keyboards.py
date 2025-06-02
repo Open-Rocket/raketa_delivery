@@ -578,7 +578,14 @@ class Keyboard:
 
         my_orders_kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Статистика", callback_data="my_statistic")],
+                [
+                    InlineKeyboardButton(
+                        text="Статистика", callback_data="my_statistic"
+                    ),
+                    InlineKeyboardButton(
+                        text="Заработал за сегодня", callback_data="my_earn_today"
+                    ),
+                ],
                 [
                     # InlineKeyboardButton(
                     #     text=f"Завершеные {completed_count}",

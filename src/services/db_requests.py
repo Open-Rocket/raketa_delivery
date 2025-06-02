@@ -716,6 +716,30 @@ class CourierData:
                 )
             return (0,) * 6
 
+    async def get_courier_earned_today(self, tg_id: int) -> float:
+        """Возвращает сумму заработка курьера за сегодня"""
+
+        async with self.async_session_factory() as session:
+            courier = await session.scalar(
+                select(Courier).where(Courier.courier_tg_id == tg_id)
+            )
+            if not courier:
+                return 0.0
+
+            today = (await Time.get_moscow_time()).date()
+            orders = await session.execute(
+                select(Order).where(
+                    Order.courier_id == courier.courier_id,
+                    Order.order_status == OrderStatus.COMPLETED,
+                    func.date(Order.completed_at_moscow_time) == today,
+                )
+            )
+            orders = orders.scalars().all()
+
+            total_earned = sum(order.price_rub for order in orders if order.price_rub)
+
+            return total_earned
+
     async def get_courier_active_orders_count(self, tg_id: int) -> int:
         """Возвращает количество активных заказов у курьера"""
 

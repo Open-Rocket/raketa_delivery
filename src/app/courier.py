@@ -2481,6 +2481,44 @@ async def get_courier_statistic(
     )
 
 
+@courier_r.callback_query(
+    F.data == "my_earn_today",
+)
+async def get_my_earn_today(
+    callback_query: CallbackQuery,
+    state: FSMContext,
+):
+    """Обрабатывает запрос на получение заработка курьера за сегодня. my_earn_today"""
+
+    tg_id = callback_query.from_user.id
+    current_state = CourierState.default.state
+
+    today_earn = await courier_data.get_courier_earned_today(tg_id)
+
+    if today_earn is None:
+        await callback_query.answer(
+            "Не удалось получить данные о заработке за сегодня.",
+            show_alert=True,
+        )
+        return
+
+    text = (
+        f"💰 <b>Ваш заработок за сегодня:</b>\n\n"
+        f"Заработано: <b>{today_earn} руб</b>\n\n"
+    )
+
+    await callback_query.answer("📊 Ваш заработок за сегодня", show_alert=False)
+
+    await callback_query.message.edit_text(
+        text,
+        disable_web_page_preview=True,
+        parse_mode="HTML",
+    )
+
+    await state.set_state(current_state)
+    await rediska.set_state(courier_bot_id, tg_id, current_state)
+
+
 # ---
 # ---
 
