@@ -168,6 +168,7 @@ async def data_name_customer(
         f"в случае необходимости, пожалуйста, нажмите на кнопку 'Поделиться номером'!\n\n"
         f"<i>*Нажмите на значок команд рядом с полем ввода, справа ->.</i>\n\n"
         f"<b>⚡️ Отправка номера возможно только по клику на кнопку 'Поделиться номером'!</b>\n\n"
+        f"<i>Если у вас возникли сложности с отправкой посмотрите</i> <a href='https://t.me/ruslanrocketman/43'>инструкцию</a>\n\n"
         f"<b>Ваш номер:</b>"
     )
     new_message = await message.answer(
@@ -1952,7 +1953,11 @@ async def set_phone(
     tg_id = callback_query.from_user.id
 
     reply_kb = await kb.get_customer_kb("phone_number")
-    text = f"Изменить данные профиля.\n\n" f"<b>Ваш Телефон:</b>"
+    text = (
+        f"Изменить данные профиля.\n\n"
+        f"<i>Если у вас возникли сложности с отправкой посмотрите</i> <a href='https://t.me/ruslanrocketman/43'>инструкцию</a>\n\n"
+        f"<b>Ваш Телефон:</b>"
+    )
     await callback_query.message.answer(
         text=text,
         disable_notification=True,
