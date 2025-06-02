@@ -35,15 +35,16 @@ from sqlalchemy import (
     Float,
     Integer,
 )
-from src.config import Time, db_settings
+from src.config import Time, db_settings, db_settings_dev
 
 
 load_dotenv()
 
 sqlalchemy_url = os.getenv("SQLALCHEMY_URL")
 engine = create_async_engine(url=db_settings.DB_URL_asyncpg, echo=False)
+engine_dev = create_async_engine(url=db_settings_dev.DB_URL_asyncpg, echo=False)
 async_session_factory = async_sessionmaker(engine)
-
+async_session_factory_dev = async_sessionmaker(engine_dev)
 
 sync_engine = create_engine(url=db_settings.DB_URL_psycopg2, echo=False)
 sync_session_factory = sessionmaker(sync_engine)
@@ -420,9 +421,28 @@ class Payment(Base):
     payer = relationship("Courier", back_populates="payment")
 
 
+class CustomerClicks(Base):
+    __tablename__ = "customer_clicks"
+
+    click_id: Mapped[intPK]
+
+    customer_tg_id: Mapped[big_intDataUnique]
+    click_date: Mapped[datetimeData] = mapped_column(DateTime, nullable=False)
+
+
+class CourierClicks(Base):
+    __tablename__ = "courier_clicks"
+
+    click_id: Mapped[intPK]
+
+    courier_tg_id: Mapped[big_intDataUnique]
+    click_date: Mapped[datetimeData] = mapped_column(DateTime, nullable=False)
+
+
 __all__ = [
     "async_session_factory",
     "sync_session_factory",
+    "async_session_factory_dev",
     "Customer",
     "Courier",
     "Admin",
@@ -437,4 +457,7 @@ __all__ = [
     "EarnRequest",
     "engine",
     "Base",
+    "CustomerClicks",
+    "CourierClicks",
+    "engine_dev",
 ]

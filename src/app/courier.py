@@ -84,6 +84,13 @@ async def cmd_start_courier(
             parse_mode="HTML",
         )
 
+        check_click_courier = await courier_data.check_click_courier(
+            tg_id=tg_id,
+        )
+
+        if check_click_courier:
+            log.info(f"Курьер {tg_id} нажал по кнопке /start")
+
     await state.set_state(current_state)
     await rediska.set_state(courier_bot_id, tg_id, current_state)
 

@@ -15,6 +15,8 @@ from src.models import (
     RefundStatus,
     Order,
     Subscription,
+    CustomerClicks,
+    CourierClicks,
 )
 from sqlalchemy import select, delete, func
 from sqlalchemy.orm import selectinload
@@ -279,6 +281,23 @@ class CustomerData:
             return False
 
     # ---
+
+    async def check_click_customer(self, tg_id: int) -> bool:
+        """Сохраняет tg_id клиента в бд при первом взаимодействии с ботом"""
+        async with self.async_session_factory() as session:
+            try:
+                new_customer_click = CustomerClicks(
+                    customer_tg_id=tg_id,
+                    click_date=await Time.get_moscow_time(),
+                )
+                session.add(new_customer_click)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении первого клика клиента: {e}")
+                return False
 
 
 class CourierData:
@@ -1027,6 +1046,23 @@ class CourierData:
             return total_earned_XP
 
     # ---
+
+    async def check_click_courier(self, tg_id: int) -> bool:
+        """Сохраняет tg_id курьера в бд при первом взаимодействии с ботом"""
+        async with self.async_session_factory() as session:
+            try:
+                new_courier_click = CourierClicks(
+                    courier_tg_id=tg_id,
+                    click_date=await Time.get_moscow_time(),
+                )
+                session.add(new_courier_click)
+                await session.flush()
+                await session.commit()
+                return True
+            except Exception as e:
+                await session.rollback()
+                log.error(f"Ошибка при добавлении первого клика курьера: {e}")
+                return False
 
 
 class AdminData:

@@ -1,5 +1,5 @@
 from .clock import Time
-from .db import db_settings
+from .db import db_settings, db_settings_dev
 
 from .db_alembic import db_settings_alembic
 from .logger import log
@@ -17,6 +17,7 @@ from .routers import (
     admin_fallback,
     partner_r,
     partner_fallback,
+    customer_router_dev,
 )
 from .bots import (
     DOMAIN,
@@ -46,6 +47,13 @@ from .bots import (
     courier_bot_secret,
     admin_bot_secret,
     partner_bot_secret,
+)
+
+from .bots_dev import (
+    customer_bot_dev,
+    customer_bot_id_dev,
+    customer_dp_dev,
+    fsm_customer_storage_dev,
 )
 
 __all__ = [
@@ -99,4 +107,9 @@ __all__ = [
     "admin_bot_secret",
     "partner_bot_secret",
     "accepted_users",
+    "customer_bot_dev",
+    "customer_bot_id_dev",
+    "customer_dp_dev",
+    "fsm_customer_storage_dev",
+    "db_settings_dev",
 ]

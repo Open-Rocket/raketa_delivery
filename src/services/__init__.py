@@ -9,6 +9,9 @@ from .db_requests import (
     admin_data,
     partner_data,
 )
+from .db_requests_dev import (
+    customer_data_dev,
+)
 from .fuzzy import cities, cities_2, find_closest_city
 from .seed import seed_maker
 from .pdf_creator import pdf_creator
@@ -30,4 +33,6 @@ __all__ = [
     "find_closest_city",
     "seed_maker",
     "pdf_creator",
+    # --
+    "customer_data_dev",
 ]

@@ -1,2 +1,2 @@
 source .venv/bin/activate
-python run.py
+python run_customer_dev.py

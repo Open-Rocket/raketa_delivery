@@ -36,6 +36,8 @@ from src.services import (
     recognizer,
     seed_maker,
     pdf_creator,
+    # --
+    customer_data_dev,
 )
 from src.models import OrderStatus
 from src.confredis import rediska
@@ -62,6 +64,12 @@ from src.config import (
     partner_fallback,
     payment_provider,
     log,
+    # --
+    customer_bot_dev,
+    customer_bot_id_dev,
+    customer_dp_dev,
+    fsm_customer_storage_dev,
+    customer_router_dev,
 )
 from aiogram.types import Message, CallbackQuery, PreCheckoutQuery, BufferedInputFile
 from src.utils import (
@@ -158,4 +166,11 @@ __all__ = [
     "delete_message_after_delay",
     "RESTRICTED_COMMANDS_COURIER",
     "accepted_users",
+    # --
+    "customer_bot_dev",
+    "customer_bot_id_dev",
+    "customer_dp_dev",
+    "fsm_customer_storage_dev",
+    "customer_router_dev",
+    "customer_data_dev",
 ]
