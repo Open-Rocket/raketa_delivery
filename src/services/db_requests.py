@@ -283,15 +283,20 @@ class CustomerData:
     # ---
 
     async def check_click_customer(self, tg_id: int) -> bool:
-        """Сохраняет tg_id клиента в бд при первом взаимодействии с ботом"""
+        """Сохраняет tg_id клиента в БД при первом взаимодействии с ботом"""
         async with self.async_session_factory() as session:
             try:
+                existing = await session.execute(
+                    select(CustomerClicks).where(CustomerClicks.customer_tg_id == tg_id)
+                )
+                if existing.scalar():
+                    return False  # Уже кликал — ничего не делаем
+
                 new_customer_click = CustomerClicks(
                     customer_tg_id=tg_id,
                     click_date=await Time.get_moscow_time(),
                 )
                 session.add(new_customer_click)
-                await session.flush()
                 await session.commit()
                 return True
             except Exception as e:
@@ -1048,15 +1053,20 @@ class CourierData:
     # ---
 
     async def check_click_courier(self, tg_id: int) -> bool:
-        """Сохраняет tg_id курьера в бд при первом взаимодействии с ботом"""
+        """Сохраняет tg_id курьера в БД при первом взаимодействии с ботом"""
         async with self.async_session_factory() as session:
             try:
+                existing = await session.execute(
+                    select(CourierClicks).where(CourierClicks.courier_tg_id == tg_id)
+                )
+                if existing.scalar():
+                    return False  # Уже кликал — ничего не делаем
+
                 new_courier_click = CourierClicks(
                     courier_tg_id=tg_id,
                     click_date=await Time.get_moscow_time(),
                 )
                 session.add(new_courier_click)
-                await session.flush()
                 await session.commit()
                 return True
             except Exception as e:
